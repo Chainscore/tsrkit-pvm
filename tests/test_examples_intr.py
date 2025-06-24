@@ -44,10 +44,34 @@ def test_add_jump():
     program = Program.decode_from(bytecode)[0]
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    gas = 1000000
+    gas = 1_000_000
     start_time = time.time_ns()
     ret = PVM.execute(program, 0, gas, regs, Memory({}, [i for i in range(10)], [i for i in range(10)]))
     assert ret[0] == ExecutionStatus.OUT_OF_GAS
     end_time = time.time_ns()
     print(f"PVM - CGOI: {1000 * gas/(end_time - start_time)} gas/us")
+
+
+def test_add_jump_loop_1_000_000():
+    """
+    Benchmarking a looped add and jump program
+
+    21Jun25:
+    - python:   0 gas/us
+    - pypy3:    0 gas/us
+
+    --------------------------------
     
+    """
+    bytecode = bytes([0,0,26,51,0,51,1,64,66,15,40,2,149,0,1,171,16,253,20,3,239,190,173,222,0,0,0,0,0,133,146,0,2])
+    program = Program.decode(bytecode)
+    regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    gas = 1000000000000
+    start_time = time.time_ns()
+    ret = PVM.execute(program, 0, gas, regs, Memory({}, [], []))
+    assert ret[0] == ExecutionStatus.OUT_OF_GAS
+    end_time = time.time_ns()
+    print(f"PVM - CGOI: {1000 * gas/(end_time - start_time)} gas/us")
+
+   

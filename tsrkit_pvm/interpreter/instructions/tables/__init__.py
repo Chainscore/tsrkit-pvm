@@ -1,24 +1,24 @@
-from jam.execution.pvm.instructions.tables.i_imm import InstructionsWArgs1Imm
-from jam.execution.pvm.instructions.tables.i_offset import WArgsOneOffset
-from jam.execution.pvm.instructions.tables.i_reg_i_ewimm import (
+from .i_imm import InstructionsWArgs1Imm
+from .i_offset import WArgsOneOffset
+from .i_reg_i_ewimm import (
     InstructionsWArgs1Imm1EwImm,
 )
-from jam.execution.pvm.instructions.tables.i_reg_i_imm import InstructionsWArgs1Reg1Imm
-from jam.execution.pvm.instructions.tables.i_reg_i_imm_i_offset import (
+from .i_reg_i_imm import InstructionsWArgs1Reg1Imm
+from .i_reg_i_imm_i_offset import (
     InstructionsWArgs1Reg1Imm1Offset,
 )
-from jam.execution.pvm.instructions.tables.i_reg_ii_imm import InstructionsWArgs1Reg2Imm
-from jam.execution.pvm.instructions.tables.ii_imm import InstructionsWArgs2Imm
-from jam.execution.pvm.instructions.tables.ii_reg import InstructionsWArgs2Reg
-from jam.execution.pvm.instructions.tables.ii_reg_i_imm import InstructionsWArgs2Reg1Imm
-from jam.execution.pvm.instructions.tables.ii_reg_i_offset import (
+from .i_reg_ii_imm import InstructionsWArgs1Reg2Imm
+from .ii_imm import InstructionsWArgs2Imm
+from .ii_reg import InstructionsWArgs2Reg
+from .ii_reg_i_imm import InstructionsWArgs2Reg1Imm
+from .ii_reg_i_offset import (
     InstructionsWArgs2Reg1Offset,
 )
-from jam.execution.pvm.instructions.tables.ii_reg_ii_imm import (
+from .ii_reg_ii_imm import (
     InstructionsWArgs2Reg2Imm,
 )
-from jam.execution.pvm.instructions.tables.iii_reg import InstructionsWArgs3Reg
-from jam.execution.pvm.instructions.tables.wo_args import InstructionsWoArgs
+from .iii_reg import InstructionsWArgs3Reg
+from .wo_args import InstructionsWoArgs
 
 __all__ = [
     "InstructionsWArgs1Imm",
