@@ -28,3 +28,26 @@ def test_benched_cgoi_interpreter():
     assert ret[0] == ExecutionStatus.OUT_OF_GAS
     end_time = time.time_ns()
     print(f"PVM - CGOI: {1000 * gas/(end_time - start_time)} gas/us")
+
+def test_add_jump():
+    """
+    Benchmarking a simple infinite add and jump program
+
+    21Jun25:
+    - python:   0.6783694440694569 gas/us
+    - pypy3:     16.06864525251876 gas/us
+
+    --------------------------------
+    
+    """
+    bytecode = bytes([0,0,14,40,2,200,50,1,40,2,200,67,2,51,1,40,246,165,20])
+    program = Program.decode_from(bytecode)[0]
+    regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    gas = 1000000
+    start_time = time.time_ns()
+    ret = PVM.execute(program, 0, gas, regs, Memory({}, [i for i in range(10)], [i for i in range(10)]))
+    assert ret[0] == ExecutionStatus.OUT_OF_GAS
+    end_time = time.time_ns()
+    print(f"PVM - CGOI: {1000 * gas/(end_time - start_time)} gas/us")
+    
