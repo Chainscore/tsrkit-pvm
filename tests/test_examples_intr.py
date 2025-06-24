@@ -34,7 +34,7 @@ def test_add_jump():
     Benchmarking a simple infinite add and jump program
 
     21Jun25:
-    - python:   0.6783694440694569 gas/us
+    - python:    0.6783694440694569 gas/us
     - pypy3:     16.06864525251876 gas/us
 
     --------------------------------
@@ -49,16 +49,16 @@ def test_add_jump():
     ret = PVM.execute(program, 0, gas, regs, Memory({}, [i for i in range(10)], [i for i in range(10)]))
     assert ret[0] == ExecutionStatus.OUT_OF_GAS
     end_time = time.time_ns()
-    print(f"PVM - CGOI: {1000 * gas/(end_time - start_time)} gas/us")
+    print(f"PVM - ADD JUMP GAS EXAUST {gas}: {1000 * gas/(end_time - start_time)} gas/us")
 
 
 def test_add_jump_loop_1_000_000():
     """
     Benchmarking a looped add and jump program
 
-    21Jun25:
-    - python:   0 gas/us
-    - pypy3:    0 gas/us
+    24Jun25:
+    - python:   0.6251248025962577 gas/us
+    - pypy3:    NA gas/us
 
     --------------------------------
     
@@ -67,11 +67,11 @@ def test_add_jump_loop_1_000_000():
     program = Program.decode(bytecode)
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    gas = 1000000000000
+    gas = 1_000_000_000
     start_time = time.time_ns()
     ret = PVM.execute(program, 0, gas, regs, Memory({}, [], []))
-    assert ret[0] == ExecutionStatus.OUT_OF_GAS
+    assert ret[0] == ExecutionStatus.PANIC
     end_time = time.time_ns()
-    print(f"PVM - CGOI: {1000 * gas/(end_time - start_time)} gas/us")
-
-   
+    gas_consumed = gas - ret[2]
+    print(f"Gas consumed:", gas_consumed)
+    print(f"PVM - ADD LOOP 1,000,000: {1000 * gas_consumed/(end_time - start_time)} gas/us | Total time {(end_time - start_time) / (10**6)} ms")
