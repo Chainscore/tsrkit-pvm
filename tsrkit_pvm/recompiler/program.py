@@ -85,7 +85,7 @@ class Program(Codable):
         self._basic_blocks_set = set(self.basic_blocks)
 
 
-    def assemble(self) -> bytes:
+    def assemble(self, program_counter: int) -> Tuple[bytes, int]:
         asm = PyAssembler()
         
         # Create labels for all basic blocks (jump targets)
@@ -98,7 +98,10 @@ class Program(Codable):
         asm_ctx = AssemblerContext(asm, labels)
 
         counter = 0
+        msn_pc_offset = 0 
         while counter < len(self.instruction_set):
+            if counter == program_counter:
+                msn_pc_offset = asm.len()
             if self.offset_bitmask[counter]:  # Only process actual opcodes
                 # Define label if this is a basic block start
                 if counter in labels:
@@ -109,7 +112,9 @@ class Program(Codable):
                 inst_map.assemble_instruction(opcode, self, counter, asm_ctx)
             counter += 1
 
-        return asm.finalize()
+        asm.ret()
+
+        return asm.finalize(), msn_pc_offset
 
 
     def _precompute_skip_values(self):

@@ -18,7 +18,8 @@ def test_add_jump_loop_1_000_000():
     program = Program.decode(bytecode)
 
     PVM.execute(
-        program, 
-        [0, 100_000_000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+        program,
+        0,
+        [0, 1_000_000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
         100000
     )

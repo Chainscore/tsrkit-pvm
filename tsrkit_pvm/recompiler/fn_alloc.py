@@ -27,5 +27,6 @@ def allocate_executable_memory(code):
     if res != 0:
         err = ctypes.get_errno()
         raise OSError(err, "mprotect failed to set RX permissions")
-
+    
+    print(f"Executable of size {size} stored at {addr}")
     return buf, addr

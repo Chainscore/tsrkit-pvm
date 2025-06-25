@@ -41,5 +41,5 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
     def add_imm_64(self, asm):
         """Generate x86 code for PVM add_imm_64 instruction"""
         # Load rb into ra, then add immediate
-        asm.mov_reg(64, r_map[self.rb], r_map[self.ra])  # mov ra, rb  
+        asm.mov_reg(64, r_map[self.ra], r_map[self.rb])  # mov ra, rb  
         asm.add_imm(r_map[self.ra], self.vx)  # add ra, vx
