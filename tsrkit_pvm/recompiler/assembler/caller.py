@@ -10,7 +10,7 @@ def create_caller(code_pointer: int, vm_pointer: int):
     asm = PyAssembler()
     
     # Save RCX, RBX, RBP, R15
-    regs_to_save = [1, 3, 5, 15]
+    regs_to_save = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     for i in regs_to_save:
         asm.push(i)
 
@@ -34,7 +34,7 @@ def create_caller(code_pointer: int, vm_pointer: int):
     for key, val in r_map.items():
         asm.store(8, 0, 64, R15, key * 8, val)
     
-    for i in regs_to_save:
+    for i in reversed(regs_to_save):
         asm.pop(i)
     
     asm.ret()

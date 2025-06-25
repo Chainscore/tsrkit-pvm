@@ -1,0 +1,4 @@
+[submodule "tests/ext"]
+	path = tests/ext
+	url = https://github.com/koute/jamtestvectors.git
+	branch = master_pvm_initial

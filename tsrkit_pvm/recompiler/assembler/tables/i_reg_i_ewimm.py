@@ -22,6 +22,5 @@ class InstructionsWArgs1Imm1EwImm(InstructionTable):
         }
 
     def load_imm_64(self, asm):
-        """Generate x86 code for PVM load_imm_64 instruction"""
         # Load 64-bit immediate value into register
         asm.mov_imm64(r_map[self.ra], self.vx)  # mov ra, vx (64-bit)
