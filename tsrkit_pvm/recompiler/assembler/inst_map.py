@@ -63,7 +63,7 @@ class InstTableMap:
         self._gas_costs = bytes(gas_tmp)
         self._terminating_mask = term_mask
     
-    def execute_instruction(
+    def assemble_instruction(
         self, 
         opcode: int, 
         program, 
