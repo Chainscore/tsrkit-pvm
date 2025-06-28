@@ -33,7 +33,7 @@ class WArgsOneOffset(InstructionTable):
         """Generate x86 code for PVM jump instruction"""
         # Get the target address and find the corresponding label
         target_addr = self.vx
-        if hasattr(asm, 'labels') and target_addr in asm.labels:
+        if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jmp_label32(target_label)
         else:

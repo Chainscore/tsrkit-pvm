@@ -36,7 +36,6 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
 
             
     def load_imm(self, asm):
-        """Generate x86 code for PVM load_imm instruction"""
         # Load immediate value into register
-        asm.mov_imm32(r_map[self.ra], self.vx & 0xFFFFFFFF)  # mov ra, vx (32-bit)
+        asm.mov_imm64(r_map[self.ra], self.vx)  # mov ra, vx
     

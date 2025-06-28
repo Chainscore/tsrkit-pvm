@@ -1,25 +1,25 @@
 import ctypes
 import mmap
 from tsrkit_types import TypedArray, structure, U64
+from tsrkit_asm import Reg 
 
 num_reg = 13
 
-r_map = {
-    0: 7, # RAX
-    1: 0, # RCX
-    2: 6, # RDX
-    3: 3, # RBX
-    4: 2, # RSP
-    5: 5, # RBP
-    6: 8,   # RSI
-    7: 9,   # RDI
-    8: 10,  # R8
-    9: 11,  # R9
-    10: 12, # R10
-    11: 13, # R11
-    12: 14  # R12
-}
-
+r_map = [
+    Reg.rdi, 
+    Reg.rax, 
+    Reg.rsi, 
+    Reg.rbx, 
+    Reg.rdi, 
+    Reg.rbp, 
+    Reg.r8, 
+    Reg.r9, 
+    Reg.r10, 
+    Reg.r11, 
+    Reg.r12, 
+    Reg.r13, 
+    Reg.r14
+]
 
 @structure
 class VMContext:

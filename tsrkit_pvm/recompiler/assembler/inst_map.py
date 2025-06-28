@@ -12,8 +12,6 @@ from .tables.i_reg_i_ewimm import InstructionsWArgs1Imm1EwImm
 from .tables.i_reg_i_imm import InstructionsWArgs1Reg1Imm
 from .tables.ii_reg_i_imm import InstructionsWArgs2Reg1Imm
 from .tables.ii_reg_i_offset import InstructionsWArgs2Reg1Offset
-
-# Import all instruction table classes
 from .tables.wo_args import InstructionsWoArgs
 
 

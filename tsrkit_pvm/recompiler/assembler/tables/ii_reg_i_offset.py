@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict
 
 from tsrkit_pvm.interpreter.utils import z
-
+from tsrkit_asm import Operands, Condition, RegMem, Size
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
 from ...vm_context import r_map
@@ -39,15 +39,20 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
         }
 
     def branch_ne(self, asm):
-        """Generate x86 code for PVM branch_ne instruction"""
-        # Compare registers and branch if not equal
-        asm.cmp(64, r_map[self.ra], r_map[self.rb])  # cmp ra, rb
+        """Compare registers and branch if not equal"""
+        asm.cmp(
+                Operands.RegMem_Reg(
+                size=Size.U64, 
+                reg_mem=RegMem.Reg(r_map[self.rb]), 
+                reg=r_map[self.ra]
+            )
+        )
         
         # Get the target address and find the corresponding label
         target_addr = self.vx
-        if hasattr(asm, 'labels') and target_addr in asm.labels:
+        if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
-            asm.jne_label32(target_label)  # jne target_label
+            asm.jcc_label32(Condition.NotEqual, target_label)  # jne target_label
         else:
             # Fallback if label not found
             asm.ud2()  # This shouldn't happen in a well-formed program

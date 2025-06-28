@@ -8,9 +8,7 @@ from tsrkit_types.itf.codable import Codable
 from ..interpreter.constants import PVM_ADDR_ALIGNMENT
 from .assembler.inst_map import inst_map
 from ..interpreter.status import CONTINUE, HALT, PANIC, ExecutionStatus, PvmError
-from py_asm import *
-from py_asm import LOAD_U64
-
+from tsrkit_asm import PyAssembler
 
 class AssemblerContext:
     """Wrapper for Assembler to contain labels"""

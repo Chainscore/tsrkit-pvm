@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict
 
 from tsrkit_pvm.interpreter.utils import chi
-
+from tsrkit_asm import Operands, RegMem, ImmKind, Size, RegSize 
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
 from ...vm_context import r_map
@@ -39,7 +39,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
        }
 
     def add_imm_64(self, asm):
-        """Generate x86 code for PVM add_imm_64 instruction"""
-        # Load rb into ra, then add immediate
-        asm.mov_reg(64, r_map[self.ra], r_map[self.rb])  # mov ra, rb  
-        asm.add_imm(r_map[self.ra], self.vx)  # add ra, vx
+        """ra = rb + vx"""
+        # Load rb into ra 
+        asm.mov(size=RegSize.R64, a=r_map[self.ra], b=r_map[self.rb])  
+        # Add vx to rb 
+        asm.add(Operands.RegMem_Imm(reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)))
+        
