@@ -15,6 +15,8 @@ def fetch_vectors(pattern: str):
 
 def test_pvm_vectors():
     pattern = "inst_add_imm_64*.json"
+
+    print(PVM_ROOT)
     for name, vector in fetch_vectors(pattern):
         print(f"\n ⏭️Running test case {name} ...")
         print("\nProcessing test case: ", vector["name"])

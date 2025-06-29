@@ -26,10 +26,15 @@ class PVM:
         vm_ctx = VMContext(regs=TypedArray[U64, 13]([U64(i) for i in registers]), gas=U64(gas))
         vm_buf, vm_pointer = vm_ctx.store()
 
+        # Ensure program has memory attribute from test harness
+        mem_pointer = 0
+        if hasattr(program, "mem") and getattr(program, "mem") is not None:
+            mem_pointer = program.mem.offset
+
         print("INITIAL VM", VMContext.decode(vm_buf))
     
         # Create callable function
-        func = create_caller(code_pointer + msn_pc_offset, vm_pointer)
+        func = create_caller(code_pointer + msn_pc_offset, vm_pointer, mem_pointer)
         
         # Execute the compiled code
         print("Executing compiled PVM code...")

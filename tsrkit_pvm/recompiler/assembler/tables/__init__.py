@@ -3,7 +3,13 @@ from .i_reg_i_ewimm import InstructionsWArgs1Imm1EwImm
 from .i_reg_i_imm import InstructionsWArgs1Reg1Imm
 from .ii_reg_i_imm import InstructionsWArgs2Reg1Imm
 from .ii_reg_i_offset import InstructionsWArgs2Reg1Offset
+from .ii_imm import InstructionsWArgs2Imm
 from .wo_args import InstructionsWoArgs
+from .i_imm import InstructionsWArgs1Imm
+from .i_reg_ii_imm import InstructionsWArgs1Reg2Imm
+from .ii_reg import InstructionsWArgs2Reg
+from .ii_reg_ii_imm import InstructionsWArgs2Reg2Imm
+from .iii_reg import InstructionsWArgs3Reg
 
 __all__ = [
     "WArgsOneOffset",
@@ -11,5 +17,11 @@ __all__ = [
     "InstructionsWArgs1Reg1Imm",
     "InstructionsWArgs2Reg1Imm",
     "InstructionsWArgs2Reg1Offset",
+    "InstructionsWArgs2Imm",
     "InstructionsWoArgs",
+    "InstructionsWArgs1Imm",
+    "InstructionsWArgs1Reg2Imm",
+    "InstructionsWArgs2Reg",
+    "InstructionsWArgs2Reg2Imm",
+    "InstructionsWArgs3Reg",
 ]

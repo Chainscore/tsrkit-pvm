@@ -3,7 +3,7 @@ from tsrkit_pvm.recompiler.fn_alloc import allocate_executable_memory
 import ctypes
 from tsrkit_pvm.recompiler.vm_context import r_map
 
-def create_caller(code_pointer: int, vm_pointer: int):
+def create_caller(code_pointer: int, vm_pointer: int, mem_pointer: int):
     asm = PyAssembler()
     
     # Save all registers
@@ -12,7 +12,8 @@ def create_caller(code_pointer: int, vm_pointer: int):
 
     # RCX –> code pointer,  R15 –> pointer to VMContext struct
     asm.mov_imm64(Reg.rcx, code_pointer)
-    asm.mov_imm64(Reg.r15, vm_pointer)
+    asm.mov_imm64(Reg.r15, vm_pointer)       # VMContext pointer
+    asm.mov_imm64(Reg.r14, mem_pointer)      # Base pointer to linear PVM memory
 
     # ----------------------------------------------------------
     # Guest-register mapping
