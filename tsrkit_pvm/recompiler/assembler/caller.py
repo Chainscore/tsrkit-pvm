@@ -3,7 +3,7 @@ from tsrkit_pvm.recompiler.fn_alloc import allocate_executable_memory
 import ctypes
 from tsrkit_pvm.recompiler.vm_context import r_map
 
-def create_caller(code_pointer: int, vm_pointer: int, mem_pointer: int):
+def create_caller(code_pointer: int, mem_pointer: int):
     asm = PyAssembler()
     
     # Save all registers
@@ -12,8 +12,7 @@ def create_caller(code_pointer: int, vm_pointer: int, mem_pointer: int):
 
     # RCX –> code pointer,  R15 –> pointer to VMContext struct
     asm.mov_imm64(Reg.rcx, code_pointer)
-    asm.mov_imm64(Reg.r15, vm_pointer)       # VMContext pointer
-    asm.mov_imm64(Reg.r14, mem_pointer)      # Base pointer to linear PVM memory
+    asm.mov_imm64(Reg.r15, mem_pointer)      # Base pointer to linear PVM memory
 
     # ----------------------------------------------------------
     # Guest-register mapping
@@ -23,7 +22,13 @@ def create_caller(code_pointer: int, vm_pointer: int, mem_pointer: int):
         asm.load(
             kind=LoadKind.U64, 
             reg=reg, 
-            mem=MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset= i*8)
+            mem=MemOp.BaseOffset(
+                seg=None, 
+                size=RegSize.R64, 
+                base=Reg.r15,
+                # Reversed 13 registers, and gas 
+                offset=(-(13-i)*8 - 8)
+            )
         )
 
     # call the generated program
@@ -35,7 +40,12 @@ def create_caller(code_pointer: int, vm_pointer: int, mem_pointer: int):
     for i, reg in enumerate(r_map):        
         asm.store(
             size=Size.U64, 
-            mem=MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset= i*8), 
+            mem=MemOp.BaseOffset(
+                seg=None, 
+                size=RegSize.R64, 
+                base=Reg.r15, 
+                offset=(-(13 - i)*8 - 8)
+            ), 
             reg=reg
         )
     

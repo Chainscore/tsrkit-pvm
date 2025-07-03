@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from tsrkit_pvm.recompiler.memory import Memory
+from tsrkit_pvm.recompiler.memory import GuestMemory
 from tsrkit_pvm.recompiler.program import Program
 from tsrkit_pvm.recompiler.pvm import PVM
 
@@ -16,17 +16,17 @@ def fetch_vectors(pattern: str):
 def test_pvm_vectors():
     pattern = "inst_add_imm_64*.json"
 
-    print(PVM_ROOT)
     for name, vector in fetch_vectors(pattern):
         print(f"\n ⏭️Running test case {name} ...")
         print("\nProcessing test case: ", vector["name"])
         
 
         program = Program.decode(bytes(vector["program"]))
-        program.mem = Memory.from_initial(vector["initial-page-map"], vector["initial-memory"])
+        mem = GuestMemory.from_initial(vector["initial-page-map"], vector["initial-memory"])
 
         _, counter, rem_gas, registers = PVM.execute(
             program,
+            mem,
             int(vector["initial-pc"]),
             vector["initial-regs"],
             int(vector["initial-gas"])

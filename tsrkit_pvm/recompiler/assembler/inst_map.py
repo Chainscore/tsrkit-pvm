@@ -97,7 +97,7 @@ class InstTableMap:
         if handler is None:
             raise ValueError("Recompiler: Invalid opcode")
         
-        table_instance = handler.table_class(counter=program_counter, program=program)
+        table_instance = handler.table_class( counter=program_counter, program=program)
         return handler.fn(table_instance, asm)
     
     def get_gas_cost(self, opcode: int) -> int:

@@ -40,7 +40,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def add_imm_64(self, asm):
         """ra = rb + vx"""
-        # Load rb into ra 
+        
+       # Load rb into ra 
         asm.mov(size=RegSize.R64, a=r_map[self.ra], b=r_map[self.rb])  
         # Add vx to rb 
         asm.add(Operands.RegMem_Imm(reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)))

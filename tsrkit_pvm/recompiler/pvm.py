@@ -1,5 +1,6 @@
 from typing import Tuple
 from tsrkit_types import U64, TypedArray
+from tsrkit_pvm.recompiler.memory import GuestMemory
 from tsrkit_pvm.recompiler.program import Program
 from tsrkit_pvm.recompiler.assembler.caller import create_caller
 from tsrkit_pvm.recompiler.fn_alloc import allocate_executable_memory
@@ -12,6 +13,7 @@ class PVM:
     @staticmethod
     def execute(
         program: Program,
+        memory: GuestMemory,
         program_counter: int,
         registers: list[int],
         gas: int
@@ -24,28 +26,23 @@ class PVM:
 
         # Vm Context
         vm_ctx = VMContext(regs=TypedArray[U64, 13]([U64(i) for i in registers]), gas=U64(gas))
-        vm_buf, vm_pointer = vm_ctx.store()
+        vm_pointer = vm_ctx.store(memory)
 
-        # Ensure program has memory attribute from test harness
-        mem_pointer = 0
-        if hasattr(program, "mem") and getattr(program, "mem") is not None:
-            mem_pointer = program.mem.offset
-
-        print("INITIAL VM", VMContext.decode(vm_buf))
+        print("INITIAL VM", VMContext.from_pointer(vm_pointer))
     
         # Create callable function
-        func = create_caller(code_pointer + msn_pc_offset, vm_pointer, mem_pointer)
+        func = create_caller(code_pointer + msn_pc_offset, memory.offset)
         
         # Execute the compiled code
         print("Executing compiled PVM code...")
         result = func()
         print(f"Execution taken {(time.time_ns() - start_time_ns) / (10**6)} ms")
         
-        vm_result = VMContext.decode(vm_buf)
+        vm_result = VMContext.from_pointer(vm_pointer)
         print("POST VM", vm_result)
         
         # Create callable function
         # Clean up
         code_buf.close()
-        vm_buf.close()
+        memory.buf.close()
         return None, 0, vm_result.gas, vm_result.regs
