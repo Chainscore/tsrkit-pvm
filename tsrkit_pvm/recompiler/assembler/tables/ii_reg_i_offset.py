@@ -15,44 +15,160 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
     @property
     def rb(self) -> int:
         return min(12, int(self.program.zeta[self.counter + 1]) // 16)
-    
+
     @property
     def lx(self) -> int:
         return min(4, max(0, self.skip_index - 1))
-    
+
     @property
     def vx(self) -> int:
         start = self.counter + 2
         end = start + self.lx
         return self.counter + z(
-            int.from_bytes(
-                self.program.zeta[start:end],
-                "little"
-            ),
-            self.lx
+            int.from_bytes(self.program.zeta[start:end], "little"), self.lx
         )
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            171: OpCode(name="branch_ne", fn=cls.branch_ne, gas=1, is_terminating=False),
+            170: OpCode(
+                name="branch_eq", fn=cls.branch_eq, gas=1, is_terminating=False
+            ),
+            171: OpCode(
+                name="branch_ne", fn=cls.branch_ne, gas=1, is_terminating=False
+            ),
+            172: OpCode(
+                name="branch_lt_u", fn=cls.branch_lt_u, gas=1, is_terminating=False
+            ),
+            173: OpCode(
+                name="branch_lt_s", fn=cls.branch_lt_s, gas=1, is_terminating=False
+            ),
+            174: OpCode(
+                name="branch_ge_u", fn=cls.branch_ge_u, gas=1, is_terminating=False
+            ),
+            175: OpCode(
+                name="branch_ge_s", fn=cls.branch_ge_s, gas=1, is_terminating=False
+            ),
         }
+
+    def branch_eq(self, asm):
+        """Compare registers and branch if equal"""
+        asm.cmp(
+            Operands.RegMem_Reg(
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+            )
+        )
+
+        # Get the target address and find the corresponding label
+        target_addr = self.vx
+        if target_addr in asm.labels:
+            target_label = asm.labels[target_addr]
+            asm.jcc_label32(Condition.Equal, target_label)  # je target_label
+        else:
+            # Branch target not found - fall through (no jump)
+            print(
+                f"Warning: Branch target {target_addr} not found in labels, falling through"
+            )
 
     def branch_ne(self, asm):
         """Compare registers and branch if not equal"""
         asm.cmp(
-                Operands.RegMem_Reg(
-                size=Size.U64, 
-                reg_mem=RegMem.Reg(r_map[self.rb]), 
-                reg=r_map[self.ra]
+            Operands.RegMem_Reg(
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
             )
         )
-        
+
         # Get the target address and find the corresponding label
         target_addr = self.vx
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.NotEqual, target_label)  # jne target_label
         else:
-            # Fallback if label not found
-            asm.ud2()  # This shouldn't happen in a well-formed program
+            # Branch target not found - fall through (no jump)
+            print(
+                f"Warning: Branch target {target_addr} not found in labels, falling through"
+            )
+
+    def branch_lt_u(self, asm):
+        """Compare registers and branch if ra < rb (unsigned)"""
+        asm.cmp(
+            Operands.RegMem_Reg(
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+            )
+        )
+
+        # Get the target address and find the corresponding label
+        target_addr = self.vx
+        if target_addr in asm.labels:
+            target_label = asm.labels[target_addr]
+            asm.jcc_label32(
+                Condition.Below, target_label
+            )  # jb target_label (unsigned less than)
+        else:
+            # Branch target not found - fall through (no jump)
+            print(
+                f"Warning: Branch target {target_addr} not found in labels, falling through"
+            )
+
+    def branch_lt_s(self, asm):
+        """Compare registers and branch if ra < rb (signed)"""
+        asm.cmp(
+            Operands.RegMem_Reg(
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+            )
+        )
+
+        # Get the target address and find the corresponding label
+        target_addr = self.vx
+        if target_addr in asm.labels:
+            target_label = asm.labels[target_addr]
+            asm.jcc_label32(
+                Condition.Less, target_label
+            )  # jl target_label (signed less than)
+        else:
+            # Branch target not found - fall through (no jump)
+            print(
+                f"Warning: Branch target {target_addr} not found in labels, falling through"
+            )
+
+    def branch_ge_u(self, asm):
+        """Compare registers and branch if ra >= rb (unsigned)"""
+        asm.cmp(
+            Operands.RegMem_Reg(
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+            )
+        )
+
+        # Get the target address and find the corresponding label
+        target_addr = self.vx
+        if target_addr in asm.labels:
+            target_label = asm.labels[target_addr]
+            asm.jcc_label32(
+                Condition.AboveOrEqual, target_label
+            )  # jae target_label (unsigned greater or equal)
+        else:
+            # Branch target not found - fall through (no jump)
+            print(
+                f"Warning: Branch target {target_addr} not found in labels, falling through"
+            )
+
+    def branch_ge_s(self, asm):
+        """Compare registers and branch if ra >= rb (signed)"""
+        asm.cmp(
+            Operands.RegMem_Reg(
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+            )
+        )
+
+        # Get the target address and find the corresponding label
+        target_addr = self.vx
+        if target_addr in asm.labels:
+            target_label = asm.labels[target_addr]
+            asm.jcc_label32(
+                Condition.GreaterOrEqual, target_label
+            )  # jge target_label (signed greater or equal)
+        else:
+            # Branch target not found - fall through (no jump)
+            print(
+                f"Warning: Branch target {target_addr} not found in labels, falling through"
+            )

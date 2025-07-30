@@ -1,21 +1,31 @@
-from math import floor
 from typing import Dict, List, Tuple, Union
-
 from tsrkit_types.bits import Bits
 from tsrkit_types.integers import Uint
 from tsrkit_types.itf.codable import Codable
 
+from tsrkit_pvm.recompiler.vm_context import VMContext, gas_offset
+
 from ..interpreter.constants import PVM_ADDR_ALIGNMENT
 from .assembler.inst_map import inst_map
 from ..interpreter.status import CONTINUE, HALT, PANIC, ExecutionStatus, PvmError
-from tsrkit_asm import PyAssembler
+from tsrkit_asm import Condition, ImmKind, MemOp, Operands, PyAssembler, Reg, RegMem, RegSize
+
 
 class AssemblerContext:
     """Wrapper for Assembler to contain labels"""
-    def __init__(self, assembler, labels):
+    asm: PyAssembler
+    labels: Dict[int, int]
+    halt_label: int
+    panic_label: int
+    jump_table_len: int
+
+    def __init__(self, assembler, labels, halt_label, panic_label, jump_table_len):
         self.asm = assembler
         self.labels = labels
-    
+        self.halt_label = halt_label 
+        self.panic_label = panic_label
+        self.jump_table_len = jump_table_len
+
     def __getattr__(self, name):
         # Delegate all other attributes to the underlying assembler
         return getattr(self.asm, name)
@@ -57,46 +67,49 @@ class Program(Codable):
         self.jump_table = jump_table
         self.instruction_set = instruction_set
         self.offset_bitmask = offset_bitmask
-        
+
         # Pre-compute and cache frequently accessed values
         self._offset_bitmask_len = len(self.offset_bitmask)
         self._extended_bitmask = self.offset_bitmask + [True] * 10  # Compute once
         self._extended_bitmask_len = len(self._extended_bitmask)
         self._jump_table_len = len(self.jump_table)
         self._jump_table_max_addr = self._jump_table_len * PVM_ADDR_ALIGNMENT
-        
+
         # Pre-compute skip values for all positions to eliminate runtime calculation
         self._skip_cache: Dict[int, int] = {}
         self._precompute_skip_values()
-        
+
         # Build basic blocks using cached skip values
         basic_blocks = [0]
         for n in range(len(self.instruction_set)):
-            if (
-                    self.offset_bitmask[n] and
-                    inst_map.is_terminating(self.instruction_set[n])
+            if self.offset_bitmask[n] and inst_map.is_terminating(
+                self.instruction_set[n]
             ):
-                basic_blocks.append(n + 1 + self._skip_cache.get(n, 0))
-        
+                basic_blocks.append(n + 1 + self._skip_cache[n])
+
         self.basic_blocks = basic_blocks
         self.zeta = bytearray(self.instruction_set) + bytes(100)
         self._basic_blocks_set = set(self.basic_blocks)
 
-
-    def assemble(self, program_counter: int) -> Tuple[bytes, int]:
+    def assemble(self, program_counter: int, logger = None) -> Tuple[bytes, int, List[int]]:
         asm = PyAssembler()
-        
+
         # Create labels for all basic blocks (jump targets)
         labels = {}
-        for block_start in self.basic_blocks:
-            if block_start < len(self.instruction_set):
-                labels[block_start] = asm.forward_declare_label()
+        for i in range(len(self.instruction_set)):
+            if self.offset_bitmask[i]:
+                labels[i] = asm.forward_declare_label()
         
+        halt_label = asm.forward_declare_label()
+        panic_label = asm.forward_declare_label()
         # Create context wrapper
-        asm_ctx = AssemblerContext(asm, labels)
+        asm_ctx = AssemblerContext(asm, labels, halt_label, panic_label, len(self.jump_table))
+
+        insts = set()
 
         counter = 0
-        msn_pc_offset = 0 
+        msn_pc_offset = 0
+        jump_table = self.jump_table
         while counter < len(self.instruction_set):
             if counter == program_counter:
                 msn_pc_offset = asm.len()
@@ -104,26 +117,56 @@ class Program(Codable):
                 # Define label if this is a basic block start
                 if counter in labels:
                     asm.define_label(labels[counter])
-                    
+                    if counter in jump_table:
+                        jump_table[jump_table.index(counter)] = asm.current_address()
+
                 opcode = self.instruction_set[counter]
-                print(f"Running opcode {opcode} at position {counter}")
-                inst_map.assemble_instruction(opcode, self, counter, asm_ctx)
+                if logger: logger.debug(f"📍 {counter} \t Processing opcode \t {inst_map._dispatch_table[opcode].fn.__name__} ({opcode})")
+                gas = inst_map.assemble_instruction(opcode, self, counter, asm_ctx)
+                
+                # --- Gas Computation --- #
+                x61mov_imm = -gas_offset + 0x61
+                asm.sub(Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm)))
+                asm.sub(
+                    Operands.RegMem_Imm(
+                        RegMem.Mem(
+                            MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=0x61)
+                        ),
+                        ImmKind.I32(gas)
+                    )
+                )
+                asm.jcc_rel32(Condition.Sign, -2)
+                asm.add(Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm)))
+
+                insts.add(inst_map._dispatch_table[opcode].fn.__name__)
             counter += 1
 
+        if logger: logger.debug("🧩 Assembled instructions:", i=insts)
+        
+        # If normally returned, then its a panic 
+        asm.define_label(panic_label)
+        panic_addr = asm.current_address()
         asm.ret()
 
-        return asm.finalize(), msn_pc_offset
+        # Add a block for HALT exit
+        asm.define_label(halt_label)
+        halt_addr = asm.current_address()
+        # Jump to memory, which is non-executable and will throw seg fault
+        asm.ud2()
 
+        if logger: logger.debug(f"🧩 Assembled program size: {asm.len()} | Starting PC offset: {msn_pc_offset}")
+
+        return asm.finalize(), msn_pc_offset, jump_table, panic_addr, halt_addr
 
     def _precompute_skip_values(self):
         """Pre-compute skip values for all positions to eliminate runtime overhead."""
         for i in range(self._offset_bitmask_len):
-            skip_value = self._extended_bitmask_len 
+            skip_value = self._extended_bitmask_len
             for j in range(i + 1, self._extended_bitmask_len):
                 if self._extended_bitmask[j]:
                     skip_value = j - i - 1
                     break
-            
+
             self._skip_cache[i] = min(24, skip_value)
 
     def skip(self, pc) -> int:
@@ -135,34 +178,6 @@ class Program(Codable):
             Distance to the next opcode.
         """
         return self._skip_cache.get(pc, 0)
-
-    def branch(
-        self,
-        counter: int,
-        branch: int,
-        condition: bool
-    ) -> Tuple[ExecutionStatus, int]:
-        if not condition:
-            return CONTINUE, counter
-        elif branch not in self._basic_blocks_set:
-            raise PvmError(PANIC)
-        return CONTINUE, branch
-
-    def djump(
-        self, 
-        counter: int,
-        a: int
-    ) -> Tuple[ExecutionStatus, int]:
-        if a == 2**32 - 2**16:
-            return HALT, counter
-        elif (
-            a == 0 or
-            a > self._jump_table_max_addr or
-            a % PVM_ADDR_ALIGNMENT != 0 or
-            self.jump_table[floor(a//PVM_ADDR_ALIGNMENT) - 1] not in self._basic_blocks_set
-        ):
-            raise PvmError(PANIC)
-        return CONTINUE, self.jump_table[floor(a//PVM_ADDR_ALIGNMENT) - 1]
 
     def encode_size(self) -> int:
         """Encode the size of the program.
@@ -194,16 +209,16 @@ class Program(Codable):
         current_offset += size
         size = Uint[8](self.z).encode_into(buffer, current_offset)
         current_offset += size
-        size = Uint(len(self.instruction_set)).encode_into(
-            buffer, current_offset
-        )
+        size = Uint(len(self.instruction_set)).encode_into(buffer, current_offset)
         current_offset += size
         for jump in self.jump_table:
             size = Uint[self.z * 8](jump).encode_into(buffer, current_offset)
             current_offset += size
 
-        buffer[current_offset:current_offset+len(self.instruction_set)] = self.instruction_set
-        current_offset+=len(self.instruction_set)
+        buffer[current_offset : current_offset + len(self.instruction_set)] = (
+            self.instruction_set
+        )
+        current_offset += len(self.instruction_set)
         size = Bits[len(self.instruction_set), "lsb"](self.offset_bitmask).encode_into(
             buffer, current_offset
         )
@@ -247,12 +262,10 @@ class Program(Codable):
             current_offset += size
             j.append(int(val))
 
-        c = buffer[current_offset:current_offset+c_len]
+        c = buffer[current_offset : current_offset + c_len]
         current_offset += c_len
 
-        offset_bitmask, size = Bits[c_len, "lsb"].decode_from(
-            buffer, current_offset
-        )
+        offset_bitmask, size = Bits[c_len, "lsb"].decode_from(buffer, current_offset)
         bytes_read += size
         current_offset += size
 
@@ -273,6 +286,11 @@ class Program(Codable):
 
     def __repr__(self):
         return f"Program(z={self.z}, jump_table={self.jump_table}, instruction_set={self.instruction_set}, offset_bitmask={self.offset_bitmask})"
-    
+
     def __eq__(self, other):
-        return self.z == other.z and self.jump_table == other.jump_table and self.instruction_set == other.instruction_set and self.offset_bitmask == other.offset_bitmask
+        return (
+            self.z == other.z
+            and self.jump_table == other.jump_table
+            and self.instruction_set == other.instruction_set
+            and self.offset_bitmask == other.offset_bitmask
+        )

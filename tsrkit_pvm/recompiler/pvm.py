@@ -1,48 +1,66 @@
 from typing import Tuple
-from tsrkit_types import U64, TypedArray
+from jam.execution.pvm.status import OUT_OF_GAS
+from tsrkit_types import U32, U64, TypedArray, TypedVector
+from tsrkit_pvm.interpreter.utils import z_inv
 from tsrkit_pvm.recompiler.memory import GuestMemory
 from tsrkit_pvm.recompiler.program import Program
-from tsrkit_pvm.recompiler.assembler.caller import create_caller
+from tsrkit_pvm.recompiler.assembler.caller import (
+    create_caller,
+)
 from tsrkit_pvm.recompiler.fn_alloc import allocate_executable_memory
 from tsrkit_pvm.recompiler.vm_context import VMContext
+from tsrkit_pvm.recompiler.sig_handler import (
+    install_signal_handler, 
+    run_code, 
+    cleanup_sig_state
+)
 import time
 
 
 class PVM:
-
     @staticmethod
     def execute(
         program: Program,
         memory: GuestMemory,
         program_counter: int,
         registers: list[int],
-        gas: int
+        gas: int,
+        logger = None
     ) -> Tuple[None, int, int, list]:
+        
         start_time_ns = time.time_ns()
-        # Assemble and store the program code 
-        msn_code, msn_pc_offset = program.assemble(program_counter)
-        print(f"Machine code {msn_code.hex()} | Start offset {msn_pc_offset}")
+        # Assemble and store the program code
+        msn_code, msn_pc_offset, jump_table, halt_addr, panic_addr = program.assemble(program_counter)
+        if logger: logger.debug(f"Machine code {msn_code[:8].hex()}... | Start offset {msn_pc_offset} | Jump Table {jump_table}")
         code_buf, code_pointer = allocate_executable_memory(msn_code)
 
-        # Vm Context
-        vm_ctx = VMContext(regs=TypedArray[U64, 13]([U64(i) for i in registers]), gas=U64(gas))
-        vm_pointer = vm_ctx.store(memory)
+        # VM Context
+        # jump_table.reverse()
+        vm_ctx = VMContext([j+code_pointer for j in jump_table], registers, gas)
+        vm_pointer, vm_size = vm_ctx.store(memory)
 
-        print("INITIAL VM", VMContext.from_pointer(vm_pointer))
-    
-        # Create callable function
-        func = create_caller(code_pointer + msn_pc_offset, memory.offset)
+        # Create callable function - pass memory.offset (guest memory pointer)
+        addr, _, _ = create_caller(code_pointer + msn_pc_offset, memory.offset, vm_size)
+        # Install safe signal handler
+        install_signal_handler()
         
-        # Execute the compiled code
-        print("Executing compiled PVM code...")
-        result = func()
-        print(f"Execution taken {(time.time_ns() - start_time_ns) / (10**6)} ms")
+        # Execute the compiled code with segfault protection
+        if logger: logger.debug(f"Assmbling completed | Time {(time.time_ns() - start_time_ns) / (10**6)} ms")
+        asm_time_ns = time.time_ns()
+        success, registers_final = run_code(addr, vm_ctx, vm_pointer, code_pointer +  halt_addr)
+        cleanup_sig_state()
+        if logger: logger.debug(f"Execution completed | Time: {(time.time_ns() - asm_time_ns) / (10**6)} ms")
         
-        vm_result = VMContext.from_pointer(vm_pointer)
-        print("POST VM", vm_result)
-        
+        gas = int(VMContext.from_pointer(vm_pointer, len(jump_table)).gas)
+
+        # Adjust overflow
+        if success._value_.name == "out-of-gas":
+            gas -= 2**32
+
+        if logger: logger.debug(f"Status: {success._value_.name} | Registers: {registers_final} | Gas: {gas}")
+
         # Create callable function
         # Clean up
         code_buf.close()
         memory.buf.close()
-        return None, 0, vm_result.gas, vm_result.regs
+        return success, 0, gas, registers_final

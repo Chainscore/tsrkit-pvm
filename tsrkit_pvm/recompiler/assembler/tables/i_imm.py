@@ -20,10 +20,11 @@ class InstructionsWArgs1Imm(InstructionTable):
         return {
             10: OpCode(name="ecalli", fn=cls.ecalli, gas=1, is_terminating=True),
         }
-    
-    def ecalli(self, asm):  # noqa: D401
-        """Emit UD2 to indicate unsupported host call.
 
-        TODO: Implement this
+    def ecalli(self, asm):  # noqa: D401
+        """Emit return for unsupported host call.
+
+        TODO: Implement this properly
         """
-        asm.ud2() 
+        print(f"Warning: ecalli instruction not implemented, returning")
+        asm.ret()
