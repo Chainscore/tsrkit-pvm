@@ -4,7 +4,7 @@ from ..instruction_table import InstructionTable
 from ..opcode import OpCode
 from ...vm_context import r_map
 
-from tsrkit_asm import RegSize, Operands, RegMem, Reg, ImmKind
+from tsrkit_asm import RegSize, Operands, RegMem, Reg, ImmKind, Size
 
 
 class InstructionsWArgs2Reg(InstructionTable):
@@ -83,70 +83,121 @@ class InstructionsWArgs2Reg(InstructionTable):
             asm.mov(RegSize.R64, r_map[self.rd], r_map[self.ra])
 
     def sbrk(self, asm):
-        """rd = heap_break; heap_break += ra (system break/memory allocation)"""
-        # This is a complex system call - for now just move ra to rd as placeholder
-        # In a real implementation, this would need to interact with memory management
-        asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-        # TODO: Implement proper heap management
+        """rd = heap_break; heap_break += ra (brk syscall)"""
+        SYS_BRK = 12
+
+        # 1) save the only registers we really clobber
+        asm.push(Reg.rax)
+        asm.push(Reg.rdx)
+        asm.push(Reg.rbx)
+
+        # 2) load byte-count (ra) into RBX (safe across syscalls)
+        asm.mov(size=RegSize.R64, a=Reg.rbx, b=r_map[self.ra])
+
+        # 3) brk(0) → old break in RAX
+        asm.mov_imm64(Reg.rax, SYS_BRK)               # syscall number
+        asm.xor_(                                       # RDI ← 0
+            Operands.RegMem_Reg(
+                Size.U64,
+                RegMem.Reg(Reg.rdi),
+                Reg.rdi
+            )
+        )
+        asm.syscall()                                 # → RAX = old_break
+
+        # 4) new_break = old_break + increment
+        asm.add(
+            Operands.Reg_RegMem(
+                Size.U64,
+                Reg.rax,
+                RegMem.Reg(Reg.rbx)
+            )
+        )                                             # RAX ← RAX + RBX
+
+        # 5) brk(new_break) → new break in RAX
+        asm.mov(size=RegSize.R64, a=Reg.rdi, b=Reg.rax)  # RDI ← new_break
+        asm.mov_imm64(Reg.rax, SYS_BRK)                  # syscall number again
+        asm.syscall()                                    # → RAX = new_break
+
+        # 6) now RAX holds the value we want to return in rd
+        #    copy into rd (or leave in RAX) *before* we restore RBX/RDX
+        if self.rd == 1:
+            #  rd is RAX → nothing to mov
+            #  restore only RDX, RBX
+            asm.pop(Reg.rdx)
+            asm.pop(Reg.rbx)
+        elif self.rd == 4:
+            #  rd is RDX → move and restore only RAX, RBX
+            asm.mov(size=RegSize.R64, a=Reg.rdx, b=Reg.rax)
+            asm.pop(Reg.rdx)   # restores old RDX
+            asm.pop(Reg.rbx)
+        else:
+            #  rd is some other reg → mov+restore all three
+            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rax)
+            asm.pop(Reg.rdx)
+            asm.pop(Reg.rbx)
+
+        # 7) done – control returns with rd set to the new break
 
     def count_set_bits_64(self, asm):
         """rd = popcount(ra) (count number of 1 bits in 64-bit value)"""
         # Use x86 POPCNT instruction if available, otherwise use a loop
-        asm.popcnt(r_map[self.rd], RegMem.Reg(r_map[self.ra]))
+        asm.popcnt(RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.ra]))
 
     def count_set_bits_32(self, asm):
-        """rd = popcount(ra & 0xFFFFFFFF) (count number of 1 bits in lower 32 bits)"""
-        # Mask to 32 bits then count
-        asm.mov(
-            size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra]
-        )  # Auto-zeros upper 32 bits
-        asm.popcnt(r_map[self.rd], RegMem.Reg(r_map[self.rd]))
+        """rd = count_set_bits(ra) (32-bit)"""
+        asm.mov(size=RegSize.R32, a=Reg.rcx, b=r_map[self.ra])
+        asm.popcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(Reg.rcx))
+        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
 
     def leading_zero_bits_64(self, asm):
         """rd = lzcnt(ra) (count leading zero bits in 64-bit value)"""
         # Use x86 LZCNT instruction
-        asm.lzcnt(r_map[self.rd], RegMem.Reg(r_map[self.ra]))
+        asm.lzcnt(RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.ra]))
 
     def leading_zero_bits_32(self, asm):
-        """rd = lzcnt(ra & 0xFFFFFFFF) (count leading zero bits in lower 32 bits)"""
-        # Mask to 32 bits then count leading zeros
-        asm.mov(
-            size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra]
-        )  # Auto-zeros upper 32 bits
-        asm.lzcnt(r_map[self.rd], RegMem.Reg(r_map[self.rd]))
+        """rd = count_leading_zeros(ra) (32-bit)"""
+        # lzcnt is undefined for an input of 0. The ISA specifies that for an input of 0,
+        # the output should be the operand size (32).
+        asm.mov(size=RegSize.R32, a=Reg.rcx, b=r_map[self.ra])
+        asm.mov_imm64(r_map[self.rd], 32)
+        asm.lzcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(Reg.rcx))
+        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
 
     def trailing_zero_bits_64(self, asm):
         """rd = tzcnt(ra) (count trailing zero bits in 64-bit value)"""
         # Use x86 TZCNT instruction (or BSF as fallback)
-        asm.tzcnt(r_map[self.rd], RegMem.Reg(r_map[self.ra]))
+        asm.tzcnt(RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.ra]))
 
     def trailing_zero_bits_32(self, asm):
-        """rd = tzcnt(ra & 0xFFFFFFFF) (count trailing zero bits in lower 32 bits)"""
-        # Mask to 32 bits then count trailing zeros
-        asm.mov(
-            size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra]
-        )  # Auto-zeros upper 32 bits
-        asm.tzcnt(r_map[self.rd], RegMem.Reg(r_map[self.rd]))
+        """rd = count_trailing_zeros(ra) (32-bit)"""
+        # tzcnt is undefined for an input of 0. The ISA specifies that for an input of 0,
+        # the output should be the operand size (32).
+        # We use a temporary register (rcx) to handle this case.
+        asm.mov(size=RegSize.R32, a=Reg.rcx, b=r_map[self.ra])
+        asm.mov_imm64(r_map[self.rd], 32)
+        asm.tzcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(Reg.rcx))
+        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
 
     def sign_extend_8(self, asm):
         """rd = sign_extend_8(ra) (sign extend 8-bit value to 64-bit)"""
         # Use MOVSX to sign extend from 8-bit to 64-bit
-        asm.movsx(
-            size=RegSize.R64, reg=r_map[self.rd], reg_mem=RegMem.Reg(r_map[self.ra])
+        asm.movsx_8_to_64(
+            RegSize.R64, r_map[self.rd], r_map[self.ra]
         )
 
     def sign_extend_16(self, asm):
         """rd = sign_extend_16(ra) (sign extend 16-bit value to 64-bit)"""
         # Use MOVSX to sign extend from 16-bit to 64-bit
-        asm.movsx(
-            size=RegSize.R64, reg=r_map[self.rd], reg_mem=RegMem.Reg(r_map[self.ra])
+        asm.movsx_16_to_64(
+            RegSize.R64, r_map[self.rd], r_map[self.ra]
         )
 
     def zero_extend_16(self, asm):
         """rd = zero_extend_16(ra) (zero extend 16-bit value to 64-bit)"""
         # Use MOVZX to zero extend from 16-bit to 64-bit
-        asm.movzx(
-            size=RegSize.R64, reg=r_map[self.rd], reg_mem=RegMem.Reg(r_map[self.ra])
+        asm.movzx_16_to_64(
+            RegSize.R64, r_map[self.rd], r_map[self.ra]
         )
 
     def reverse_bytes(self, asm):
@@ -154,4 +205,4 @@ class InstructionsWArgs2Reg(InstructionTable):
         # Copy ra to rd first, then byte swap in place
         asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
         # Use BSWAP to reverse byte order
-        asm.bswap(r_map[self.rd])
+        asm.bswap(RegSize.R64, r_map[self.rd])

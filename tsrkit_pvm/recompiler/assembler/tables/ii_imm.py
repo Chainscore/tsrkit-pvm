@@ -1,6 +1,8 @@
 from typing import Any, Callable, Dict
 from tsrkit_asm import Reg, MemOp, PyAssembler
 
+from tsrkit_pvm.interpreter.utils import z
+
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
 
@@ -53,7 +55,7 @@ class InstructionsWArgs2Imm(InstructionTable):
                 seg=None,
                 size=RegSize.R64,
                 base=Reg.r15,  # R15 holds memory base pointer
-                offset=int(self.vx),
+                offset=z(self.vx, 8),
             )
             asm.store(size_map[bit_size], mem=mem, reg=Reg.rcx)
 

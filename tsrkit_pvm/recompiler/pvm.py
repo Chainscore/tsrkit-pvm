@@ -30,8 +30,8 @@ class PVM:
         
         start_time_ns = time.time_ns()
         # Assemble and store the program code
-        msn_code, msn_pc_offset, jump_table, halt_addr, panic_addr = program.assemble(program_counter)
-        if logger: logger.debug(f"Machine code {msn_code[:8].hex()}... | Start offset {msn_pc_offset} | Jump Table {jump_table}")
+        msn_code, msn_pc_offset, jump_table, halt_addr, panic_addr = program.assemble(program_counter, logger)
+        if logger: logger.debug(f"Machine code {msn_code.hex()}... | Start offset {msn_pc_offset} | Jump Table {jump_table}")
         code_buf, code_pointer = allocate_executable_memory(msn_code)
 
         # VM Context

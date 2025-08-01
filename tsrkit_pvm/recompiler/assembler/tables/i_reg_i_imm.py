@@ -1,6 +1,7 @@
+from os import wait
 from typing import Any, Callable, Dict, TYPE_CHECKING
 
-from tsrkit_pvm.interpreter.utils import chi
+from tsrkit_pvm.interpreter.utils import chi, z, z_inv
 
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
@@ -116,7 +117,8 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
 
     def load_imm(self, asm):
         """Load immediate value vx into register ra."""
-        asm.mov_imm64(r_map[self.ra], self.vx)
+        # print(f"load_imm r{self.ra} = {self.vx}")
+        asm.mov_imm64(r_map[self.ra], z_inv(self.vx, 8))
 
     def load_u8(self, asm):
         """Load unsigned 8-bit value from memory address vx into register ra."""

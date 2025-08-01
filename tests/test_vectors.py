@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 import pytest
 
@@ -42,9 +43,9 @@ def test_vectors(pattern: str):
     if not vectors:
         pytest.skip(f"No test vectors found for pattern: {pattern}")
 
-    for name, vector in vectors:
-        print(f"\n ⏭️Running test case {name} ...")
-        print("\nProcessing test case: ", vector["name"])
+    for i, (name, vector) in enumerate(vectors):
+        print(f"#--- [{i}/{len(vectors)}] ---#")
+        print(f"⏭️Running test case {name} ...")
         from tsrkit_pvm.recompiler.program import Program
         from tsrkit_pvm.recompiler.pvm import PVM
         from tsrkit_pvm.recompiler.memory import GuestMemory
@@ -72,8 +73,10 @@ def test_vectors(pattern: str):
 
 def test_pvm_vectors_single_pattern():
     """Test a single pattern - can be modified for quick testing"""
-    pattern = "inst_load_imm_and_jump_indirect_same_regs_with_offset_ok.json"
+    pattern = "riscv_rv64ui_add.json"
     mode = "native"
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
 
     for name, vector in fetch_vectors(pattern):
         print(f"\n ⏭️Running test case {name} ...")
@@ -97,6 +100,7 @@ def test_pvm_vectors_single_pattern():
                 int(vector["initial-pc"]),
                 vector["initial-regs"],
                 int(vector["initial-gas"]),
+                logger
             )
 
             assert registers == vector["expected-regs"], (

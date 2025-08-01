@@ -141,7 +141,7 @@ class Program(Codable):
                 insts.add(inst_map._dispatch_table[opcode].fn.__name__)
             counter += 1
 
-        if logger: logger.debug("🧩 Assembled instructions:", i=insts)
+        if logger: logger.debug(f"🧩 Assembled instructions: {insts}")
         
         # If normally returned, then its a panic 
         asm.define_label(panic_label)

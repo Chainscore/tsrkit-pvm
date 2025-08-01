@@ -207,7 +207,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset= self.vx_signed,
+                offset=z(self.vx, 8),
             ),
             reg=r_map[self.ra],
         )
@@ -222,7 +222,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset= self.vx_signed,
+                offset=z(self.vx, 8),
             ),
             reg=r_map[self.ra],
         )
@@ -237,7 +237,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset= self.vx_signed,
+                offset=z(self.vx, 8)
             ),
             reg=r_map[self.ra],
         )
@@ -252,7 +252,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset= self.vx_signed,
+                offset=z(self.vx, 8)
             ),
             reg=r_map[self.ra],
         )
@@ -268,7 +268,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=self.vx_signed
+                offset=z(self.vx, 8)
             ),
         )
 
@@ -283,7 +283,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=self.vx_signed
+                offset=z(self.vx, 8)
             ),
         )
 
@@ -298,7 +298,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=self.vx_signed
+                offset=z(self.vx, 8)
             ),
         )
 
@@ -313,7 +313,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=self.vx_signed
+                offset=z(self.vx, 8)
             ),
         )
 
@@ -328,7 +328,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=self.vx_signed
+                offset=z(self.vx, 8)
             ),
         )
 
@@ -343,7 +343,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=self.vx_signed
+                offset=z(self.vx, 8)
             ),
         )
 
@@ -358,12 +358,13 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=self.vx_signed
+                offset=z(self.vx, 8)
             ),
         )
 
     def add_imm_32(self, asm):
         """ra = (rb + vx) % 2^32, then sign-extend to 64 bits"""
+        # print(f"add_imm_32 {self.ra} = {self.rb} + {z(self.vx, 8)}")
         if self.ra != self.rb:
             # Load rb into ra (32-bit)
             asm.mov(size=RegSize.R32, a=r_map[self.ra], b=r_map[self.rb])
@@ -384,7 +385,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # AND with immediate
         asm.and_(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(z(self.vx, 8))
             )
         )
 
@@ -395,7 +396,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # XOR with immediate
         asm.xor_(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(z(self.vx, 8))
             )
         )
 
@@ -406,7 +407,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # OR with immediate
         asm.or_(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(z(self.vx, 8))
             )
         )
 
@@ -496,7 +497,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Subtract rb from ra
         asm.sub(
-            Operands.RegMem_Reg(reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb])
+            Operands.RegMem_Reg(Size.U32, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb])
         )
 
     def set_gt_u_imm(self, asm):
@@ -703,6 +704,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         asm.mov(size=RegSize.R32, a=r_map[self.ra], b=r_map[self.rb])
         # Rotate right by immediate
         asm.ror_imm(RegSize.R32, RegMem.Reg(r_map[self.ra]), self.vx & 0x1F)
+        asm.movsxd_32_to_64(r_map[self.ra], r_map[self.ra])
 
     def rot_r_32_imm_alt(self, asm):
         """ra = rotate_right(vx, rb) (alternate: immediate rotated by register, 32-bit)"""
