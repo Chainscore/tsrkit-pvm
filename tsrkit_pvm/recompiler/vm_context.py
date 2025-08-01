@@ -47,7 +47,6 @@ if os.uname().sysname == "Darwin":
 else:
     libc = ctypes.CDLL("libc.so.6")
 
-
 from .memory import GuestMemory
 
 ret_stack_offset = - 8
@@ -56,10 +55,10 @@ gas_offset = ret_add_offset - 8
 regs_offset = gas_offset - (8 * num_reg)
 jump_len_offset = regs_offset - 8
 
+
 @structure
 class VMContext:
     """VM context structure with 4 guest registers, gas, and jump table"""
-
     # --- Jump Table --- #
     jump_table: TypedArray[U64]
     jump_table_len: U64

@@ -83,61 +83,31 @@ class InstructionsWArgs2Reg(InstructionTable):
             asm.mov(RegSize.R64, r_map[self.rd], r_map[self.ra])
 
     def sbrk(self, asm):
-        """rd = heap_break; heap_break += ra (brk syscall)"""
-        SYS_BRK = 12
+        """rd = old_heap_break; heap_break += ra (PVM sbrk syscall)"""
+        PVM_SYS_SBRK = 1000  # Use the correct PVM sbrk syscall number
 
-        # 1) save the only registers we really clobber
-        asm.push(Reg.rax)
-        asm.push(Reg.rdx)
-        asm.push(Reg.rbx)
+        # Save registers we'll clobber (but not rd if it's one of them)
+        if self.rd != 1:  # If rd is not RAX, save RAX
+            asm.push(Reg.rax)
+        if self.rd != 0:  # If rd is not RDI, save RDI  
+            asm.push(Reg.rdi)
 
-        # 2) load byte-count (ra) into RBX (safe across syscalls)
-        asm.mov(size=RegSize.R64, a=Reg.rbx, b=r_map[self.ra])
+        # Load increment (ra) into RDI (first argument)
+        asm.mov(size=RegSize.R64, a=Reg.rdi, b=r_map[self.ra])
+        
+        # Call PVM sbrk syscall
+        asm.mov_imm64(Reg.rax, PVM_SYS_SBRK)
+        asm.syscall()  # → RAX = old_break
 
-        # 3) brk(0) → old break in RAX
-        asm.mov_imm64(Reg.rax, SYS_BRK)               # syscall number
-        asm.xor_(                                       # RDI ← 0
-            Operands.RegMem_Reg(
-                Size.U64,
-                RegMem.Reg(Reg.rdi),
-                Reg.rdi
-            )
-        )
-        asm.syscall()                                 # → RAX = old_break
-
-        # 4) new_break = old_break + increment
-        asm.add(
-            Operands.Reg_RegMem(
-                Size.U64,
-                Reg.rax,
-                RegMem.Reg(Reg.rbx)
-            )
-        )                                             # RAX ← RAX + RBX
-
-        # 5) brk(new_break) → new break in RAX
-        asm.mov(size=RegSize.R64, a=Reg.rdi, b=Reg.rax)  # RDI ← new_break
-        asm.mov_imm64(Reg.rax, SYS_BRK)                  # syscall number again
-        asm.syscall()                                    # → RAX = new_break
-
-        # 6) now RAX holds the value we want to return in rd
-        #    copy into rd (or leave in RAX) *before* we restore RBX/RDX
-        if self.rd == 1:
-            #  rd is RAX → nothing to mov
-            #  restore only RDX, RBX
-            asm.pop(Reg.rdx)
-            asm.pop(Reg.rbx)
-        elif self.rd == 4:
-            #  rd is RDX → move and restore only RAX, RBX
-            asm.mov(size=RegSize.R64, a=Reg.rdx, b=Reg.rax)
-            asm.pop(Reg.rdx)   # restores old RDX
-            asm.pop(Reg.rbx)
-        else:
-            #  rd is some other reg → mov+restore all three
+        # Move result to destination register if needed
+        if self.rd != 1:  # rd != RAX
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rax)
-            asm.pop(Reg.rdx)
-            asm.pop(Reg.rbx)
 
-        # 7) done – control returns with rd set to the new break
+        # Restore registers in reverse order
+        if self.rd != 0:  # If rd is not RDI, restore RDI
+            asm.pop(Reg.rdi)
+        if self.rd != 1:  # If rd is not RAX, restore RAX
+            asm.pop(Reg.rax)
 
     def count_set_bits_64(self, asm):
         """rd = popcount(ra) (count number of 1 bits in 64-bit value)"""

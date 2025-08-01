@@ -9,7 +9,8 @@ from ..interpreter.status import PANIC, HALT, PAGE_FAULT, HOST, OUT_OF_GAS
 _lib_path = os.path.join(os.path.dirname(__file__), 'libsegwrap.so')
 lib = ctypes.CDLL(_lib_path)
 
-class Regs64(ctypes.Structure):
+
+class ProgramData(ctypes.Structure):
     """Register state at time of segfault"""
     _fields_ = [
         ('r8', ctypes.c_uint64), ('r9', ctypes.c_uint64), 
@@ -22,8 +23,8 @@ class Regs64(ctypes.Structure):
         ('rcx', ctypes.c_uint64),
         ('rsp', ctypes.c_uint64), ('rip', ctypes.c_uint64), 
         ('eflags', ctypes.c_uint64),
-        ('fault_addr', ctypes.c_uint64),
-        ('seg_fault', ctypes.c_bool)
+        ('si_data', ctypes.c_uint64),
+        ('status', ctypes.c_int8)
     ]
 
     def vm_regs(self):
@@ -51,15 +52,14 @@ class Regs64(ctypes.Structure):
 
     def vm_fault_addr(self):
         """si_addr - r15"""
-        return self.fault_addr - self.r15 
+        return self.si_data - self.r15 
 
 
-def install_signal_handler():
-    """Install the safe C signal handler"""
-    result = lib.install_seg_handlers()
+def init_sig_handlers():
+    """Install the C signal handlers"""
+    result = lib.initialize()
     if result != 0:
         raise OSError(f"Failed to install signal handler: {result}")
-
 
 def run_code(addr: int, vm_ctx: VMContext, vm_pointer: int, halt_addr: int, logger = None) -> tuple[int, list[int]]:
     """
@@ -80,11 +80,14 @@ def run_code(addr: int, vm_ctx: VMContext, vm_pointer: int, halt_addr: int, logg
         return PANIC, [int(r) for r in updated_vm_ctx.regs]
     else:
         # Segfault occurred - get register state
-        regs = Regs64()
-        if lib.get_last_regs(ctypes.byref(regs)) == 0:
-            if logger: logger.debug(f"Faulted! \n\t PF? \t {regs.seg_fault} \n\t RIP \t {regs.rip} \n\t Fault \t {regs.fault_addr} \n\t R15 \t {regs.r15} \n\t RCX \t {regs.rcx}")
-            if regs.seg_fault:
-                return PAGE_FAULT(regs.fault_addr), regs.vm_regs()
+        regs = ProgramData()
+        if lib.get_program_status(ctypes.byref(regs)) == 0:
+            if logger: 
+                logger.debug(f"Faulted! \n\t Status \t {regs.status} \n\t SI Data \t {regs.si_data} \n\t RIP \t {regs.rip} \n\t Fault \t {regs.si_data} \n\t R15 \t {regs.r15} \n\t RCX \t {regs.rcx}")
+            if regs.status == 0:
+                return HOST(regs.si_data), regs.vm_regs()
+            if regs.status == 1:
+                return PAGE_FAULT(regs.si_data), regs.vm_regs()
             elif regs.rip > halt_addr:
                 return HALT, regs.vm_regs()
             else:
