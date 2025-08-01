@@ -61,7 +61,7 @@ def init_sig_handlers():
     if result != 0:
         raise OSError(f"Failed to install signal handler: {result}")
 
-def run_code(addr: int, vm_ctx: VMContext, vm_pointer: int, halt_addr: int, logger = None) -> tuple[int, list[int]]:
+def run_code(addr: int, vm_ctx: VMContext, vm_pointer: int, halt_addr: int, logger = None) -> tuple[int, list[int], ProgramData|None]:
     """
     Run code at given address with segfault protection.
     
@@ -77,7 +77,7 @@ def run_code(addr: int, vm_ctx: VMContext, vm_pointer: int, halt_addr: int, logg
     if result == 0:
         # Success - no segfault
         updated_vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
-        return PANIC, [int(r) for r in updated_vm_ctx.regs]
+        return PANIC, [int(r) for r in updated_vm_ctx.regs], None
     else:
         # Segfault occurred - get register state
         regs = ProgramData()
@@ -85,16 +85,18 @@ def run_code(addr: int, vm_ctx: VMContext, vm_pointer: int, halt_addr: int, logg
             if logger: 
                 logger.debug(f"Faulted! \n\t Status \t {regs.status} \n\t SI Data \t {regs.si_data} \n\t RIP \t {regs.rip} \n\t Fault \t {regs.si_data} \n\t R15 \t {regs.r15} \n\t RCX \t {regs.rcx}")
             if regs.status == 0:
-                return HOST(regs.si_data), regs.vm_regs()
-            if regs.status == 1:
-                return PAGE_FAULT(regs.si_data), regs.vm_regs()
-            elif regs.rip > halt_addr:
-                return HALT, regs.vm_regs()
+                updated_vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
+                return HOST(regs.si_data), [int(r) for r in updated_vm_ctx.regs], regs
+            elif regs.status == 2:
+                return PAGE_FAULT(regs.si_data), regs.vm_regs(), regs
+            elif regs.rip > halt_addr and regs.status == 1:
+                return HALT, regs.vm_regs(), regs
+            elif regs.status == 3:
+                return OUT_OF_GAS, regs.vm_regs(), regs
             else:
-                return OUT_OF_GAS, regs.vm_regs()
+                PANIC, [0] * len(regs.vm_regs()), None
         else:
-            return PANIC, [0] * len(regs.vm_regs())
+            return PANIC, [0] * len(regs.vm_regs()), None
 
 def cleanup_sig_state():
     lib.cleanup()
-

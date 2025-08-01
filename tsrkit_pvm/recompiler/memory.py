@@ -66,6 +66,26 @@ class GuestMemory:
 
         return mem
 
+    def alter_accessibility(self, start: int, len_: int, is_write = True):
+        prot = (mmap.PROT_READ | mmap.PROT_WRITE)
+        # Calculate the actual memory address within our buffer
+        start_addr = self.offset + start
+
+        # Ensure the address is page-aligned
+        page_size = 4096  # Standard page size
+        aligned_addr = (start_addr // page_size) * page_size
+
+        res = libc.mprotect(
+            ctypes.c_void_p(aligned_addr), 
+            len_, 
+            prot
+        )
+        # mprotect returns 0 on success, -1 on failure
+        if res != 0:
+            error = ctypes.get_errno()
+            print(f"Warning: mprotect failed for address {hex(start_addr)}: {error}")
+            # Continue without failing - the memory might still be usable
+
     @classmethod
     def from_pc(cls, read: bytes, write: bytes, args: bytes, z: int, s: int) -> int:
         """Creates memory as per GP"""

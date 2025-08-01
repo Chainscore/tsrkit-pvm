@@ -31,6 +31,7 @@ struct pg_data {
 };
 
 static struct pg_data program_status;
+static uint64_t host_call_offset = 1000;
 
 static void syscall_handler(int sig, siginfo_t *si, void *ctx_) {
   printf("=== SIGSYS HANDLER CALLED ===\n");
@@ -44,10 +45,13 @@ static void syscall_handler(int sig, siginfo_t *si, void *ctx_) {
     program_status.r14 = g[REG_R14]; program_status.r15 = g[REG_R15];
     program_status.rdi = g[REG_RDI]; program_status.rsi = g[REG_RSI];
     program_status.rbp = g[REG_RBP]; program_status.rbx = g[REG_RBX];
-    program_status.rdx = g[REG_RDX]; program_status.rax = g[REG_RAX];
+    program_status.rdx = g[REG_RDX]; 
+    // NOTE: Every PVM syscall shall move RAX value to RCX since we need RAX to store sys call id
+    // We restore the value here
+    program_status.rax = g[REG_RCX];
     program_status.rcx = g[REG_RCX]; program_status.rsp = g[REG_RSP];
     program_status.rip = g[REG_RIP]; program_status.eflags = g[REG_EFL];
-    program_status.si_data = si->si_value.sival_int;
+    program_status.si_data = si->si_value.sival_int - host_call_offset;
     program_status.status = HOST_CALL;
 #endif
     siglongjmp(jmpbuf, 1);
@@ -136,6 +140,8 @@ int init_syscall_handler(void) {
         BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
         
         // Add specific PVM syscalls we want to trap
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 999, 0, 1),  // PVM_SYS_SBRK
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
         BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 1000, 0, 1),  // PVM_SYS_SBRK
         BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
         BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 1001, 0, 1),  // PVM_SYS_MMAP

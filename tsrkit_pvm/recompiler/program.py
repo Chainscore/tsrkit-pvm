@@ -55,6 +55,15 @@ class Program(Codable):
     _jump_table_len: int
     _jump_table_max_addr: int
     _skip_cache: Dict[int, int]
+   
+    # Assembled Machine Code
+    msn_code: bytes
+    # Indexes of machine inst in msn_code 
+    pvm_msn_map: list[int]
+    # Index to halt label
+    halt_offset: int 
+    # Index to panic label
+    panic_offset: int 
 
     def __init__(
         self,
@@ -91,7 +100,9 @@ class Program(Codable):
         self.zeta = bytearray(self.instruction_set) + bytes(100)
         self._basic_blocks_set = set(self.basic_blocks)
 
-    def assemble(self, program_counter: int, logger = None) -> Tuple[bytes, int, List[int]]:
+        self.msn_code, self.pvm_msn_map, self.panic_offset, self.halt_offset = self.assemble()
+
+    def assemble(self, logger = None) -> Tuple[bytes, dict, int, int]:
         asm = PyAssembler()
 
         # Create labels for all basic blocks (jump targets)
@@ -105,20 +116,15 @@ class Program(Codable):
         # Create context wrapper
         asm_ctx = AssemblerContext(asm, labels, halt_label, panic_label, len(self.jump_table))
 
-        insts = set()
-
         counter = 0
-        msn_pc_offset = 0
-        jump_table = self.jump_table
+        pvm_table = []
         while counter < len(self.instruction_set):
-            if counter == program_counter:
-                msn_pc_offset = asm.len()
             if self.offset_bitmask[counter]:  # Only process actual opcodes
                 # Define label if this is a basic block start
                 if counter in labels:
                     asm.define_label(labels[counter])
-                    if counter in jump_table:
-                        jump_table[jump_table.index(counter)] = asm.current_address()
+
+                pvm_table.append(asm.current_address())
 
                 opcode = self.instruction_set[counter]
                 if logger: logger.debug(f"📍 {counter} \t Processing opcode \t {inst_map._dispatch_table[opcode].fn.__name__} ({opcode})")
@@ -138,10 +144,7 @@ class Program(Codable):
                 asm.jcc_rel32(Condition.Sign, -2)
                 asm.add(Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm)))
 
-                insts.add(inst_map._dispatch_table[opcode].fn.__name__)
             counter += 1
-
-        if logger: logger.debug(f"🧩 Assembled instructions: {insts}")
         
         # If normally returned, then its a panic 
         asm.define_label(panic_label)
@@ -156,7 +159,22 @@ class Program(Codable):
 
         if logger: logger.debug(f"🧩 Assembled program size: {asm.len()} | Starting PC offset: {msn_pc_offset}")
 
-        return asm.finalize(), msn_pc_offset, jump_table, panic_addr, halt_addr
+        return asm.finalize(), pvm_table, panic_addr, halt_addr
+
+    def msn_to_pvm_index(self, msn_offset: int):
+        """Input any location from native code, and this will return its PVM inst start"""
+        target = self.pvm_msn_map
+        res = 0
+        # Binary search to find
+        while len(target) != 1:
+            res = (len(target) // 2)
+            target = target[:res] if msn_offset < self.pvm_msn_map[res] else target[res:]
+        return res
+
+    def pvm_to_msn_index(self, pvm_offset: int) -> int:
+        """Input any index of PVM inst start [from inst set], and this will return its machine inst start"""
+        bms = self.offset_bitmask[:pvm_offset]
+        return self.pvm_msn_map[bms.count(True)]
 
     def _precompute_skip_values(self):
         """Pre-compute skip values for all positions to eliminate runtime overhead."""

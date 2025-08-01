@@ -5,7 +5,7 @@ from tsrkit_pvm.interpreter.utils import chi, z, z_inv
 
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
-from ...vm_context import VMContext, r_map
+from ...vm_context import VMContext, r_map, TEMP_REG
 
 from tsrkit_asm import (
     PyAssembler,
@@ -62,22 +62,22 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
         # Part 2: Calculate the PVM address: rb + vy
         # Use rcx as temp register for address calculation
         if self.vx != 0:
-            asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
             asm.add(
                 Operands.RegMem_Imm(
-                    reg_mem=RegMem.Reg(Reg.rcx), imm=ImmKind.I64(self.vx)
+                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(self.vx)
                 )
             )
         else:
-            asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
 
         # Ensure 32-bit wrap: rcx = rcx % 2**32
-        asm.mov(size=RegSize.R32, a=Reg.rcx, b=Reg.rcx)
+        asm.mov(size=RegSize.R32, a=TEMP_REG, b=TEMP_REG)
 
         # Part 3: Check if it's the halt value (2**32 - 2**16)
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(Reg.rcx), imm=ImmKind.I32(2**32 - 2**16)
+                reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(2**32 - 2**16)
             )
         )
         asm.jcc_label32(Condition.Equal, asm.halt_label)
@@ -85,20 +85,20 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
         # Part 4: Validate PVM address (check alignment, bounds, etc.)
         # Check if pvm_address == 0 (invalid)
         asm.test(
-            Operands.RegMem_Reg(size=Size.U32, reg_mem=RegMem.Reg(Reg.rcx), reg=Reg.rcx)
+            Operands.RegMem_Reg(size=Size.U32, reg_mem=RegMem.Reg(TEMP_REG), reg=TEMP_REG)
         )
         asm.jcc_label32(Condition.Equal, asm.panic_label)
 
         # Check alignment: pvm_address % 2 == 0
-        asm.test(Operands.RegMem_Imm(reg_mem=RegMem.Reg(Reg.rcx), imm=ImmKind.I32(1)))
+        asm.test(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(1)))
         asm.jcc_label32(Condition.NotEqual, asm.panic_label)
         
         # Calculate jump table index: (pvm_address / 2) - 1
-        asm.shr_imm(RegSize.R64, RegMem.Reg(Reg.rcx), 1)  # rcx = pvm_address / 2
-        asm.dec(Size.U64, RegMem.Reg(Reg.rcx))
+        asm.shr_imm(RegSize.R64, RegMem.Reg(TEMP_REG), 1)  # rcx = pvm_address / 2
+        asm.dec(Size.U64, RegMem.Reg(TEMP_REG))
         
         # Check bounds: index >= jump_table_len
-        asm.cmp(Operands.RegMem_Imm(reg_mem=RegMem.Reg(Reg.rcx), imm=ImmKind.I32(asm.jump_table_len)))
+        asm.cmp(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(asm.jump_table_len)))
         asm.jcc_label32(Condition.AboveOrEqual, asm.panic_label)
 
         # Jump to the machine code address
@@ -117,7 +117,6 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
 
     def load_imm(self, asm):
         """Load immediate value vx into register ra."""
-        # print(f"load_imm r{self.ra} = {self.vx}")
         asm.mov_imm64(r_map[self.ra], z_inv(self.vx, 8))
 
     def load_u8(self, asm):

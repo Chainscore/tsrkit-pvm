@@ -2,7 +2,7 @@ from typing import Any, Callable, Dict, TYPE_CHECKING
 
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
-from ...vm_context import r_map
+from ...vm_context import r_map, TEMP_REG
 
 from tsrkit_asm import (
     ImmKind,
@@ -55,11 +55,11 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
     def store_imm_ind_u8(self, asm: PyAssembler):
         """Store immediate value vy as u8 at memory [ra + vx]"""
         # Calculate address: [r15 + ra + vx]
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.ra])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
         if self.vx != 0:
             asm.add(
                 Operands.RegMem_Imm(
-                    reg_mem=RegMem.Reg(Reg.rcx), imm=ImmKind.I64(self.vx)
+                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(self.vx)
                 )
             )
         # Store immediate value to calculated address
@@ -80,11 +80,11 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
     def store_imm_ind_u16(self, asm: PyAssembler):
         """Store immediate value vy as u16 at memory [ra + vx]"""
         # Calculate address: [r15 + ra + vx]
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.ra])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
         if self.vx != 0:
             asm.add(
                 Operands.RegMem_Imm(
-                    reg_mem=RegMem.Reg(Reg.rcx), imm=ImmKind.I64(self.vx)
+                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(self.vx)
                 )
             )
         # Store immediate value to calculated address
@@ -105,11 +105,11 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
     def store_imm_ind_u32(self, asm: PyAssembler):
         """Store immediate value vy as u32 at memory [ra + vx]"""
         # Calculate address: [r15 + ra + vx]
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.ra])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
         if self.vx != 0:
             asm.add(
                 Operands.RegMem_Imm(
-                    reg_mem=RegMem.Reg(Reg.rcx), imm=ImmKind.I64(self.vx)
+                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(self.vx)
                 )
             )
         # Store immediate value to calculated address
@@ -130,11 +130,11 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
     def store_imm_ind_u64(self, asm: PyAssembler):
         """Store immediate value vy as u64 at memory [ra + vx]"""
         # Calculate address: [r15 + ra + vx]
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.ra])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
         if self.vx != 0:
             asm.add(
                 Operands.RegMem_Imm(
-                    reg_mem=RegMem.Reg(Reg.rcx), imm=ImmKind.I64(self.vx)
+                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(self.vx)
                 )
             )
         # Store immediate value to calculated address

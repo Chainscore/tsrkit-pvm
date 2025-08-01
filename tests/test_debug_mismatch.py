@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tests.types import PvmTestcase
 from tsrkit_pvm.recompiler.assembler.inst_map import inst_map
+from tsrkit_pvm.recompiler.vm_context import VMContext
 
 PVM_ROOT = Path(__file__).parent / "ext" / "pvm" / "programs"
 
@@ -50,8 +51,6 @@ def test_debug_mismatch():
             tc.initial_memory.to_memory(tc.initial_page_map),
         )
         
-
-
         print(f"[2] Running in native mode...")
         from tsrkit_pvm.recompiler.program import Program
         from tsrkit_pvm.recompiler.pvm import PVM
@@ -61,7 +60,7 @@ def test_debug_mismatch():
         mem = GuestMemory.from_initial(
             vector["initial-page-map"],
             vector["initial-memory"],
-            jump_len=len(program.jump_table),
+            VMContext.calculate_size(len(program.jump_table)),
         )
 
         r_status, r_counter, r_gas, r_registers = PVM.execute(

@@ -2,7 +2,7 @@ from typing import Any, Callable, Dict
 from tsrkit_asm import Reg, MemOp, PyAssembler
 
 from tsrkit_pvm.interpreter.utils import z
-
+from ...vm_context import r_map, TEMP_REG
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
 
@@ -49,7 +49,7 @@ class InstructionsWArgs2Imm(InstructionTable):
         def impl(self: "InstructionsWArgs2Imm", asm: PyAssembler):  # noqa: N802
             # Use RCX as a scratch register (not part of guest mapping)
             imm_val = int(self.vy % (2**bit_size))
-            asm.mov_imm64(Reg.rcx, imm_val)
+            asm.mov_imm64(TEMP_REG, imm_val)
 
             mem = MemOp.BaseOffset(
                 seg=None,
@@ -57,6 +57,6 @@ class InstructionsWArgs2Imm(InstructionTable):
                 base=Reg.r15,  # R15 holds memory base pointer
                 offset=z(self.vx, 8),
             )
-            asm.store(size_map[bit_size], mem=mem, reg=Reg.rcx)
+            asm.store(size_map[bit_size], mem=mem, reg=TEMP_REG)
 
         return impl

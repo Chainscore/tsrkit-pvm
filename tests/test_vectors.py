@@ -3,6 +3,8 @@ import logging
 from pathlib import Path
 import pytest
 
+from tsrkit_pvm.recompiler.vm_context import VMContext
+
 from .types import PvmTestcase
 
 PVM_ROOT = Path(__file__).parent / "ext" / "pvm" / "programs"
@@ -54,7 +56,7 @@ def test_vectors(pattern: str):
         mem = GuestMemory.from_initial(
             vector["initial-page-map"],
             vector["initial-memory"],
-            len(program.jump_table),
+            VMContext.calculate_size(len(program.jump_table)),
         )
 
         _, counter, rem_gas, registers = PVM.execute(
@@ -91,7 +93,7 @@ def test_pvm_vectors_single_pattern():
             mem = GuestMemory.from_initial(
                 vector["initial-page-map"],
                 vector["initial-memory"],
-                jump_len=len(program.jump_table),
+                VMContext.calculate_size(len(program.jump_table))
             )
 
             status, counter, rem_gas, registers = PVM.execute(

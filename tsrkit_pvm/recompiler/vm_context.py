@@ -7,6 +7,8 @@ from tsrkit_asm import Reg
 num_reg = 13
 guest_mem_size = 2 * 1024 * 1024 * 1024
 
+TEMP_REG = Reg.rcx
+
 r_map = [
     Reg.rdi,  # PVM r0
     Reg.rax,  # PVM r1
@@ -49,7 +51,8 @@ else:
 
 from .memory import GuestMemory
 
-ret_stack_offset = - 8
+heap_start_offset = -4
+ret_stack_offset = heap_start_offset - 8
 ret_add_offset = ret_stack_offset - 8
 gas_offset = ret_add_offset - 8
 regs_offset = gas_offset - (8 * num_reg)
@@ -69,6 +72,8 @@ class VMContext:
     # --- SF Handler Info --- #
     ret_addr: U64
     ret_stack: U64
+    # --- SBRK --- #
+    heap_start: U32
 
     def __init__(
         self, 
@@ -76,7 +81,8 @@ class VMContext:
         regs: list[int], 
         gas = 0, 
         ret_addr = 0, 
-        ret_stack = 0
+        ret_stack = 0,
+        heap_start = 0
     ):
         self.jump_table = TypedArray[U64, len(jump_table)]([U64(j) for j in jump_table])
         self.jump_table_len = U64(len(jump_table))
@@ -85,6 +91,7 @@ class VMContext:
         self.gas = U64(gas)
         self.ret_addr = U64(ret_addr)
         self.ret_stack = U64(ret_stack)
+        self.heap_start = U32(heap_start)
 
     @classmethod
     def calculate_size(cls, jump_len: int):
@@ -97,7 +104,8 @@ class VMContext:
     def from_pointer(cls, pointer: int, jump_len: int):
         buf_len = cls.calculate_size(jump_len)
         buffer = ctypes.string_at(pointer, buf_len)
-
+        
+        heap_start = U32.decode(buffer[heap_start_offset:])
         ret_stack = U64.decode(buffer[ret_stack_offset:])
         ret_addr = U64.decode(buffer[ret_add_offset:])
         gas = U64.decode(buffer[gas_offset:])

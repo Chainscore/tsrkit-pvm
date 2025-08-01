@@ -1,8 +1,10 @@
 from typing import Any, Callable, Dict, TYPE_CHECKING
 
+from tsrkit_pvm.recompiler.assembler.utils import pop_all_regs, save_all_regs
+
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
-from ...vm_context import r_map
+from ...vm_context import r_map, TEMP_REG
 
 from tsrkit_asm import RegSize, Operands, RegMem, Reg, ImmKind, Size
 
@@ -84,30 +86,14 @@ class InstructionsWArgs2Reg(InstructionTable):
 
     def sbrk(self, asm):
         """rd = old_heap_break; heap_break += ra (PVM sbrk syscall)"""
-        PVM_SYS_SBRK = 1000  # Use the correct PVM sbrk syscall number
-
-        # Save registers we'll clobber (but not rd if it's one of them)
-        if self.rd != 1:  # If rd is not RAX, save RAX
-            asm.push(Reg.rax)
-        if self.rd != 0:  # If rd is not RDI, save RDI  
-            asm.push(Reg.rdi)
-
-        # Load increment (ra) into RDI (first argument)
-        asm.mov(size=RegSize.R64, a=Reg.rdi, b=r_map[self.ra])
-        
-        # Call PVM sbrk syscall
+        PVM_SYS_SBRK = 999
+        # Save all regs before exiting
+        save_all_regs(asm)
+        pop_all_regs(asm) # This is safe to do so, not doing this also works 
+        # Load rax in rcx
         asm.mov_imm64(Reg.rax, PVM_SYS_SBRK)
-        asm.syscall()  # → RAX = old_break
 
-        # Move result to destination register if needed
-        if self.rd != 1:  # rd != RAX
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rax)
-
-        # Restore registers in reverse order
-        if self.rd != 0:  # If rd is not RDI, restore RDI
-            asm.pop(Reg.rdi)
-        if self.rd != 1:  # If rd is not RAX, restore RAX
-            asm.pop(Reg.rax)
+        asm.syscall()
 
     def count_set_bits_64(self, asm):
         """rd = popcount(ra) (count number of 1 bits in 64-bit value)"""
@@ -116,8 +102,8 @@ class InstructionsWArgs2Reg(InstructionTable):
 
     def count_set_bits_32(self, asm):
         """rd = count_set_bits(ra) (32-bit)"""
-        asm.mov(size=RegSize.R32, a=Reg.rcx, b=r_map[self.ra])
-        asm.popcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(Reg.rcx))
+        asm.mov(size=RegSize.R32, a=TEMP_REG, b=r_map[self.ra])
+        asm.popcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(TEMP_REG))
         asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
 
     def leading_zero_bits_64(self, asm):
@@ -129,9 +115,9 @@ class InstructionsWArgs2Reg(InstructionTable):
         """rd = count_leading_zeros(ra) (32-bit)"""
         # lzcnt is undefined for an input of 0. The ISA specifies that for an input of 0,
         # the output should be the operand size (32).
-        asm.mov(size=RegSize.R32, a=Reg.rcx, b=r_map[self.ra])
+        asm.mov(size=RegSize.R32, a=TEMP_REG, b=r_map[self.ra])
         asm.mov_imm64(r_map[self.rd], 32)
-        asm.lzcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(Reg.rcx))
+        asm.lzcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(TEMP_REG))
         asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
 
     def trailing_zero_bits_64(self, asm):
@@ -144,9 +130,9 @@ class InstructionsWArgs2Reg(InstructionTable):
         # tzcnt is undefined for an input of 0. The ISA specifies that for an input of 0,
         # the output should be the operand size (32).
         # We use a temporary register (rcx) to handle this case.
-        asm.mov(size=RegSize.R32, a=Reg.rcx, b=r_map[self.ra])
+        asm.mov(size=RegSize.R32, a=TEMP_REG, b=r_map[self.ra])
         asm.mov_imm64(r_map[self.rd], 32)
-        asm.tzcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(Reg.rcx))
+        asm.tzcnt(RegSize.R32, r_map[self.rd], RegMem.Reg(TEMP_REG))
         asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
 
     def sign_extend_8(self, asm):

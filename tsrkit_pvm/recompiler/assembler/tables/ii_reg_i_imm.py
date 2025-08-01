@@ -16,7 +16,7 @@ from tsrkit_asm import (
 )
 from ..instruction_table import InstructionTable
 from ..opcode import OpCode
-from ...vm_context import r_map, rindex_map
+from ...vm_context import r_map, rindex_map, TEMP_REG
 
 
 class InstructionsWArgs2Reg1Imm(InstructionTable):
@@ -364,7 +364,6 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def add_imm_32(self, asm):
         """ra = (rb + vx) % 2^32, then sign-extend to 64 bits"""
-        # print(f"add_imm_32 {self.ra} = {self.rb} + {z(self.vx, 8)}")
         if self.ra != self.rb:
             # Load rb into ra (32-bit)
             asm.mov(size=RegSize.R32, a=r_map[self.ra], b=r_map[self.rb])
@@ -414,11 +413,11 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
     def mul_imm_32(self, asm):
         """ra = (rb * vx) % 2^32"""
         # Load immediate into temp register
-        asm.mov_imm64(Reg.rcx, self.vx & 0xFFFFFFFF)
+        asm.mov_imm64(TEMP_REG, self.vx & 0xFFFFFFFF)
         # Load rb into ra (32-bit)
         asm.mov(size=RegSize.R32, a=r_map[self.ra], b=r_map[self.rb])
         # Multiply ra by rcx (32-bit)
-        asm.imul(RegSize.R32, r_map[self.ra], RegMem.Reg(Reg.rcx))
+        asm.imul(RegSize.R32, r_map[self.ra], RegMem.Reg(TEMP_REG))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
         asm.movsxd_32_to_64(r_map[self.ra], r_map[self.ra])
 
@@ -426,10 +425,10 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         """ra = (rb < vx) ? 1 : 0 (unsigned)"""
         # Handle large immediate values by using a temporary register
         if abs(self.vx) > 0x7FFFFFFFFFFFFFFF:  # If too large for signed I64
-            asm.mov_imm64(Reg.rcx, self.vx)
+            asm.mov_imm64(TEMP_REG, self.vx)
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=Reg.rcx
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=TEMP_REG
                 )
             )
         else:
@@ -447,10 +446,10 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         """ra = (rb < vx) ? 1 : 0 (signed)"""
         # Handle large immediate values by using a temporary register
         if abs(self.vx) > 0x7FFFFFFFFFFFFFFF:  # If too large for signed I64
-            asm.mov_imm64(Reg.rcx, self.vx)
+            asm.mov_imm64(TEMP_REG, self.vx)
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=Reg.rcx
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=TEMP_REG
                 )
             )
         else:
@@ -504,10 +503,10 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         """ra = (rb > vx) ? 1 : 0 (unsigned)"""
         # Handle large immediate values by using a temporary register
         if abs(self.vx) > 0x7FFFFFFFFFFFFFFF:  # If too large for signed I64
-            asm.mov_imm64(Reg.rcx, self.vx)
+            asm.mov_imm64(TEMP_REG, self.vx)
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=Reg.rcx
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=TEMP_REG
                 )
             )
         else:
@@ -525,10 +524,10 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         """ra = (rb > vx) ? 1 : 0 (signed)"""
         # Handle large immediate values by using a temporary register
         if abs(self.vx) > 0x7FFFFFFFFFFFFFFF:  # If too large for signed I64
-            asm.mov_imm64(Reg.rcx, self.vx)
+            asm.mov_imm64(TEMP_REG, self.vx)
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=Reg.rcx
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=TEMP_REG
                 )
             )
         else:
@@ -547,7 +546,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra (32-bit)
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Shift left by cl (using shl_cl method) - 32-bit operation
         asm.shl_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -558,7 +557,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra (32-bit)
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Shift right logical by cl (using shr_cl method) - 32-bit operation
         asm.shr_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -569,7 +568,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra (32-bit)
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Shift right arithmetic by cl (using sar_cl method) - 32-bit operation
         asm.sar_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -584,9 +583,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
             )
         )
         # Load immediate into a temp register
-        asm.mov_imm64(Reg.rcx, self.vx)
+        asm.mov_imm64(TEMP_REG, self.vx)
         # Conditionally move if zero (using cmov with Equal condition)
-        asm.cmov(Condition.Equal, RegSize.R64, r_map[self.ra], RegMem.Reg(Reg.rcx))
+        asm.cmov(Condition.Equal, RegSize.R64, r_map[self.ra], RegMem.Reg(TEMP_REG))
 
     def cmov_nz_imm(self, asm):
         """ra = (rb != 0) ? vx : ra (conditional move if not zero)"""
@@ -597,9 +596,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
             )
         )
         # Load immediate into a temp register
-        asm.mov_imm64(Reg.rcx, self.vx)
+        asm.mov_imm64(TEMP_REG, self.vx)
         # Conditionally move if not zero (using cmov with NotEqual condition)
-        asm.cmov(Condition.NotEqual, RegSize.R64, r_map[self.ra], RegMem.Reg(Reg.rcx))
+        asm.cmov(Condition.NotEqual, RegSize.R64, r_map[self.ra], RegMem.Reg(TEMP_REG))
 
     def add_imm_64(self, asm):
         """ra = rb + vx"""
@@ -615,11 +614,11 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
     def mul_imm_64(self, asm):
         """ra = (rb * vx) % 2^64"""
         # Load immediate into a temp register
-        asm.mov_imm64(Reg.rcx, self.vx)
+        asm.mov_imm64(TEMP_REG, self.vx)
         # Load rb into ra
         asm.mov(size=RegSize.R64, a=r_map[self.ra], b=r_map[self.rb])
         # Multiply ra by rcx
-        asm.imul(RegSize.R64, r_map[self.ra], RegMem.Reg(Reg.rcx))
+        asm.imul(RegSize.R64, r_map[self.ra], RegMem.Reg(TEMP_REG))
 
     def shlo_l_imm_64(self, asm):
         """ra = rb << (vx % 64) (left shift logical 64-bit)"""
@@ -660,7 +659,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra
         asm.mov_imm64(r_map[self.ra], self.vx)
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Shift left by cl (using shl_cl method)
         asm.shl_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -669,7 +668,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra
         asm.mov_imm64(r_map[self.ra], self.vx)
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Shift right logical by cl (using shr_cl method)
         asm.shr_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -678,7 +677,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra
         asm.mov_imm64(r_map[self.ra], self.vx)
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Shift right arithmetic by cl (using sar_cl method)
         asm.sar_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -694,7 +693,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra
         asm.mov_imm64(r_map[self.ra], self.vx)
         # Load rb into rcx (rotate amount) - cl is the low 8 bits of rcx
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Rotate right by cl (using ror_cl method)
         asm.ror_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -711,6 +710,6 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra (32-bit)
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Load rb into rcx (rotate amount) - cl is the low 8 bits of rcx
-        asm.mov(size=RegSize.R64, a=Reg.rcx, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Rotate right by cl (using ror_cl method)
         asm.ror_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
