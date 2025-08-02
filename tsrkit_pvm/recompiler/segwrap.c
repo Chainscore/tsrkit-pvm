@@ -17,9 +17,8 @@ static sigjmp_buf jmpbuf;
 
 enum ExitStatus {
   HOST_CALL,
-  HALT,
   PAGE_FAULT,
-  OUT_OF_GAS
+  ILL
 };
 
 struct pg_data {
@@ -70,7 +69,8 @@ static void sill_handler(int sig, siginfo_t *si, void *ctx) {
     program_status.rdx = g[REG_RDX]; program_status.rax = g[REG_RAX];
     program_status.rcx = g[REG_RCX]; program_status.rsp = g[REG_RSP];
     program_status.rip = g[REG_RIP]; program_status.eflags = g[REG_EFL];
-    program_status.status = OUT_OF_GAS;
+    program_status.si_data = (uint64_t)si->si_addr;
+    program_status.status = ILL;
 #endif
     siglongjmp(jmpbuf, 1);
 }

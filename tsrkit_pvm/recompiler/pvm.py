@@ -85,6 +85,8 @@ class PVM:
                     code_pointer +  program.halt_offset, 
                     logger
                 )
+        except Exception as e:
+            raise ValueError(f"Page Fault {e}")
         finally:
             cleanup_sig_state()
 

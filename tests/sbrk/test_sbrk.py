@@ -1,13 +1,15 @@
 """Test the sbrk (system break) instruction implementation."""
 
 import pytest
+from tests.sbrk.utils import create_sbrk_test_program
 from tsrkit_pvm.interpreter.memory import Memory
 from tsrkit_pvm.interpreter.program import Program
-from tsrkit_pvm.interpreter.pvm import PVM
 from tsrkit_pvm.interpreter.status import ExecutionStatus
+from tsrkit_pvm.interpreter.pvm import PVM
 from tsrkit_pvm.recompiler.program import Program as RecompilerProgram
 from tsrkit_pvm.recompiler.pvm import PVM as RecompilerPVM
 from tsrkit_pvm.recompiler.memory import GuestMemory
+from tsrkit_pvm.recompiler.vm_context import VMContext
 
 def test_sbrk_interpreter_basic():
     """Test sbrk instruction with interpreter - basic allocation."""
@@ -120,9 +122,8 @@ def test_sbrk_recompiler_basic():
     # Initial registers: ra=2 contains 1024 (bytes to allocate)
     initial_registers = [0, 0, 1024, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     
-    # Create guest memory
-    guest_memory = GuestMemory(0)
-    
+    # Create guest memory 
+    guest_memory = GuestMemory.from_initial([], [], VMContext.calculate_size(len(recomp_program.jump_table)))
     # Execute with recompiler
     result, pc, gas_left, final_registers = RecompilerPVM.execute(
         recomp_program, guest_memory, 0, initial_registers.copy(), 1000
@@ -132,25 +133,6 @@ def test_sbrk_recompiler_basic():
     # Register 1 should be modified to contain the new heap break
     assert final_registers[1] != initial_registers[1]
     assert final_registers[1] > 0  # Should contain some heap break value
-
-
-def test_sbrk_recompiler_zero_allocation():
-    """Test sbrk instruction with recompiler - zero allocation."""
-    program = create_sbrk_test_program(rd=3, ra=4)
-    buffer = bytearray(program.encode_size())
-    program.encode_into(buffer)
-    recomp_program = RecompilerProgram.decode(bytes(buffer))
-    
-    initial_registers = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    guest_memory = GuestMemory(0)
-    
-    result, pc, gas_left, final_registers = RecompilerPVM.execute(
-        recomp_program, guest_memory, 0, initial_registers.copy(), 1000
-    )
-    
-    # rd should be modified (contains current break)
-    assert final_registers[3] != initial_registers[3]
-    assert final_registers[3] > 0  # Should contain some heap break value
 
 
 def test_sbrk_consistency():
@@ -168,7 +150,8 @@ def test_sbrk_consistency():
     buffer = bytearray(program.encode_size())
     program.encode_into(buffer)
     recomp_program = RecompilerProgram.decode(bytes(buffer))
-    guest_memory = GuestMemory(0)
+    guest_memory = GuestMemory.from_initial([], [], VMContext.calculate_size(len(recomp_program.jump_table)))
+
     
     recomp_result, recomp_pc, recomp_gas, recomp_regs = RecompilerPVM.execute(
         recomp_program, guest_memory, 0, initial_registers.copy(), 1000

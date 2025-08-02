@@ -87,12 +87,13 @@ def run_code(addr: int, vm_ctx: VMContext, vm_pointer: int, halt_addr: int, logg
             if regs.status == 0:
                 updated_vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
                 return HOST(regs.si_data), [int(r) for r in updated_vm_ctx.regs], regs
-            elif regs.status == 2:
+            elif regs.status == 1:
                 return PAGE_FAULT(regs.si_data), regs.vm_regs(), regs
-            elif regs.rip > halt_addr and regs.status == 1:
-                return HALT, regs.vm_regs(), regs
-            elif regs.status == 3:
-                return OUT_OF_GAS, regs.vm_regs(), regs
+            elif regs.status == 2:
+                if regs.si_data == halt_addr:
+                    return HALT, regs.vm_regs(), regs
+                else:
+                    return OUT_OF_GAS, regs.vm_regs(), regs
             else:
                 PANIC, [0] * len(regs.vm_regs()), None
         else:

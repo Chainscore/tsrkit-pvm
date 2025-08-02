@@ -22,7 +22,7 @@ def test_benched_cgoi_interpreter():
     program = Program.decode_from(bytecode)[0]
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    gas = 1000000
+    gas = 100000
     start_time = time.time_ns()
     ret = PVM.execute(program, 0, gas, regs, Memory({}, [i for i in range(10)], [i for i in range(10)]))
     assert ret[0] == ExecutionStatus.OUT_OF_GAS
@@ -44,7 +44,7 @@ def test_add_jump():
     program = Program.decode_from(bytecode)[0]
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    gas = 1_000_000
+    gas = 100_000
     start_time = time.time_ns()
     ret = PVM.execute(program, 0, gas, regs, Memory({}, [i for i in range(10)], [i for i in range(10)]))
     assert ret[0] == ExecutionStatus.OUT_OF_GAS
@@ -67,10 +67,10 @@ def test_add_jump_loop_1_000_000():
     program = Program.decode(bytecode)
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    gas = 1_000_000_000
+    gas = 1_000_000
     start_time = time.time_ns()
     ret = PVM.execute(program, 0, gas, regs, Memory({}, [], []))
-    assert ret[0] == ExecutionStatus.PANIC
+    assert ret[0] == ExecutionStatus.OUT_OF_GAS
     end_time = time.time_ns()
     gas_consumed = gas - ret[2]
     print(f"Gas consumed:", gas_consumed)

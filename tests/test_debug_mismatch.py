@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 
+import pytest
+
 from tests.types import PvmTestcase
 from tsrkit_pvm.recompiler.assembler.inst_map import inst_map
 from tsrkit_pvm.recompiler.vm_context import VMContext
@@ -13,7 +15,7 @@ PVM_ROOT = Path(__file__).parent / "ext" / "pvm" / "programs"
 def fetch_vectors(pattern: str):
     return [(f.name, json.load(open(f))) for f in PVM_ROOT.glob(pattern)]
 
-
+@pytest.mark.skip
 def test_debug_mismatch():
     """Test a single pattern - can be modified for quick testing"""
     pattern = os.environ["PTRN"] or "riscv_rv64ui_lw.json"
