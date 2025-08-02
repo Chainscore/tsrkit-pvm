@@ -49,7 +49,7 @@ if os.uname().sysname == "Darwin":
 else:
     libc = ctypes.CDLL("libc.so.6")
 
-from .memory import GuestMemory
+from .memory import REC_Memory
 
 heap_start_offset = -4
 ret_stack_offset = heap_start_offset - 8
@@ -114,9 +114,9 @@ class VMContext:
         jump_table_len = U64.decode(buffer[jump_len_offset:])
         jump_table = TypedArray[U64, jump_table_len].decode(buffer)
 
-        return cls(jump_table, regs, gas, ret_addr, ret_stack)
+        return cls(jump_table, regs, gas, ret_addr, ret_stack, heap_start)
 
-    def store(self, guest: GuestMemory, logger=None):
+    def store(self, guest: REC_Memory, logger=None):
         encoded = self.encode()
         size = len(encoded)
 

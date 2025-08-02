@@ -1,3 +1,5 @@
+"""Common constants shared across PVM implementations."""
+
 # Z_A — PVM dynamic address alignment factor. See equation A.18
 PVM_ADDR_ALIGNMENT = 2
 

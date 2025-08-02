@@ -1,12 +1,12 @@
 import logging
 import pytest
-from tsrkit_pvm.interpreter.memory import Memory
-from tsrkit_pvm.interpreter.program import Program
-from tsrkit_pvm.interpreter.pvm import PVM
-from tsrkit_pvm.interpreter.status import ExecutionStatus
-from tsrkit_pvm.recompiler.program import Program as RecompilerProgram
-from tsrkit_pvm.recompiler.pvm import PVM as RecompilerPVM
-from tsrkit_pvm.recompiler.memory import GuestMemory
+from tsrkit_pvm.interpreter.memory import INT_Memory
+from tsrkit_pvm.interpreter.program import INT_Program
+from tsrkit_pvm.interpreter.pvm import Interpreter
+from tsrkit_pvm.common.status import ExecutionStatus
+from tsrkit_pvm.recompiler.program import REC_Program
+from tsrkit_pvm.recompiler.pvm import Recompiler
+from tsrkit_pvm.recompiler.memory import REC_Memory
 
 from tests.sbrk.utils import create_sbrk_test_program
 from tsrkit_pvm.recompiler.vm_context import VMContext
@@ -63,10 +63,10 @@ def test_sbrk_i_vs_native(rd, ra, allocation_size, description):
     # Test with interpreter
     print("[1] Running in PVM interpreter mode...")
     # initial_memory = Memory.from_pc(b"", b"", b"args", 0, 0)
-    initial_memory = Memory({}, [], [])
+    initial_memory = INT_Memory({}, [], [])
     initial_heap_break = initial_memory.heap_break
 
-    interp_status, interp_pc, interp_gas, interp_regs, interp_mem = PVM.execute(
+    interp_status, interp_pc, interp_gas, interp_regs, interp_mem = Interpreter.execute(
         program, 0, 1000, initial_registers.copy(), initial_memory
     )
 
@@ -74,13 +74,13 @@ def test_sbrk_i_vs_native(rd, ra, allocation_size, description):
     print("[2] Running in PVM recompiler mode...")
     buffer = bytearray(program.encode_size())
     program.encode_into(buffer)
-    recomp_program = RecompilerProgram.decode(bytes(buffer))
-    guest_memory = GuestMemory.from_initial(
+    recomp_program = REC_Program.decode(bytes(buffer))
+    guest_memory = REC_Memory.from_initial(
         [], [], VMContext.calculate_size(len(recomp_program.jump_table))
     )
 
-    recomp_status, recomp_pc, recomp_gas, recomp_regs = RecompilerPVM.execute(
-        recomp_program, guest_memory, 0, initial_registers.copy(), 1000, logger
+    recomp_status, recomp_pc, recomp_gas, recomp_regs, recom_mem = Recompiler.execute(
+        recomp_program, 0, 1000, initial_registers.copy(), guest_memory, logger
     )
 
     print(f"  Interpreter registers: {interp_regs}")

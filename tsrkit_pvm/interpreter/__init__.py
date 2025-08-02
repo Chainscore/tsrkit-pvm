@@ -4,19 +4,18 @@ The interpreter module provides the core execution engine for PVM bytecode,
 including program loading, memory management, and instruction execution.
 """
 
-from .code import Code
-from .constants import (
+from ..core.code import Code
+from ..common.constants import (
     PVM_ADDR_ALIGNMENT,
     PVM_INIT_DATA_SIZE,
     PVM_INIT_ZONE_SIZE,
     PVM_MEMORY_PAGE_SIZE,
     REGISTER_COUNT,
 )
-from .memory import Memory
-from .program import Program
-from .pvm import PVM
-from .register import from_pc
-from .status import (
+from .memory import INT_Memory as Memory
+from .program import INT_Program as Program
+from .pvm import Interpreter as PVM
+from ..common.status import (
     CONTINUE,
     HALT,
     HOST,
@@ -30,9 +29,8 @@ from .status import (
 __all__ = [
     # Core execution engine
     "PVM",
-    "Program",
+    "Program", 
     "Memory",
-    "from_pc",
     "Code",
     # Status and error handling
     "ExecutionStatus",

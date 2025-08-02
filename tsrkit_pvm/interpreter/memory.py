@@ -1,15 +1,15 @@
-from math import ceil
-from typing import Dict, List, Self, Sequence
-
-from .constants import PVM_INIT_DATA_SIZE, PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
-from .status import PAGE_FAULT, PvmError
+from __future__ import annotations
+from typing import Dict, List, Self, Sequence, TYPE_CHECKING
+from tsrkit_pvm.common.utils import get_pages, total_page_size, total_zone_size
+from tsrkit_pvm.common.constants import PVM_INIT_DATA_SIZE, PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
+from tsrkit_pvm.common.status import PAGE_FAULT, ExecutionStatus, PvmError
 
 ADDR_MOD = 2**32
 PAGE_SIZE = PVM_MEMORY_PAGE_SIZE
 LOW_BOUND = 0
 
 
-class Memory:
+class INT_Memory:
     """
     Sparse, page-mapped memory model with read/write page protection.
     """
@@ -80,7 +80,7 @@ class Memory:
                 raise PvmError(PAGE_FAULT(addr))
 
     # --------------------------------------------------------------------- #
-    # Public operations (interface unchanged)
+    # Public operations
     # --------------------------------------------------------------------- #
 
     def read(self, address: int, length: int) -> bytes:
@@ -127,6 +127,10 @@ class Memory:
             address += chunk
             cursor += chunk
 
+    def get_pages(self, address: int, length: int) -> list[int]:
+        """Get list of page numbers spanning a memory range."""
+        return get_pages(address, length)
+
     def is_accessible(self, address: int, length: int, for_write: bool = False) -> bool:
         if length <= 0:
             return True
@@ -150,7 +154,7 @@ class Memory:
         return f"Memory(pages={len(self._pages)}, read={sorted(self._r_pages)}, write={sorted(self._w_pages)})"
 
     def __eq__(self, other):
-        if not isinstance(other, Memory):
+        if not isinstance(other, self.__class__):
             return NotImplemented
         if self._r_pages != other._r_pages or self._w_pages != other._w_pages:
             return False
@@ -170,15 +174,15 @@ class Memory:
         memory = {}
 
         read_start = PVM_INIT_ZONE_SIZE
-        read_pages = cls.get_pages(read_start, cls.total_page_size(len(read)))
+        read_pages = get_pages(read_start, total_page_size(len(read)))
         # print(f"READ \t\t | Start: {int(read_start).to_bytes(4).hex()} \t | End {int(read_pages[-1] * PVM_MEMORY_PAGE_SIZE).to_bytes(4).hex()}")
         for i, byt in enumerate(read):
             memory[read_start + i] = int(byt)
 
-        write_start = 2 * PVM_INIT_ZONE_SIZE + cls.total_zone_size(len(read))
-        write_pages = cls.get_pages(
+        write_start = 2 * PVM_INIT_ZONE_SIZE + total_zone_size(len(read))
+        write_pages = get_pages(
             write_start,
-            cls.total_page_size(len(write)) + (int(z) * PVM_MEMORY_PAGE_SIZE),
+            total_page_size(len(write)) + (int(z) * PVM_MEMORY_PAGE_SIZE),
         )
         # print(f"WRITE \t\t | Start: {int(write_start).to_bytes(4).hex()} \t | End {int((write_pages[-1] + 1) * PVM_MEMORY_PAGE_SIZE).to_bytes(4).hex()}")
         for i, byt in enumerate(write):
@@ -187,37 +191,22 @@ class Memory:
         heap = int((write_pages[-1] + 1) * PVM_MEMORY_PAGE_SIZE)
 
         write_pages.extend(
-            cls.get_pages(
+            get_pages(
                 2**32
                 - 2 * PVM_INIT_ZONE_SIZE
                 - PVM_INIT_DATA_SIZE
-                - cls.total_page_size(s),
-                cls.total_page_size(s),
+                - total_page_size(s),
+                total_page_size(s),
             )
         )
 
         arg_start = 2**32 - PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE
-        read_pages.extend(cls.get_pages(arg_start, cls.total_page_size(len(args))))
+        read_pages.extend(get_pages(arg_start, total_page_size(len(args))))
         # print(f"ARG \t\t | START: {int(arg_start).to_bytes(4).hex()}")
         for i, byt in enumerate(args):
             memory[arg_start + i] = int(byt)
 
         return cls(memory, read_pages, write_pages, heap=heap)
-
-    @staticmethod
-    def total_page_size(blob_len: int) -> int:
-        return PAGE_SIZE * ceil(blob_len / PAGE_SIZE)
-
-    @staticmethod
-    def total_zone_size(blob_len: int) -> int:
-        return PVM_INIT_ZONE_SIZE * ceil(blob_len / PVM_INIT_ZONE_SIZE)
-
-    @staticmethod
-    def get_pages(start_index: int, length: int) -> List[int]:
-        start = start_index // PAGE_SIZE
-        end_index = start_index + max(length, 1) - 1
-        end = end_index // PAGE_SIZE
-        return list(range(start, end + 1))
 
     def zero_memory_range(self, start_address: int, offset: int):
         if offset <= 0:
@@ -231,7 +220,7 @@ class Memory:
             start_address += chunk
 
     def alter_accessibility(self, start_address: int, length: int, access_type: str):
-        for pg in self.get_pages(start_address, length):
+        for pg in get_pages(start_address, length):
             if access_type == "write":
                 self._w_pages.add(pg)
             else:
@@ -239,3 +228,6 @@ class Memory:
 
 
 _ZERO_PAGE = bytes(PAGE_SIZE)
+
+# Export INT_Memory as Memory for backward compatibility
+Memory = INT_Memory

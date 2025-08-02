@@ -2,9 +2,9 @@ from math import floor
 from typing import Dict
 
 from ...memory import Memory
-from ...utils import chi
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode, OpReturn
+from ....common.utils import chi
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs2Reg2Imm(InstructionTable):

@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, TYPE_CHECKING
 from math import floor
 
-from tsrkit_pvm.interpreter.utils import chi
+from tsrkit_pvm.common.utils import chi
 from tsrkit_asm import (
     LoadKind,
     Reg,
@@ -15,8 +15,8 @@ from tsrkit_asm import (
     Scale,
     Size,
 )
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 from ...vm_context import VMContext, r_map, TEMP_REG
 
 

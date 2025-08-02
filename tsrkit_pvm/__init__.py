@@ -1,6 +1,6 @@
 """Tessera - Polkadot Virtual Machine
 
-A high-performance PVM implementation with interpreter and recompiler
+A PVM implementation with interpreter and recompiler
 for the Tessera client.
 
 This package provides:

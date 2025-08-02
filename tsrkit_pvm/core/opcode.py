@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Tuple
 
+OpReturn = Any
+
 
 @dataclass
 class OpCode:

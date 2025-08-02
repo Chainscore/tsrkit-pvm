@@ -2,8 +2,8 @@ from typing import Any, Callable, Dict, TYPE_CHECKING
 
 from tsrkit_pvm.recompiler.assembler.utils import pop_all_regs, save_all_regs
 
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 from ...vm_context import r_map, TEMP_REG
 
 from tsrkit_asm import RegSize, Operands, RegMem, Reg, ImmKind, Size
@@ -92,7 +92,6 @@ class InstructionsWArgs2Reg(InstructionTable):
         pop_all_regs(asm)  # This is safe to do so, not doing this also works
         # Load rax in rcx
         asm.mov_imm64(Reg.rax, PVM_SYS_SBRK)
-
         asm.syscall()
 
     def count_set_bits_64(self, asm):

@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict
 
-from tsrkit_pvm.interpreter.utils import chi, z
+from tsrkit_pvm.common.utils import chi, z
 from tsrkit_asm import (
     Reg,
     RegSize,
@@ -14,8 +14,8 @@ from tsrkit_asm import (
     RegIndex,
     Scale,
 )
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 from ...vm_context import r_map, rindex_map, TEMP_REG
 
 

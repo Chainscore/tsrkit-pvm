@@ -1,9 +1,6 @@
-from tsrkit_types import U64, TypedArray
-from tsrkit_pvm.recompiler.memory import GuestMemory
-from tsrkit_pvm.recompiler.program import Program
-import time
-
-from tsrkit_pvm.recompiler.pvm import PVM
+from tsrkit_pvm.recompiler.memory import REC_Memory
+from tsrkit_pvm.recompiler.program import REC_Program
+from tsrkit_pvm.recompiler.pvm import Recompiler
 from tsrkit_pvm.recompiler.vm_context import VMContext
 
 
@@ -44,12 +41,12 @@ def test_add_jump_loop_1_000_000():
             1,
         ]
     )
-    program = Program.decode(bytecode)
+    program = REC_Program.decode(bytecode)
 
-    PVM.execute(
+    Recompiler.execute(
         program,
-        GuestMemory.from_initial([], [], VMContext.calculate_size(0)),
         0,
-        [0, 1_000_000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         100000,
+        [0, 1_000_000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        REC_Memory.from_initial([], [], VMContext.calculate_size(0)),
     )

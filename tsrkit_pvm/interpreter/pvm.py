@@ -1,24 +1,25 @@
 from dataclasses import dataclass
 from typing import List, Tuple
-
+from tsrkit_pvm.core.ipvm import PVM 
 from .instructions.inst_map import inst_map
-from .memory import Memory
-from .program import Program
-from .status import OUT_OF_GAS, PAGE_FAULT, PANIC, ExecutionStatus, PvmError
+from .memory import INT_Memory
+from .program import INT_Program
+from ..common.status import OUT_OF_GAS, PAGE_FAULT, PANIC, ExecutionStatus, PvmError
 
 
-@dataclass
-class PVM:
+class Interpreter(PVM):
+    """Interpreter mode of PVM"""
+
     @classmethod
     def execute(
         cls,
-        program: Program,
+        program: INT_Program,
         program_counter: int,
         gas: int,
         registers: List[int],
-        memory: Memory,
+        memory: INT_Memory,
         logger=None,
-    ) -> Tuple[ExecutionStatus, int, int, list, Memory]:
+    ) -> Tuple[ExecutionStatus, int, int, list, INT_Memory]:
         """
         Execute the program blob `p` as per Psi specification.
 
@@ -53,13 +54,12 @@ class PVM:
             try:
                 opcode = program.zeta[program_counter]
 
-                status, program_counter, registers, memory = (
-                    inst_map.execute_instruction(
+                (status, program_counter, registers, memory), gas_cost = (
+                    inst_map.process_instruction(
                         opcode, program, program_counter, registers, memory
                     )
                 )
 
-                gas_cost = inst_map.get_gas_cost(opcode)
                 remaining_gas -= gas_cost
 
                 insts.add(inst_map._dispatch_table[opcode].name)
@@ -136,3 +136,7 @@ class PVM:
             )
 
         return status, program_counter, remaining_gas, registers, memory
+
+
+# Export Interpreter as PVM for backward compatibility
+PVM = Interpreter

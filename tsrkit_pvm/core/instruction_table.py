@@ -1,8 +1,6 @@
 from typing import TYPE_CHECKING, Dict, Protocol, Tuple
-from tsrkit_pvm.recompiler.assembler.opcode import OpCode
-
-if TYPE_CHECKING:
-    from tsrkit_pvm.interpreter.program import Program
+from tsrkit_pvm.core.program_base import Program
+from .opcode import OpCode
 
 
 class InstructionTable(Protocol):
@@ -27,11 +25,11 @@ class InstructionTable(Protocol):
     def table(cls) -> Dict[int, OpCode]: ...
 
     # Execute the instruction
-    def execute(self, opcode: int, asm):
+    def execute(self, opcode: int, *args):
         # Read the opcode from instruction table
         op = self.table()[opcode]
         # Raise an error if the opcode is not found
         if op is None:
             raise ValueError(f"Invalid opcode: {self.program.zeta[self.counter]}")
         # Execute the instruction
-        return op.fn(self, asm)
+        return op.fn(self, *args)

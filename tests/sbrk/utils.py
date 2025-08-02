@@ -1,4 +1,4 @@
-from tsrkit_pvm.interpreter.program import Program
+from tsrkit_pvm.interpreter.program import INT_Program
 
 
 def create_sbrk_test_program(rd: int, ra: int):
@@ -22,7 +22,7 @@ def create_sbrk_test_program(rd: int, ra: int):
     offset_bitmask = [True, False]
 
     # Create program with no jump table (z=0, empty jump_table)
-    return Program(
+    return INT_Program(
         z=0,
         jump_table=[],
         instruction_set=instruction_set,

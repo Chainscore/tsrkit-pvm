@@ -1,9 +1,9 @@
 from typing import Dict
 
-from tsrkit_pvm.interpreter.utils import z
+from tsrkit_pvm.common.utils import z
 
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 
 
 class WArgsOneOffset(InstructionTable):

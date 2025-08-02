@@ -98,8 +98,22 @@ int run_code(uint64_t addr, uint64_t *ret_val) {
     if (sigsetjmp(jmpbuf, 1) == 0) {
         uint64_t (*fn)(void) = (uint64_t (*)(void))addr;
         uint64_t r = fn();
-        if (ret_val) *ret_val = r;
-        return 0;  // success
+        uint64_t return_address;
+
+        //  1) lea the label “1” into return_address  
+        //  2) call *fn (which pushes that very address on the stack)  
+        //  3) label “1” is where fn() will return to  
+        asm volatile(
+            "  lea    1f(%%rip), %0\n"
+            "  call   *%1\n"
+            "1:\n"
+            : "=&r"(return_address)       // output #0
+            : "r"(fn)                     // input #1
+            : "rax", "memory"             // clobberss
+        );
+
+        if (ret_val) *ret_val = return_address;
+        return 0;   // normal return
     } else {
         return 1;  // segfault
     }

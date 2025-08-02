@@ -1,7 +1,11 @@
 from typing import Dict
 
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from tsrkit_asm import Reg
+
+from tsrkit_pvm.recompiler.assembler.utils import pop_all_regs, save_all_regs
+
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 
 
 class InstructionsWArgs1Imm(InstructionTable):
@@ -22,9 +26,11 @@ class InstructionsWArgs1Imm(InstructionTable):
         }
 
     def ecalli(self, asm):  # noqa: D401
-        """Emit return for unsupported host call.
-
-        TODO: Implement this properly
-        """
-        print(f"Warning: ecalli instruction not implemented, returning")
-        asm.ret()
+        """Host call invocation"""
+        PVM_SYS_CALL_OFFSET = 1000
+        # Save all regs before exiting
+        save_all_regs(asm)
+        pop_all_regs(asm)  # This is safe to do so, not doing this also works
+        # Load rax in rcx
+        asm.mov_imm64(Reg.rax, PVM_SYS_CALL_OFFSET + self.vx)
+        asm.syscall()

@@ -1,9 +1,9 @@
 from typing import Dict
 
 from ...memory import Memory
-from ...status import CONTINUE, PANIC, PvmError
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode, OpReturn
+from ....common.status import CONTINUE, PANIC, PvmError
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWoArgs(InstructionTable):

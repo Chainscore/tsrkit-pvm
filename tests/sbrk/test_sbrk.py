@@ -2,13 +2,13 @@
 
 import pytest
 from tests.sbrk.utils import create_sbrk_test_program
-from tsrkit_pvm.interpreter.memory import Memory
-from tsrkit_pvm.interpreter.program import Program
-from tsrkit_pvm.interpreter.status import ExecutionStatus
-from tsrkit_pvm.interpreter.pvm import PVM
-from tsrkit_pvm.recompiler.program import Program as RecompilerProgram
-from tsrkit_pvm.recompiler.pvm import PVM as RecompilerPVM
-from tsrkit_pvm.recompiler.memory import GuestMemory
+from tsrkit_pvm.interpreter.memory import INT_Memory
+from tsrkit_pvm.interpreter.program import INT_Program
+from tsrkit_pvm.common.status import ExecutionStatus
+from tsrkit_pvm.interpreter.pvm import Interpreter
+from tsrkit_pvm.recompiler.program import REC_Program
+from tsrkit_pvm.recompiler.pvm import Recompiler
+from tsrkit_pvm.recompiler.memory import REC_Memory
 from tsrkit_pvm.recompiler.vm_context import VMContext
 
 
@@ -21,11 +21,11 @@ def test_sbrk_interpreter_basic():
     initial_registers = [0, 0, 1024, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     # Initial memory with some writable pages
-    initial_memory = Memory({}, [], [])
+    initial_memory = INT_Memory({}, [], [])
     initial_heap_break = initial_memory.heap_break
 
     # Execute
-    status, pc, gas_left, final_registers, final_memory = PVM.execute(
+    status, pc, gas_left, final_registers, final_memory = Interpreter.execute(
         program, 0, 1000, initial_registers.copy(), initial_memory
     )
 
@@ -59,10 +59,10 @@ def test_sbrk_interpreter_zero_allocation():
 
     # ra=4 contains 0 (no allocation)
     initial_registers = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    initial_memory = Memory({}, [], [])
+    initial_memory = INT_Memory({}, [], [])
     initial_heap_break = initial_memory.heap_break
 
-    status, pc, gas_left, final_registers, final_memory = PVM.execute(
+    status, pc, gas_left, final_registers, final_memory = Interpreter.execute(
         program, 0, 1000, initial_registers.copy(), initial_memory
     )
 
@@ -85,10 +85,10 @@ def test_sbrk_interpreter_large_allocation():
     # ra=5 contains 65536 bytes (64KB)
     large_allocation = 65536
     initial_registers = [0, 0, 0, 0, 0, large_allocation, 0, 0, 0, 0, 0, 0, 0]
-    initial_memory = Memory({}, [], [])
+    initial_memory = INT_Memory({}, [], [])
     initial_heap_break = initial_memory.heap_break
 
-    status, pc, gas_left, final_registers, final_memory = PVM.execute(
+    status, pc, gas_left, final_registers, final_memory = Interpreter.execute(
         program, 0, 1000, initial_registers.copy(), initial_memory
     )
 
@@ -112,10 +112,10 @@ def test_sbrk_interpreter_same_register():
     # ra=2 and rd=2, so register 2 contains allocation size and will receive result
     allocation_size = 512
     initial_registers = [0, 0, allocation_size, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    initial_memory = Memory({}, [], [])
+    initial_memory = INT_Memory({}, [], [])
     initial_heap_break = initial_memory.heap_break
 
-    status, pc, gas_left, final_registers, final_memory = PVM.execute(
+    status, pc, gas_left, final_registers, final_memory = Interpreter.execute(
         program, 0, 1000, initial_registers.copy(), initial_memory
     )
 
@@ -138,18 +138,18 @@ def test_sbrk_recompiler_basic():
     program = create_sbrk_test_program(rd=1, ra=2)
     buffer = bytearray(program.encode_size())
     program.encode_into(buffer)
-    recomp_program = RecompilerProgram.decode(bytes(buffer))
+    recomp_program = REC_Program.decode(bytes(buffer))
 
     # Initial registers: ra=2 contains 1024 (bytes to allocate)
     initial_registers = [0, 0, 1024, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     # Create guest memory
-    guest_memory = GuestMemory.from_initial(
+    guest_memory = REC_Memory.from_initial(
         [], [], VMContext.calculate_size(len(recomp_program.jump_table))
     )
     # Execute with recompiler
-    result, pc, gas_left, final_registers = RecompilerPVM.execute(
-        recomp_program, guest_memory, 0, initial_registers.copy(), 1000
+    result, pc, gas_left, final_registers, recom_mem = Recompiler.execute(
+        recomp_program, 0, 1000, initial_registers.copy(), guest_memory
     )
 
     # The recompiler should execute the sbrk syscall
@@ -163,22 +163,22 @@ def test_sbrk_consistency():
     # Test with interpreter
     program = create_sbrk_test_program(rd=1, ra=2)
     initial_registers = [0, 0, 1024, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    initial_memory = Memory({}, [], [])
+    initial_memory = INT_Memory({}, [], [])
 
-    interp_status, interp_pc, interp_gas, interp_regs, interp_mem = PVM.execute(
+    interp_status, interp_pc, interp_gas, interp_regs, interp_mem = Interpreter.execute(
         program, 0, 1000, initial_registers.copy(), initial_memory
     )
 
     # Test with recompiler
     buffer = bytearray(program.encode_size())
     program.encode_into(buffer)
-    recomp_program = RecompilerProgram.decode(bytes(buffer))
-    guest_memory = GuestMemory.from_initial(
+    recomp_program = REC_Program.decode(bytes(buffer))
+    guest_memory = REC_Memory.from_initial(
         [], [], VMContext.calculate_size(len(recomp_program.jump_table))
     )
 
-    recomp_result, recomp_pc, recomp_gas, recomp_regs = RecompilerPVM.execute(
-        recomp_program, guest_memory, 0, initial_registers.copy(), 1000
+    recomp_result, recomp_pc, recomp_gas, recomp_regs, recom_mem = Recompiler.execute(
+        recomp_program, 0, 1000, initial_registers.copy(), guest_memory
     )
 
     print(

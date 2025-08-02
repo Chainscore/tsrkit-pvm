@@ -1,7 +1,29 @@
-import math
+"""Common utilities shared across PVM implementations."""
+
+from .constants import PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
+from math import ceil
+import math 
 from typing import List
 
 
+# --- Memory Utils --- #
+def total_page_size(blob_len: int) -> int:
+    """Calculate total page size needed for a blob."""
+    return PVM_MEMORY_PAGE_SIZE * ceil(blob_len / PVM_MEMORY_PAGE_SIZE)
+
+
+def total_zone_size(blob_len: int) -> int:
+    return PVM_INIT_ZONE_SIZE * ceil(blob_len / PVM_INIT_ZONE_SIZE)
+
+
+def get_pages(start_index: int, length: int) -> list[int]:
+    """Get list of page numbers spanning a memory range."""
+    start = start_index // PVM_MEMORY_PAGE_SIZE
+    end_index = start_index + max(length, 1) - 1
+    end = end_index // PVM_MEMORY_PAGE_SIZE
+    return list(range(start, end + 1))
+
+# --- Inst utils --- #
 def chi(value: int, n: int) -> int:
     # Make value (of size n) an unbounded integer
     return value + (math.floor(value / 2 ** (8 * n - 1)) * (2**64 - 2 ** (8 * n)))

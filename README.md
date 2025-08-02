@@ -1,245 +1,84 @@
-# Tessera Polkadot Virtual Machine (PVM)
+# Tessera PVM
 
-[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+Tessera PVM is a Python implementation of the Tessera virtual machine, offering two execution modes: a straightforward interpreter and a more performant recompiler.
 
-A high-performance PVM implementation for the Tessera client, featuring both an interpreter and recompiler for optimal bytecode execution.
+## Project Structure
 
-## Overview
+-   `tsrkit_pvm/`: The main package.
+    -   `core/`: Abstract base classes and core PVM components.
+    -   `common/`: Shared utilities and data structures.
+    -   `interpreter/`: The interpreter-based PVM implementation.
+    -   `recompiler/`: The recompiler-based PVM implementation.
+-   `tests/`: The project's test suite, which includes PVM test cases and schemas.
 
-Tessera PVM implementation is designed to execute bytecode efficiently with support for both Interpreter and Recompiler modes.
+## Core Components
 
-## Architecture
+The fundamental building blocks of the PVM are defined in `tsrkit_pvm/core/`:
 
-The PVM consists of two main methodologies:
+-   `ipvm.py`: Contains the `PVM` abstract base class.
+-   `program_base.py`: Defines the base class for PVM programs.
+-   `memory.py`: Provides the base class for memory management.
 
-### 1. Interpreter (`tsrkit_pvm.interpreter`)
+## Implementations
 
-The interpreter provides the core execution engine with:
-
-- **PVM**: Main virtual machine class for bytecode execution
-- **Program**: Program blob handling and instruction management
-- **Memory**: Memory management with paging and access control
-- **Instructions**: Complete instruction set implementation
-- **Status**: Execution status and error handling
-- **Register**: Register file management
-
-### 2. Recompiler (`tsrkit_pvm.recompiler`)
-
-WIP
+1.  **Interpreter**: Located in `tsrkit_pvm/interpreter/`, this implementation executes bytecode instruction by instruction. It is easier to debug and inspect.
+2.  **Recompiler**: Found in `tsrkit_pvm/recompiler/`, this implementation recompiles PVM bytecode into native machine code for significantly faster execution.
 
 ## Installation
 
-### From PyPI (when published)
+Install the package using pip:
 
 ```bash
-pip install tsrkit-pvm
+pip install .
 ```
 
-### Development Installation
+## Usage
 
-```bash
-# Clone the repository
-git clone https://github.com/tessera-project/tsr-pvm.git
-cd tsr-pvm
+The primary way to run a PVM program is to use the static `execute` method on either the `Interpreter` or `Recompiler` class.
 
-# Install in development mode
-pip install -e ".[dev]"
-```
-
-## Quick Start
+Here is a corrected example of how to execute a PVM program with the interpreter:
 
 ```python
-from tsrkit_pvm import PVM, Program, Memory
+from tsrkit_pvm.interpreter.pvm import Interpreter
+from tsrkit_pvm.interpreter.program import Program
+from tsrkit_pvm.interpreter.memory import INT_Memory
+from tsrkit_pvm.common.status import ExecutionStatus
 
-# Create a simple program
-program_data = b"..."  # Your bytecode here
-program = Program.from_json(program_data)
+# Your PVM bytecode
+bytecode = bytes([0, 0, 14, 40, 2, 200, 50, 1, 40, 2, 200, 67, 2, 51, 1, 40, 246, 165, 20])
 
-# Initialize memory
-memory = Memory()
+# 1. Decode the bytecode into a Program object
+# The `decode` method returns a single Program instance.
+program = Program.decode(bytecode)
 
-# Create and run PVM
-pvm = PVM(program, memory)
-status = pvm.run()
+# 2. Initialize memory, registers, and gas
+# INT_Memory takes a dictionary for initial memory, a list for input, and a list for output.
+memory = INT_Memory({}, [], [])
+registers = [0] * 13  # PVM has 13 registers
+gas = 100_000
 
-print(f"Execution completed with status: {status}")
+# 3. Execute the program
+status, final_pc, remaining_gas, final_registers, final_memory = Interpreter.execute(
+    program=program,
+    program_counter=0,
+    gas=gas,
+    registers=registers,
+    memory=memory
+)
+
+# 4. Check the result
+if status == ExecutionStatus.OUT_OF_GAS:
+    print("Execution finished: Out of gas.")
+    print(f"Gas consumed: {gas - remaining_gas}")
+else:
+    print(f"Execution finished with status: {status}")
+
 ```
 
-## Dependencies
+## Testing
 
-- **Python**: 3.11 or higher
-- **tsrkit-types**: Type definitions and utilities for the TSR Kit ecosystem
-
-## Development
-
-### Setting up Development Environment
+To run the comprehensive test suite and verify the functionality of both the interpreter and recompiler, use `pytest`:
 
 ```bash
-# Clone the repository
-git clone https://github.com/tessera-project/tsr-pvm.git
-cd tsr-pvm
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install development dependencies
-pip install -e ".[dev]"
-
-# Install pre-commit hooks
-pre-commit install
+poetry run pytest
 ```
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=tsrkit_pvm --cov-report=html
-
-# Run specific test categories
-pytest -m unit          # Unit tests only
-pytest -m integration   # Integration tests only
-pytest -m "not slow"    # Skip slow tests
-```
-
-### Code Quality
-
-The project uses several tools to maintain code quality:
-
-```bash
-# Format code
-black tsrkit_pvm/
-isort tsrkit_pvm/
-
-# Lint code
-flake8 tsrkit_pvm/
-
-# Type checking
-mypy tsrkit_pvm/
-```
-
-### Project Structure
-
-```
-tsr-pvm/
-├── tsrkit_pvm/                 # Main package
-│   ├── __init__.py            # Package exports
-│   ├── interpreter/           # Interpreter submodule
-│   │   ├── __init__.py       # Interpreter exports
-│   │   ├── pvm.py            # Main PVM class
-│   │   ├── program.py        # Program handling
-│   │   ├── memory.py         # Memory management
-│   │   ├── status.py         # Status and errors
-│   │   ├── register.py       # Register management
-│   │   ├── constants.py      # PVM constants
-│   │   └── instructions/     # Instruction set
-│   │       ├── __init__.py
-│   │       ├── inst_map.py   # Instruction mapping
-│   │       ├── opcode.py     # Opcode definitions
-│   │       └── tables/       # Instruction tables
-│   └── recompiler/           # Recompiler submodule (planned)
-│       └── __init__.py       # Recompiler exports
-├── tests/                    # Test suite
-├── pyproject.toml           # Project configuration
-├── README.md               # This file
-└── .gitignore             # Git ignore rules
-```
-
-## API Reference
-
-### Core Classes
-
-#### PVM
-
-The main virtual machine class for executing bytecode.
-
-```python
-from tsrkit_pvm import PVM
-
-pvm = PVM(program, memory)
-status = pvm.run()
-```
-
-#### Program
-
-Handles program blob loading and instruction management.
-
-```python
-from tsrkit_pvm import Program
-
-# Load from bytecode
-program = Program.from_json(bytecode_data)
-
-# Access program properties
-print(f"Jump table: {program.jump_table}")
-print(f"Instruction set size: {len(program.instruction_set)}")
-```
-
-#### Memory
-
-Manages virtual machine memory with paging support.
-
-```python
-from tsrkit_pvm import Memory
-
-memory = Memory()
-memory.write(address, data)
-data = memory.read(address, size)
-```
-
-### Status Codes
-
-The PVM uses several status codes to indicate execution state:
-
-- `CONTINUE`: Normal execution continues
-- `HALT`: Execution completed successfully
-- `PANIC`: Fatal error occurred
-- `OUT_OF_GAS`: Execution limit reached
-- `PAGE_FAULT`: Memory access violation
-- `HOST`: Host function call required
-
-## Contributing
-
-We welcome contributions! Please see our contributing guidelines:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass (`pytest`)
-6. Run code quality checks (`black`, `isort`, `flake8`, `mypy`)
-7. Commit your changes (`git commit -m 'Add amazing feature'`)
-8. Push to the branch (`git push origin feature/amazing-feature`)
-9. Open a Pull Request
-
-### Code Style
-
-- Follow PEP 8 guidelines
-- Use Black for code formatting
-- Add type hints for all public APIs
-- Write comprehensive docstrings
-- Maintain test coverage above 90%
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes.
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/tessera-project/tsr-pvm/issues)
-- **Documentation**: [Read the Docs](https://tsr-pvm.readthedocs.io)
-- **Discussions**: [GitHub Discussions](https://github.com/tessera-project/tsr-pvm/discussions)
-
-## Acknowledgments
-
-- Tessera Team
-- Polkadot ecosystem contributors

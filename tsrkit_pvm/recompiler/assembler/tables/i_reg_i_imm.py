@@ -1,10 +1,10 @@
 from os import wait
 from typing import Any, Callable, Dict, TYPE_CHECKING
 
-from tsrkit_pvm.interpreter.utils import chi, z, z_inv
+from tsrkit_pvm.common.utils import chi, z, z_inv
 
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 from ...vm_context import VMContext, r_map, TEMP_REG
 
 from tsrkit_asm import (

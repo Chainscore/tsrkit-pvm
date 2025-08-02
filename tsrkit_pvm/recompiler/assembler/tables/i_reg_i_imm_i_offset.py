@@ -1,8 +1,8 @@
 from typing import Dict
-from tsrkit_pvm.interpreter.utils import z
-from tsrkit_asm import Operands, Condition, RegMem, Size, ImmKind
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from tsrkit_pvm.common.utils import z
+from tsrkit_asm import Operands, Condition, RegMem, ImmKind
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 from ...vm_context import r_map
 
 

@@ -2,9 +2,9 @@
 
 import time
 from tsrkit_pvm.interpreter.memory import Memory
-from tsrkit_pvm.interpreter.program import Program
+from tsrkit_pvm.interpreter.program import INT_Program
 from tsrkit_pvm.interpreter.pvm import PVM
-from tsrkit_pvm.interpreter.status import ExecutionStatus
+from tsrkit_pvm.common.status import ExecutionStatus
 
 
 def test_benched_cgoi_interpreter():
@@ -340,7 +340,7 @@ def test_benched_cgoi_interpreter():
             33,
         ]
     )
-    program = Program.decode_from(bytecode)[0]
+    program = INT_Program.decode_from(bytecode)[0]
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     gas = 100000
@@ -371,7 +371,7 @@ def test_add_jump():
     bytecode = bytes(
         [0, 0, 14, 40, 2, 200, 50, 1, 40, 2, 200, 67, 2, 51, 1, 40, 246, 165, 20]
     )
-    program = Program.decode_from(bytecode)[0]
+    program = INT_Program.decode_from(bytecode)[0]
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     gas = 100_000
@@ -438,7 +438,7 @@ def test_add_jump_loop_1_000_000():
             2,
         ]
     )
-    program = Program.decode(bytecode)
+    program = INT_Program.decode(bytecode)
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     gas = 1_000_000

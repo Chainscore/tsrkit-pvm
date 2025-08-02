@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import Self, Tuple
+from typing import Any, Self, Tuple, Type
 
 from tsrkit_types.integers import Uint
 from tsrkit_types.itf.codable import Codable
 
-from .memory import Memory
-from .register import from_pc
+from tsrkit_pvm.core.memory import Memory
+
+from ..common.constants import PVM_INIT_DATA_SIZE, PVM_INIT_ZONE_SIZE
 
 
 @dataclass
@@ -73,10 +74,23 @@ class Code(Codable):
         return offset - start
 
 
-def y_function(bytecode: bytes, args: bytes) -> Tuple[bytes, list, Memory]:
+def regs_from_pc(args) -> list:
+    result = [0] * 13
+    result[0] = 2**32 - 2**16
+    result[1] = 2**32 - 2 * PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE
+    result[7] = 2**32 - PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE
+    result[8] = len(args)
+    return result
+
+def y_function(bytecode: bytes, args: bytes, mem_class: Type[Memory]) -> Tuple[bytes, list, Memory]:
+    """Extract program components from bytecode.
+    
+    Returns:
+        Tuple of (program_code, registers, memory_data)
+    """
     code = Code.decode_from(bytecode)
     return (
         code.code,
-        from_pc(args),
-        Memory.from_pc(code.read, code.r_write, args, code.z, code.s),
+        regs_from_pc(args),
+        mem_class.from_pc(code.read, code.r_write, args, code.z, code.s),
     )

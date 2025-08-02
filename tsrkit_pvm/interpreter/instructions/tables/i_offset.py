@@ -1,10 +1,10 @@
 from typing import Dict
 
 from ...memory import Memory
-from ...status import CONTINUE
-from ...utils import z
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode, OpReturn
+from ....common.status import CONTINUE
+from ....common.utils import z
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode, OpReturn
 
 
 class WArgsOneOffset(InstructionTable):

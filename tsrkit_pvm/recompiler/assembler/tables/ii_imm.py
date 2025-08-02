@@ -1,10 +1,10 @@
 from typing import Any, Callable, Dict
 from tsrkit_asm import Reg, MemOp, PyAssembler
 
-from tsrkit_pvm.interpreter.utils import z
+from tsrkit_pvm.common.utils import z
 from ...vm_context import r_map, TEMP_REG
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 
 
 class InstructionsWArgs2Imm(InstructionTable):

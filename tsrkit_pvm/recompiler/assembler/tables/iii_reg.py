@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, TYPE_CHECKING
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 from ...vm_context import r_map, TEMP_REG
 from tsrkit_asm import RegSize, RegMem, Operands, Reg, Condition, Size, ImmKind, MemOp
 

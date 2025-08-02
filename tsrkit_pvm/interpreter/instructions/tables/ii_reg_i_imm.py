@@ -1,10 +1,10 @@
 from typing import Any, Callable, Dict
 
 from ...memory import Memory
-from ...status import CONTINUE
-from ...utils import b, b_inv, chi, compare, z, z_inv
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode, OpReturn
+from ....common.status import CONTINUE
+from ....common.utils import b, b_inv, chi, compare, z, z_inv
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs2Reg1Imm(InstructionTable):

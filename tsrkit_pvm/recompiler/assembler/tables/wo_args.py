@@ -1,7 +1,7 @@
 from typing import Dict
 
-from ..instruction_table import InstructionTable
-from ..opcode import OpCode
+from ....core.instruction_table import InstructionTable
+from ....core.opcode import OpCode
 
 
 class InstructionsWoArgs(InstructionTable):
