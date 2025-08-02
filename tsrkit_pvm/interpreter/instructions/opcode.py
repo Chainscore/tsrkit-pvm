@@ -6,6 +6,7 @@ from ..status import ExecutionStatus
 
 OpReturn = Tuple[ExecutionStatus, Any, list, Memory]
 
+
 @dataclass
 class OpCode:
     name: str

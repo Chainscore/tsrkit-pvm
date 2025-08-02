@@ -36,24 +36,21 @@ class GuestMemory:
 
         # Set up memory protections for mapped pages
         for pm in initial_page_map:
-            prot = (mmap.PROT_READ | mmap.PROT_WRITE)
+            prot = mmap.PROT_READ | mmap.PROT_WRITE
             # Calculate the actual memory address within our buffer
             start_addr = mem.buf_start + vm_size + pm["address"]
-
 
             # Ensure the address is page-aligned
             page_size = 4096  # Standard page size
             aligned_addr = (start_addr // page_size) * page_size
 
-            res = libc.mprotect(
-                ctypes.c_void_p(aligned_addr), 
-                pm["length"], 
-                prot
-            )
+            res = libc.mprotect(ctypes.c_void_p(aligned_addr), pm["length"], prot)
             # mprotect returns 0 on success, -1 on failure
             if res != 0:
                 error = ctypes.get_errno()
-                print(f"Warning: mprotect failed for address {hex(start_addr)}: {error}")
+                print(
+                    f"Warning: mprotect failed for address {hex(start_addr)}: {error}"
+                )
                 # Continue without failing - the memory might still be usable
 
         # Initialize memory data
@@ -66,8 +63,8 @@ class GuestMemory:
 
         return mem
 
-    def alter_accessibility(self, start: int, len_: int, is_write = True):
-        prot = (mmap.PROT_READ | mmap.PROT_WRITE)
+    def alter_accessibility(self, start: int, len_: int, is_write=True):
+        prot = mmap.PROT_READ | mmap.PROT_WRITE
         # Calculate the actual memory address within our buffer
         start_addr = self.offset + start
 
@@ -75,11 +72,7 @@ class GuestMemory:
         page_size = 4096  # Standard page size
         aligned_addr = (start_addr // page_size) * page_size
 
-        res = libc.mprotect(
-            ctypes.c_void_p(aligned_addr), 
-            len_, 
-            prot
-        )
+        res = libc.mprotect(ctypes.c_void_p(aligned_addr), len_, prot)
         # mprotect returns 0 on success, -1 on failure
         if res != 0:
             error = ctypes.get_errno()

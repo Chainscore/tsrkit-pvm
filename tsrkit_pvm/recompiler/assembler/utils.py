@@ -1,6 +1,7 @@
 from tsrkit_asm import LoadKind, MemOp, Reg, RegSize, Size
 from ..vm_context import r_map, regs_offset
 
+
 def save_all_regs(asm):
     for i, reg in enumerate(r_map):
         asm.store(
@@ -10,6 +11,7 @@ def save_all_regs(asm):
             ),
             reg=reg,
         )
+
 
 def load_all_regs(asm):
     for i, reg in enumerate(r_map):
@@ -25,9 +27,11 @@ def load_all_regs(asm):
             ),
         )
 
+
 def push_all_regs(asm):
     for i in r_map:
         asm.push(i)
+
 
 def pop_all_regs(asm):
     for i in reversed(r_map):

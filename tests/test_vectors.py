@@ -67,9 +67,7 @@ def test_vectors(pattern: str):
             int(vector["initial-gas"]),
         )
 
-        assert registers == vector["expected-regs"], (
-            f"Register mismatch in {name}"
-        )
+        assert registers == vector["expected-regs"], f"Register mismatch in {name}"
         print("✅Passed")
 
 
@@ -93,7 +91,7 @@ def test_pvm_vectors_single_pattern():
             mem = GuestMemory.from_initial(
                 vector["initial-page-map"],
                 vector["initial-memory"],
-                VMContext.calculate_size(len(program.jump_table))
+                VMContext.calculate_size(len(program.jump_table)),
             )
 
             status, counter, rem_gas, registers = PVM.execute(
@@ -102,12 +100,10 @@ def test_pvm_vectors_single_pattern():
                 int(vector["initial-pc"]),
                 vector["initial-regs"],
                 int(vector["initial-gas"]),
-                logger
+                logger,
             )
 
-            assert registers == vector["expected-regs"], (
-                f"Register mismatch in {name}"
-            )
+            assert registers == vector["expected-regs"], f"Register mismatch in {name}"
 
             assert status._value_.name == vector["expected-status"]
 

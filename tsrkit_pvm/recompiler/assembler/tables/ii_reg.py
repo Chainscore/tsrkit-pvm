@@ -89,7 +89,7 @@ class InstructionsWArgs2Reg(InstructionTable):
         PVM_SYS_SBRK = 999
         # Save all regs before exiting
         save_all_regs(asm)
-        pop_all_regs(asm) # This is safe to do so, not doing this also works 
+        pop_all_regs(asm)  # This is safe to do so, not doing this also works
         # Load rax in rcx
         asm.mov_imm64(Reg.rax, PVM_SYS_SBRK)
 
@@ -138,23 +138,17 @@ class InstructionsWArgs2Reg(InstructionTable):
     def sign_extend_8(self, asm):
         """rd = sign_extend_8(ra) (sign extend 8-bit value to 64-bit)"""
         # Use MOVSX to sign extend from 8-bit to 64-bit
-        asm.movsx_8_to_64(
-            RegSize.R64, r_map[self.rd], r_map[self.ra]
-        )
+        asm.movsx_8_to_64(RegSize.R64, r_map[self.rd], r_map[self.ra])
 
     def sign_extend_16(self, asm):
         """rd = sign_extend_16(ra) (sign extend 16-bit value to 64-bit)"""
         # Use MOVSX to sign extend from 16-bit to 64-bit
-        asm.movsx_16_to_64(
-            RegSize.R64, r_map[self.rd], r_map[self.ra]
-        )
+        asm.movsx_16_to_64(RegSize.R64, r_map[self.rd], r_map[self.ra])
 
     def zero_extend_16(self, asm):
         """rd = zero_extend_16(ra) (zero extend 16-bit value to 64-bit)"""
         # Use MOVZX to zero extend from 16-bit to 64-bit
-        asm.movzx_16_to_64(
-            RegSize.R64, r_map[self.rd], r_map[self.ra]
-        )
+        asm.movzx_16_to_64(RegSize.R64, r_map[self.rd], r_map[self.ra])
 
     def reverse_bytes(self, asm):
         """rd = bswap(ra) (reverse byte order of 64-bit value)"""

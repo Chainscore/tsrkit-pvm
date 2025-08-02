@@ -8,11 +8,21 @@ from tsrkit_pvm.recompiler.vm_context import VMContext, gas_offset
 from ..interpreter.constants import PVM_ADDR_ALIGNMENT
 from .assembler.inst_map import inst_map
 from ..interpreter.status import CONTINUE, HALT, PANIC, ExecutionStatus, PvmError
-from tsrkit_asm import Condition, ImmKind, MemOp, Operands, PyAssembler, Reg, RegMem, RegSize
+from tsrkit_asm import (
+    Condition,
+    ImmKind,
+    MemOp,
+    Operands,
+    PyAssembler,
+    Reg,
+    RegMem,
+    RegSize,
+)
 
 
 class AssemblerContext:
     """Wrapper for Assembler to contain labels"""
+
     asm: PyAssembler
     labels: Dict[int, int]
     halt_label: int
@@ -22,7 +32,7 @@ class AssemblerContext:
     def __init__(self, assembler, labels, halt_label, panic_label, jump_table_len):
         self.asm = assembler
         self.labels = labels
-        self.halt_label = halt_label 
+        self.halt_label = halt_label
         self.panic_label = panic_label
         self.jump_table_len = jump_table_len
 
@@ -55,15 +65,15 @@ class Program(Codable):
     _jump_table_len: int
     _jump_table_max_addr: int
     _skip_cache: Dict[int, int]
-   
+
     # Assembled Machine Code
     msn_code: bytes
-    # Indexes of machine inst in msn_code 
+    # Indexes of machine inst in msn_code
     pvm_msn_map: list[int]
     # Index to halt label
-    halt_offset: int 
+    halt_offset: int
     # Index to panic label
-    panic_offset: int 
+    panic_offset: int
 
     def __init__(
         self,
@@ -100,9 +110,11 @@ class Program(Codable):
         self.zeta = bytearray(self.instruction_set) + bytes(100)
         self._basic_blocks_set = set(self.basic_blocks)
 
-        self.msn_code, self.pvm_msn_map, self.panic_offset, self.halt_offset = self.assemble()
+        self.msn_code, self.pvm_msn_map, self.panic_offset, self.halt_offset = (
+            self.assemble()
+        )
 
-    def assemble(self, logger = None) -> Tuple[bytes, dict, int, int]:
+    def assemble(self, logger=None) -> Tuple[bytes, dict, int, int]:
         asm = PyAssembler()
 
         # Create labels for all basic blocks (jump targets)
@@ -110,11 +122,13 @@ class Program(Codable):
         for i in range(len(self.instruction_set)):
             if self.offset_bitmask[i]:
                 labels[i] = asm.forward_declare_label()
-        
+
         halt_label = asm.forward_declare_label()
         panic_label = asm.forward_declare_label()
         # Create context wrapper
-        asm_ctx = AssemblerContext(asm, labels, halt_label, panic_label, len(self.jump_table))
+        asm_ctx = AssemblerContext(
+            asm, labels, halt_label, panic_label, len(self.jump_table)
+        )
 
         counter = 0
         pvm_table = []
@@ -127,26 +141,35 @@ class Program(Codable):
                 pvm_table.append(asm.current_address())
 
                 opcode = self.instruction_set[counter]
-                if logger: logger.debug(f"📍 {counter} \t Processing opcode \t {inst_map._dispatch_table[opcode].fn.__name__} ({opcode})")
+                if logger:
+                    logger.debug(
+                        f"📍 {counter} \t Processing opcode \t {inst_map._dispatch_table[opcode].fn.__name__} ({opcode})"
+                    )
                 gas = inst_map.assemble_instruction(opcode, self, counter, asm_ctx)
-                
+
                 # --- Gas Computation --- #
                 x61mov_imm = -gas_offset + 0x61
-                asm.sub(Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm)))
+                asm.sub(
+                    Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
+                )
                 asm.sub(
                     Operands.RegMem_Imm(
                         RegMem.Mem(
-                            MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=0x61)
+                            MemOp.BaseOffset(
+                                seg=None, size=RegSize.R64, base=Reg.r15, offset=0x61
+                            )
                         ),
-                        ImmKind.I32(gas)
+                        ImmKind.I32(gas),
                     )
                 )
                 asm.jcc_rel32(Condition.Sign, -2)
-                asm.add(Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm)))
+                asm.add(
+                    Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
+                )
 
             counter += 1
-        
-        # If normally returned, then its a panic 
+
+        # If normally returned, then its a panic
         asm.define_label(panic_label)
         panic_addr = asm.current_address()
         asm.ret()
@@ -157,7 +180,10 @@ class Program(Codable):
         # Jump to memory, which is non-executable and will throw seg fault
         asm.ud2()
 
-        if logger: logger.debug(f"🧩 Assembled program size: {asm.len()} | Starting PC offset: {msn_pc_offset}")
+        if logger:
+            logger.debug(
+                f"🧩 Assembled program size: {asm.len()} | Starting PC offset: {msn_pc_offset}"
+            )
 
         return asm.finalize(), pvm_table, panic_addr, halt_addr
 
@@ -167,8 +193,10 @@ class Program(Codable):
         res = 0
         # Binary search to find
         while len(target) != 1:
-            res = (len(target) // 2)
-            target = target[:res] if msn_offset < self.pvm_msn_map[res] else target[res:]
+            res = len(target) // 2
+            target = (
+                target[:res] if msn_offset < self.pvm_msn_map[res] else target[res:]
+            )
         return res
 
     def pvm_to_msn_index(self, pvm_offset: int) -> int:

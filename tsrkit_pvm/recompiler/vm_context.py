@@ -62,6 +62,7 @@ jump_len_offset = regs_offset - 8
 @structure
 class VMContext:
     """VM context structure with 4 guest registers, gas, and jump table"""
+
     # --- Jump Table --- #
     jump_table: TypedArray[U64]
     jump_table_len: U64
@@ -76,13 +77,13 @@ class VMContext:
     heap_start: U32
 
     def __init__(
-        self, 
-        jump_table: list[int], 
-        regs: list[int], 
-        gas = 0, 
-        ret_addr = 0, 
-        ret_stack = 0,
-        heap_start = 0
+        self,
+        jump_table: list[int],
+        regs: list[int],
+        gas=0,
+        ret_addr=0,
+        ret_stack=0,
+        heap_start=0,
     ):
         self.jump_table = TypedArray[U64, len(jump_table)]([U64(j) for j in jump_table])
         self.jump_table_len = U64(len(jump_table))
@@ -104,7 +105,7 @@ class VMContext:
     def from_pointer(cls, pointer: int, jump_len: int):
         buf_len = cls.calculate_size(jump_len)
         buffer = ctypes.string_at(pointer, buf_len)
-        
+
         heap_start = U32.decode(buffer[heap_start_offset:])
         ret_stack = U64.decode(buffer[ret_stack_offset:])
         ret_addr = U64.decode(buffer[ret_add_offset:])
@@ -115,7 +116,7 @@ class VMContext:
 
         return cls(jump_table, regs, gas, ret_addr, ret_stack)
 
-    def store(self, guest: GuestMemory, logger = None):
+    def store(self, guest: GuestMemory, logger=None):
         encoded = self.encode()
         size = len(encoded)
 
@@ -129,6 +130,7 @@ class VMContext:
         # Write to its buffer
         ctypes.memmove(vm_pointer, encoded, size)
 
-        if logger: logger.debug(f"VM Context of size {size}; stored at", vm_pointer)
+        if logger:
+            logger.debug(f"VM Context of size {size}; stored at", vm_pointer)
 
         return vm_pointer, size

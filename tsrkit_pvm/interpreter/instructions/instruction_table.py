@@ -7,6 +7,7 @@ from .opcode import OpCode
 if TYPE_CHECKING:
     from ..program import Program
 
+
 class InstructionTable(Protocol):
     """
     A protocol for instruction tables.
@@ -15,7 +16,7 @@ class InstructionTable(Protocol):
 
     counter: int
     program: "Program"
-    
+
     # Constructor
     def __init__(self, counter: int, program: "Program"):
         self.counter = counter
@@ -26,15 +27,11 @@ class InstructionTable(Protocol):
         return self.program.skip(self.counter)
 
     @classmethod
-    def table(cls) -> Dict[int, OpCode]: 
-        ...
-    
+    def table(cls) -> Dict[int, OpCode]: ...
+
     # Execute the instruction
     def execute(
-        self, 
-        opcode: int,
-        registers: list,
-        memory: Memory
+        self, opcode: int, registers: list, memory: Memory
     ) -> Tuple[ExecutionStatus, int, list, Memory]:
         # Read the opcode from instruction table
         op = self.table()[opcode]

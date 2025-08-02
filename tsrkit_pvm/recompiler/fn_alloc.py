@@ -9,7 +9,7 @@ else:
     libc = ctypes.CDLL("libc.so.6")
 
 
-def allocate_executable_memory(code, logger = None):
+def allocate_executable_memory(code, logger=None):
     """Allocate RWX memory and copy machine code"""
     size = len(code)
     # Allocate RW memory first
@@ -30,5 +30,6 @@ def allocate_executable_memory(code, logger = None):
         err = ctypes.get_errno()
         raise OSError(err, "mprotect failed to set RX permissions")
 
-    if logger: logger.debug(f"Executable of size {size} stored at {addr}")
+    if logger:
+        logger.debug(f"Executable of size {size} stored at {addr}")
     return buf, addr

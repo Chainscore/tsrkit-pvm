@@ -32,13 +32,13 @@ from .interpreter import (
 __all__ = [
     # Core classes
     "PVM",
-    "Program", 
+    "Program",
     "Memory",
     # Status and errors
     "ExecutionStatus",
     "PvmError",
     "CONTINUE",
-    "HALT", 
+    "HALT",
     "PANIC",
     "OUT_OF_GAS",
     "PAGE_FAULT",

@@ -107,7 +107,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
         """Load immediate value into register and jump to target address"""
         # Load immediate value into register
         asm.mov_imm64(r_map[self.ra], self.vx)
-        
+
         # Jump to target address
         target_addr = self.vy
         if target_addr in asm.labels:

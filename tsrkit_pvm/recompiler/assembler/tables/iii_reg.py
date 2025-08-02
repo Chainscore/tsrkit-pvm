@@ -87,13 +87,17 @@ class InstructionsWArgs3Reg(InstructionTable):
         if self.rd == self.rb:
             asm.add(
                 Operands.RegMem_Reg(
-                    size=Size.U32, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.ra]
+                    size=Size.U32,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.ra],
                 )
             )
         elif self.rd == self.ra:
             asm.add(
                 Operands.RegMem_Reg(
-                    size=Size.U32, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U32,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         else:
@@ -102,7 +106,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Add rb to rd
             asm.add(
                 Operands.RegMem_Reg(
-                    size=Size.U32, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U32,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -113,13 +119,17 @@ class InstructionsWArgs3Reg(InstructionTable):
         if self.rd == self.rb:
             asm.add(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.ra]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.ra],
                 )
             )
         elif self.rd == self.ra:
             asm.add(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         else:
@@ -128,7 +138,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Add rb to rd
             asm.add(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
 
@@ -137,16 +149,16 @@ class InstructionsWArgs3Reg(InstructionTable):
         if self.ra == self.rd:
             asm.sub(
                 Operands.RegMem_Reg(
-                    size=Size.U32, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U32,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         elif self.rb == self.rd:
             asm.neg(Size.U32, RegMem.Reg(r_map[self.rd]))
             asm.add(
                 Operands.RegMem_Reg(
-                    Size.U32,
-                    RegMem.Reg(r_map[self.rd]), 
-                    r_map[self.ra]
+                    Size.U32, RegMem.Reg(r_map[self.rd]), r_map[self.ra]
                 )
             )
         else:
@@ -155,7 +167,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Subtract rb from rd
             asm.sub(
                 Operands.RegMem_Reg(
-                    size=Size.U32, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U32,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -166,16 +180,16 @@ class InstructionsWArgs3Reg(InstructionTable):
         if self.ra == self.rd:
             asm.sub(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         elif self.rb == self.rd:
             asm.neg(Size.U64, RegMem.Reg(r_map[self.rd]))
             asm.add(
                 Operands.RegMem_Reg(
-                    Size.U64,
-                    RegMem.Reg(r_map[self.rd]), 
-                    r_map[self.ra]
+                    Size.U64, RegMem.Reg(r_map[self.rd]), r_map[self.ra]
                 )
             )
         else:
@@ -184,7 +198,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Subtract rb from rd
             asm.sub(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
 
@@ -328,11 +344,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Normal division: use direct div instruction
         asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[self.ra])  # Load dividend
         asm.xor_(
-            Operands.RegMem_Reg(
-                size=Size.U64, 
-                reg_mem=RegMem.Reg(Reg.rdx), 
-                reg=Reg.rdx
-            )
+            Operands.RegMem_Reg(size=Size.U64, reg_mem=RegMem.Reg(Reg.rdx), reg=Reg.rdx)
         )  # Clear rdx
         asm.div(RegSize.R64, RegMem.Reg(r_map[self.rb]))  # Direct division
         asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rax)  # Result
@@ -425,15 +437,23 @@ class InstructionsWArgs3Reg(InstructionTable):
 
         # Normal remainder: use direct div instruction
         # For unsigned 32-bit remainder, we need to treat inputs as 32-bit unsigned values
-        asm.mov(size=RegSize.R32, a=Reg.rax, b=r_map[self.ra])  # Load dividend (auto-zeros upper 32 bits)
+        asm.mov(
+            size=RegSize.R32, a=Reg.rax, b=r_map[self.ra]
+        )  # Load dividend (auto-zeros upper 32 bits)
         asm.xor_(
             Operands.RegMem_Reg(size=Size.U32, reg_mem=RegMem.Reg(Reg.rdx), reg=Reg.rdx)
         )  # Clear rdx for 64-bit dividend rdx:rax
-        
+
         # Ensure divisor is treated as 32-bit unsigned by using a temp register
-        asm.mov(size=RegSize.R32, a=TEMP_REG, b=r_map[self.rb])  # Load divisor as 32-bit (auto-zeros upper 32 bits)
-        asm.div(RegSize.R32, RegMem.Reg(TEMP_REG))  # Direct division (32-bit) using temp register
-        asm.mov(size=RegSize.R32, a=r_map[self.rd], b=Reg.rdx)  # Remainder in rdx, auto-zeros upper 32 bits
+        asm.mov(
+            size=RegSize.R32, a=TEMP_REG, b=r_map[self.rb]
+        )  # Load divisor as 32-bit (auto-zeros upper 32 bits)
+        asm.div(
+            RegSize.R32, RegMem.Reg(TEMP_REG)
+        )  # Direct division (32-bit) using temp register
+        asm.mov(
+            size=RegSize.R32, a=r_map[self.rd], b=Reg.rdx
+        )  # Remainder in rdx, auto-zeros upper 32 bits
         asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
         asm.jmp_label32(end_label)
 
@@ -694,20 +714,26 @@ class InstructionsWArgs3Reg(InstructionTable):
         if self.rd == self.rb:
             asm.and_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.ra]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.ra],
                 )
             )
         elif self.rd == self.ra:
             asm.and_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         else:
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.and_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
 
@@ -716,20 +742,26 @@ class InstructionsWArgs3Reg(InstructionTable):
         if self.rd == self.rb:
             asm.xor_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.ra]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.ra],
                 )
             )
         elif self.rd == self.ra:
             asm.xor_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         else:
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.xor_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
 
@@ -738,20 +770,26 @@ class InstructionsWArgs3Reg(InstructionTable):
         if self.rd == self.rb:
             asm.or_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.ra]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.ra],
                 )
             )
         elif self.rd == self.ra:
             asm.or_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         else:
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.or_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
 
@@ -819,7 +857,11 @@ class InstructionsWArgs3Reg(InstructionTable):
         label_end = asm.forward_declare_label()
 
         # Test if ra (in rcx) is negative
-        asm.test(Operands.RegMem_Reg(size=Size.U64, reg_mem=RegMem.Reg(TEMP_REG), reg=TEMP_REG))
+        asm.test(
+            Operands.RegMem_Reg(
+                size=Size.U64, reg_mem=RegMem.Reg(TEMP_REG), reg=TEMP_REG
+            )
+        )
         asm.jcc_label32(Condition.NotSign, label_pos)
 
         # --- Negative case: ra < 0 ---
@@ -829,9 +871,15 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Now, calculate -(hi + carry). Result should end up in rdx.
         # hi is in rdx, lo is in rax. We reuse rcx for the carry.
         asm.mov_imm64(TEMP_REG, 0)
-        asm.test(Operands.RegMem_Reg(size=Size.U64, reg_mem=RegMem.Reg(Reg.rax), reg=Reg.rax))
+        asm.test(
+            Operands.RegMem_Reg(size=Size.U64, reg_mem=RegMem.Reg(Reg.rax), reg=Reg.rax)
+        )
         asm.setcc(Condition.NotEqual, RegMem.Reg(TEMP_REG))  # rcx = (rax != 0) ? 1 : 0
-        asm.add(Operands.RegMem_Reg(size=Size.U64, reg_mem=RegMem.Reg(Reg.rdx), reg=TEMP_REG))  # rdx = hi + carry
+        asm.add(
+            Operands.RegMem_Reg(
+                size=Size.U64, reg_mem=RegMem.Reg(Reg.rdx), reg=TEMP_REG
+            )
+        )  # rdx = hi + carry
         asm.neg(Size.U64, RegMem.Reg(Reg.rdx))  # rdx = -(hi + carry)
         asm.jmp_label32(label_end)
 
@@ -846,13 +894,13 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Now, move it to the destination register `rd` and restore clobbered registers.
         # The stack contains: [original rcx], [original rdx], [original rax]
         if self.rd == 1:  # rd is rax
-            asm.mov(size=RegSize.R64, a=Reg.rax, b=Reg.rdx) # Move result to rax
+            asm.mov(size=RegSize.R64, a=Reg.rax, b=Reg.rdx)  # Move result to rax
             asm.pop(TEMP_REG)
             asm.pop(Reg.rdx)
             asm.add_imm8(Reg.rsp, 8)  # Discard original rax from stack
-        elif self.rd == 2: # rd is rcx
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=Reg.rdx) # Move result to rcx
-            asm.add_imm8(Reg.rsp, 8) # Discard original rcx from stack
+        elif self.rd == 2:  # rd is rcx
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=Reg.rdx)  # Move result to rcx
+            asm.add_imm8(Reg.rsp, 8)  # Discard original rcx from stack
             asm.pop(Reg.rdx)
             asm.pop(Reg.rax)
         elif self.rd == 4:  # rd is rdx
@@ -1054,13 +1102,17 @@ class InstructionsWArgs3Reg(InstructionTable):
         if self.rd == self.rb:
             asm.xor_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.ra]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.ra],
                 )
             )
         elif self.rd == self.ra:
             asm.xor_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         else:
@@ -1069,7 +1121,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # XOR with rb
             asm.xor_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.rd]),
+                    reg=r_map[self.rb],
                 )
             )
         # Invert result
@@ -1092,7 +1146,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Normal case or ra == rd (which is fine)
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.ra]),
+                    reg=r_map[self.rb],
                 )
             )
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
@@ -1117,7 +1173,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Normal case or ra == rd (which is fine)
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.ra]),
+                    reg=r_map[self.rb],
                 )
             )
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
@@ -1137,17 +1195,24 @@ class InstructionsWArgs3Reg(InstructionTable):
                 )
             )
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.cmov(Condition.Greater, RegSize.R64, r_map[self.rd], RegMem.Reg(TEMP_REG))
+            asm.cmov(
+                Condition.Greater, RegSize.R64, r_map[self.rd], RegMem.Reg(TEMP_REG)
+            )
         else:
             # Normal case or ra == rd (which is fine)
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.ra]),
+                    reg=r_map[self.rb],
                 )
             )
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.cmov(
-                Condition.Greater, RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.rb])
+                Condition.Greater,
+                RegSize.R64,
+                r_map[self.rd],
+                RegMem.Reg(r_map[self.rb]),
             )
 
     def min_u(self, asm):
@@ -1167,7 +1232,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Normal case or ra == rd (which is fine)
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.ra]),
+                    reg=r_map[self.rb],
                 )
             )
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])

@@ -19,7 +19,7 @@ from tsrkit_asm import (
     Size,
     Condition,
     RegIndex,
-    Scale
+    Scale,
 )
 
 
@@ -85,20 +85,26 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
         # Part 4: Validate PVM address (check alignment, bounds, etc.)
         # Check if pvm_address == 0 (invalid)
         asm.test(
-            Operands.RegMem_Reg(size=Size.U32, reg_mem=RegMem.Reg(TEMP_REG), reg=TEMP_REG)
+            Operands.RegMem_Reg(
+                size=Size.U32, reg_mem=RegMem.Reg(TEMP_REG), reg=TEMP_REG
+            )
         )
         asm.jcc_label32(Condition.Equal, asm.panic_label)
 
         # Check alignment: pvm_address % 2 == 0
         asm.test(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(1)))
         asm.jcc_label32(Condition.NotEqual, asm.panic_label)
-        
+
         # Calculate jump table index: (pvm_address / 2) - 1
         asm.shr_imm(RegSize.R64, RegMem.Reg(TEMP_REG), 1)  # rcx = pvm_address / 2
         asm.dec(Size.U64, RegMem.Reg(TEMP_REG))
-        
+
         # Check bounds: index >= jump_table_len
-        asm.cmp(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(asm.jump_table_len)))
+        asm.cmp(
+            Operands.RegMem_Imm(
+                reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(asm.jump_table_len)
+            )
+        )
         asm.jcc_label32(Condition.AboveOrEqual, asm.panic_label)
 
         # Jump to the machine code address

@@ -15,6 +15,7 @@ PVM_ROOT = Path(__file__).parent / "ext" / "pvm" / "programs"
 def fetch_vectors(pattern: str):
     return [(f.name, json.load(open(f))) for f in PVM_ROOT.glob(pattern)]
 
+
 @pytest.mark.skip
 def test_debug_mismatch():
     """Test a single pattern - can be modified for quick testing"""
@@ -22,16 +23,16 @@ def test_debug_mismatch():
     all_matches = fetch_vectors(pattern)
     if len(all_matches) == 0:
         print(f"No matches found for pattern -- {pattern}")
-        return 
+        return
     name, vector = all_matches[0]
     print(f"\n ⏭️Running test case {name} ...")
     print(f"Processing test case: {vector['name']}")
 
-
     from tsrkit_pvm.interpreter.program import Program
+
     tc = PvmTestcase.from_json(vector)
     tc_prog = Program.decode(tc.program)
-    
+
     c = 0
     for i, inst in enumerate(tc_prog.instruction_set):
         if tc_prog.offset_bitmask[i]:
@@ -44,7 +45,6 @@ def test_debug_mismatch():
         print(f"[1] Running in PVM mode...")
         from tsrkit_pvm.interpreter.pvm import PVM
 
-
         i_status, i_pc, i_gas, i_registers, i_memory = PVM.execute(
             tc_prog,
             int(tc.initial_pc),
@@ -52,7 +52,7 @@ def test_debug_mismatch():
             [int(reg) for reg in tc.initial_regs],
             tc.initial_memory.to_memory(tc.initial_page_map),
         )
-        
+
         print(f"[2] Running in native mode...")
         from tsrkit_pvm.recompiler.program import Program
         from tsrkit_pvm.recompiler.pvm import PVM

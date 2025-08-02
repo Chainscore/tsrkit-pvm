@@ -52,4 +52,3 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
         registers[self.ra] = self.vx
         status, counter = self.program.djump(self.counter, floor(wb + self.vy) % 2**32)
         return status, counter, registers, memory
-

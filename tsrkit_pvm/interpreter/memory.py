@@ -14,14 +14,13 @@ class Memory:
     Sparse, page-mapped memory model with read/write page protection.
     """
 
-
     def __init__(
         self,
         data: Dict[int, int] | None = None,
         allowed_read_pages: List[int] | None = None,
         allowed_write_pages: List[int] | None = None,
         heap: int = 0,
-        logger = None
+        logger=None,
     ):
         allowed_read_pages = allowed_read_pages or []
         allowed_write_pages = allowed_write_pages or []
@@ -71,12 +70,12 @@ class Memory:
         pg = self._page_index(addr)
         if write:
             if pg not in self._w_pages:
-                if self.logger: 
+                if self.logger:
                     self.logger.debug(f"Not allowed to write {addr}(Page={pg})")
                 raise PvmError(PAGE_FAULT(addr))
         else:
             if pg not in self._r_pages and pg not in self._w_pages:
-                if self.logger: 
+                if self.logger:
                     self.logger.debug(f"Not allowed to read {addr}(Page={pg})")
                 raise PvmError(PAGE_FAULT(addr))
 
@@ -128,7 +127,6 @@ class Memory:
             address += chunk
             cursor += chunk
 
-
     def is_accessible(self, address: int, length: int, for_write: bool = False) -> bool:
         if length <= 0:
             return True
@@ -137,9 +135,13 @@ class Memory:
             return all(pg in self._w_pages for pg in pages)
         return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
 
-    def dump_memory(self, start: int, end: int):        # debug helper
+    def dump_memory(self, start: int, end: int):  # debug helper
         return [
-            self._page_for(addr)[addr % PAGE_SIZE] if self._page_index(addr) in self._pages else 0
+            (
+                self._page_for(addr)[addr % PAGE_SIZE]
+                if self._page_index(addr) in self._pages
+                else 0
+            )
             for addr in range(start, end)
         ]
 
@@ -171,20 +173,26 @@ class Memory:
         read_pages = cls.get_pages(read_start, cls.total_page_size(len(read)))
         # print(f"READ \t\t | Start: {int(read_start).to_bytes(4).hex()} \t | End {int(read_pages[-1] * PVM_MEMORY_PAGE_SIZE).to_bytes(4).hex()}")
         for i, byt in enumerate(read):
-            memory[read_start+i] = int(byt)
+            memory[read_start + i] = int(byt)
 
-        write_start = 2*PVM_INIT_ZONE_SIZE + cls.total_zone_size(len(read))
-        write_pages = cls.get_pages(write_start, cls.total_page_size(len(write)) + (int(z) * PVM_MEMORY_PAGE_SIZE))
+        write_start = 2 * PVM_INIT_ZONE_SIZE + cls.total_zone_size(len(read))
+        write_pages = cls.get_pages(
+            write_start,
+            cls.total_page_size(len(write)) + (int(z) * PVM_MEMORY_PAGE_SIZE),
+        )
         # print(f"WRITE \t\t | Start: {int(write_start).to_bytes(4).hex()} \t | End {int((write_pages[-1] + 1) * PVM_MEMORY_PAGE_SIZE).to_bytes(4).hex()}")
         for i, byt in enumerate(write):
-            memory[write_start+i] = int(byt)
+            memory[write_start + i] = int(byt)
 
         heap = int((write_pages[-1] + 1) * PVM_MEMORY_PAGE_SIZE)
 
         write_pages.extend(
             cls.get_pages(
-                2**32 - 2*PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE - cls.total_page_size(s),
-                cls.total_page_size(s)
+                2**32
+                - 2 * PVM_INIT_ZONE_SIZE
+                - PVM_INIT_DATA_SIZE
+                - cls.total_page_size(s),
+                cls.total_page_size(s),
             )
         )
 
@@ -192,7 +200,7 @@ class Memory:
         read_pages.extend(cls.get_pages(arg_start, cls.total_page_size(len(args))))
         # print(f"ARG \t\t | START: {int(arg_start).to_bytes(4).hex()}")
         for i, byt in enumerate(args):
-            memory[arg_start+i] = int(byt)
+            memory[arg_start + i] = int(byt)
 
         return cls(memory, read_pages, write_pages, heap=heap)
 
@@ -228,5 +236,6 @@ class Memory:
                 self._w_pages.add(pg)
             else:
                 self._r_pages.add(pg)
+
 
 _ZERO_PAGE = bytes(PAGE_SIZE)

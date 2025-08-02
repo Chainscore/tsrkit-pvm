@@ -82,7 +82,9 @@ class InstTableMap:
         self._gas_costs = bytes(gas_tmp)
         self._terminating_mask = term_mask
 
-    def assemble_instruction(self, opcode: int, program, program_counter: int, asm) -> int:
+    def assemble_instruction(
+        self, opcode: int, program, program_counter: int, asm
+    ) -> int:
         """
         Execute an instruction directly using the optimized dispatch table.
 

@@ -237,7 +237,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
             reg=r_map[self.ra],
         )
@@ -252,7 +252,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
             reg=r_map[self.ra],
         )
@@ -268,7 +268,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
         )
 
@@ -283,7 +283,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
         )
 
@@ -298,7 +298,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
         )
 
@@ -313,7 +313,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
         )
 
@@ -328,7 +328,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
         )
 
@@ -343,7 +343,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
         )
 
@@ -358,7 +358,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
                 base=Reg.r15,
                 index=rindex_map[self.rb],
                 scale=Scale.x1,
-                offset=z(self.vx, 8)
+                offset=z(self.vx, 8),
             ),
         )
 
@@ -496,7 +496,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Subtract rb from ra
         asm.sub(
-            Operands.RegMem_Reg(Size.U32, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb])
+            Operands.RegMem_Reg(
+                Size.U32, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+            )
         )
 
     def set_gt_u_imm(self, asm):
@@ -648,9 +650,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Subtract rb from ra
         asm.sub(
             Operands.RegMem_Reg(
-                size=Size.U64,
-                reg_mem=RegMem.Reg(r_map[self.ra]), 
-                reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
             )
         )
 

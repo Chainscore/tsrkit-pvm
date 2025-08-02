@@ -39,7 +39,7 @@ __all__ = [
     "PvmError",
     "CONTINUE",
     "HALT",
-    "PANIC", 
+    "PANIC",
     "OUT_OF_GAS",
     "PAGE_FAULT",
     "HOST",
