@@ -11,8 +11,8 @@ from tsrkit_pvm.recompiler.program import REC_Program
 from tsrkit_pvm.recompiler.pvm import Recompiler
 
 def test_jam_refine():
-    # service = "hello"
-    # payload = b"Prasad"
+    service = "hello"
+    payload = b"Prasad"
 
     service = "counter"
     payload = b"inc"
@@ -22,7 +22,7 @@ def test_jam_refine():
     metadata, m_len = Bytes.decode_from(service_code)
     bytecode = service_code[m_len:]
 
-    gas = 0
+    gas = 10000
     pc = 0
 
     while True:
@@ -46,6 +46,8 @@ def test_jam_refine():
 
         # --- Recompiler Mode --- #
         code, regs, mem = y_function(bytecode, args, "recompiler")
+        if i_status._value_.name == "host" and i_status._value_.register == 2**64 - 1:
+            print("INT_SBRK")
         r_status, r_pc, r_gas, r_regs, r_mem = Recompiler.execute(
             REC_Program.decode(code),
             copy(pc),
@@ -61,7 +63,11 @@ def test_jam_refine():
               Regs: {r_regs}
               """)
 
-        assert i_regs == r_regs, f"Mismatch at {gas}"
         assert i_status == r_status
         assert i_gas == r_gas
+        assert i_regs == r_regs, f"Mismatch at {gas}"
+
+        if i_status._value_.name == "halt":
+            print("Reached HALT")
+            break
         gas += 1

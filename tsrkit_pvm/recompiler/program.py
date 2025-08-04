@@ -75,9 +75,8 @@ class REC_Program(Program):
         pvm_table = []
         while counter < len(self.instruction_set):
             if self.offset_bitmask[counter]:  # Only process actual opcodes
-                # Define label if this is a basic block start
-                if counter in labels:
-                    asm.define_label(labels[counter])
+                # Define labe
+                asm.define_label(labels[counter])
 
                 pvm_table.append(asm.current_address())
 
@@ -86,9 +85,8 @@ class REC_Program(Program):
                     logger.debug(
                         f"📍 {counter} \t Processing opcode \t {inst_map._dispatch_table[opcode].fn.__name__} ({opcode})"
                     )
-
-                _, gas = inst_map.process_instruction(opcode, self, counter, asm_ctx)
-
+                
+                gas = inst_map._dispatch_table[opcode].gas_cost
                 # --- Gas Computation --- #
                 x61mov_imm = -gas_offset + 0x61
                 asm.sub(
@@ -108,6 +106,10 @@ class REC_Program(Program):
                 asm.add(
                     Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
                 )
+                
+                _, gas = inst_map.process_instruction(opcode, self, counter, asm_ctx)
+
+                
 
             counter += 1
 
@@ -153,7 +155,6 @@ class REC_Program(Program):
                     return i
                 inst_index += 1
                 
-
 
     def pvm_to_msn_index(self, pvm_offset: int) -> int:
         """Input any index of PVM inst start [from inst set], and this will return its machine inst start"""

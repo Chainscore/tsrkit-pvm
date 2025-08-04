@@ -39,6 +39,14 @@ static void syscall_handler(int sig, siginfo_t *si, void *ctx_) {
     greg_t *g = uc->uc_mcontext.gregs;
     // NOTE: RCX and R11 gets clobbered during syscall, so we cannot restore their value.
     // For simplicity, we store all regs in memory before syscall and restore from there instead here
+    // Save all registers like other handlers to ensure consistency
+    program_status.r8  = g[REG_R8];  program_status.r9  = g[REG_R9];
+    program_status.r10 = g[REG_R10]; program_status.r11 = g[REG_R11];
+    program_status.r12 = g[REG_R12]; program_status.r13 = g[REG_R13];
+    program_status.r14 = g[REG_R14]; program_status.r15 = g[REG_R15];
+    program_status.rdi = g[REG_RDI]; program_status.rsi = g[REG_RSI];
+    program_status.rbp = g[REG_RBP]; program_status.rbx = g[REG_RBX];
+    program_status.rdx = g[REG_RDX]; program_status.rax = g[REG_RAX];
     program_status.rcx = g[REG_RCX]; program_status.rsp = g[REG_RSP];
     program_status.rip = g[REG_RIP]; program_status.eflags = g[REG_EFL];
     program_status.si_data = si->si_value.sival_int - host_call_offset;
@@ -142,18 +150,11 @@ int init_syscall_handler(void) {
         // Load syscall number
         BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
         
-        // Add specific PVM syscalls we want to trap
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 999, 0, 1),  // PVM_SYS_SBRK
-        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 1000, 0, 1),  // PVM_SYS_SBRK
-        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 1001, 0, 1),  // PVM_SYS_MMAP
-        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 1002, 0, 1),  // PVM_SYS_MUNMAP
-        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 1003, 0, 1),  // PVM_SYS_DEBUG
-        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 1004, 0, 1),  // PVM_SYS_TRACE
+        // Check if syscall number >= 999
+        BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 999, 0, 2),
+        // Check if syscall number <= 1050
+        BPF_JUMP(BPF_JMP | BPF_JGT | BPF_K, 1050, 1, 0),
+        // If in range [999, 1050], trap it
         BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
         
         // Allow all other syscalls

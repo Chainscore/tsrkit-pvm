@@ -492,14 +492,25 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def neg_add_imm_32(self, asm):
         """ra = (vx - rb) % 2^32"""
-        # Load immediate into ra
-        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
-        # Subtract rb from ra
-        asm.sub(
-            Operands.RegMem_Reg(
-                Size.U32, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+        if self.ra == self.rb:
+            asm.neg(Size.U32, RegMem.Reg(r_map[self.ra]))
+            asm.add(
+                Operands.RegMem_Imm(
+                    reg_mem=RegMem.Reg(r_map[self.ra]),
+                    imm=ImmKind.I32(self.vx & 0xFFFFFFFF),
+                )
             )
-        )
+        else:
+            # Load immediate into ra
+            asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
+            # Subtract rb from ra
+            asm.sub(
+                Operands.RegMem_Reg(
+                    Size.U32, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                )
+            )
+        # Sign-extend 32-bit result to 64 bits (PVM requirement)
+        asm.movsxd_32_to_64(r_map[self.ra], r_map[self.ra])
 
     def set_gt_u_imm(self, asm):
         """ra = (rb > vx) ? 1 : 0 (unsigned)"""
@@ -545,10 +556,12 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def shlo_l_imm_alt_32(self, asm):
         """ra = (vx << (rb % 32)) % 2^32 (alternate: immediate shifted by register)"""
-        # Load immediate into ra (32-bit)
-        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
         asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        # Load immediate into ra (32-bit)
+        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
+        # Mask shift amount
+        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
         # Shift left by cl (using shl_cl method) - 32-bit operation
         asm.shl_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -556,10 +569,12 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def shlo_r_imm_alt_32(self, asm):
         """ra = (vx >> (rb % 32)) (alternate: immediate shifted by register)"""
-        # Load immediate into ra (32-bit)
-        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
         asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        # Load immediate into ra (32-bit)
+        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
+        # Mask shift amount
+        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
         # Shift right logical by cl (using shr_cl method) - 32-bit operation
         asm.shr_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -567,10 +582,12 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def shar_r_imm_alt_32(self, asm):
         """ra = (vx >> (rb % 32)) arithmetic (alternate: immediate shifted by register)"""
-        # Load immediate into ra (32-bit)
-        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
         asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        # Load immediate into ra (32-bit)
+        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
+        # Mask shift amount
+        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
         # Shift right arithmetic by cl (using sar_cl method) - 32-bit operation
         asm.sar_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -645,39 +662,55 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def neg_add_imm_64(self, asm):
         """ra = vx - rb"""
-        # Load immediate into ra
-        asm.mov_imm64(r_map[self.ra], self.vx)
-        # Subtract rb from ra
-        asm.sub(
-            Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+        if self.ra == self.rb:
+            asm.neg(Size.U64, RegMem.Reg(r_map[self.ra]))
+            asm.add(
+                Operands.RegMem_Imm(
+                    reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                )
             )
-        )
+        else:
+            # Load immediate into ra
+            asm.mov_imm64(r_map[self.ra], self.vx)
+            # Subtract rb from ra
+            asm.sub(
+                Operands.RegMem_Reg(
+                    size=Size.U64,
+                    reg_mem=RegMem.Reg(r_map[self.ra]),
+                    reg=r_map[self.rb],
+                )
+            )
 
     def shlo_l_imm_alt_64(self, asm):
         """ra = vx << (rb % 64) (alternate: immediate shifted by register)"""
-        # Load immediate into ra
-        asm.mov_imm64(r_map[self.ra], self.vx)
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
         asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        # Load immediate into ra
+        asm.mov_imm64(r_map[self.ra], self.vx)
+        # Mask shift amount
+        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
         # Shift left by cl (using shl_cl method)
         asm.shl_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
     def shlo_r_imm_alt_64(self, asm):
         """ra = vx >> (rb % 64) (alternate: immediate shifted by register)"""
-        # Load immediate into ra
-        asm.mov_imm64(r_map[self.ra], self.vx)
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
         asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        # Load immediate into ra
+        asm.mov_imm64(r_map[self.ra], self.vx)
+        # Mask shift amount
+        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
         # Shift right logical by cl (using shr_cl method)
         asm.shr_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
     def shar_r_imm_alt_64(self, asm):
         """ra = vx >> (rb % 64) arithmetic (alternate: immediate shifted by register)"""
-        # Load immediate into ra
-        asm.mov_imm64(r_map[self.ra], self.vx)
         # Load rb into rcx (shift amount) - cl is the low 8 bits of rcx
         asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        # Load immediate into ra
+        asm.mov_imm64(r_map[self.ra], self.vx)
+        # Mask shift amount
+        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
         # Shift right arithmetic by cl (using sar_cl method)
         asm.sar_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -690,10 +723,12 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def rot_r_64_imm_alt(self, asm):
         """ra = rotate_right(vx, rb) (alternate: immediate rotated by register)"""
-        # Load immediate into ra
-        asm.mov_imm64(r_map[self.ra], self.vx)
         # Load rb into rcx (rotate amount) - cl is the low 8 bits of rcx
         asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        # Load immediate into ra
+        asm.mov_imm64(r_map[self.ra], self.vx)
+        # Mask the rotate amount
+        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
         # Rotate right by cl (using ror_cl method)
         asm.ror_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -707,9 +742,11 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
     def rot_r_32_imm_alt(self, asm):
         """ra = rotate_right(vx, rb) (alternate: immediate rotated by register, 32-bit)"""
-        # Load immediate into ra (32-bit)
-        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Load rb into rcx (rotate amount) - cl is the low 8 bits of rcx
         asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        # Load immediate into ra (32-bit)
+        asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
+        # Mask the rotate amount
+        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
         # Rotate right by cl (using ror_cl method)
         asm.ror_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))

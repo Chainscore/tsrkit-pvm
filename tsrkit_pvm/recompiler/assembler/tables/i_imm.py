@@ -22,7 +22,7 @@ class InstructionsWArgs1Imm(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            10: OpCode(name="ecalli", fn=cls.ecalli, gas=1, is_terminating=True),
+            10: OpCode(name="ecalli", fn=cls.ecalli, gas=1, is_terminating=False),
         }
 
     def ecalli(self, asm):  # noqa: D401
@@ -30,7 +30,9 @@ class InstructionsWArgs1Imm(InstructionTable):
         PVM_SYS_CALL_OFFSET = 1000
         # Save all regs before exiting
         save_all_regs(asm)
-        pop_all_regs(asm)  # This is safe to do so, not doing this also works
+        # pop_all_regs(asm)  # This is safe to do so, not doing this also works
         # Load rax in rcx
+
+        print(f"Calling host function with vx={self.vx} (offset {PVM_SYS_CALL_OFFSET + self.vx})")
         asm.mov_imm64(Reg.rax, PVM_SYS_CALL_OFFSET + self.vx)
         asm.syscall()

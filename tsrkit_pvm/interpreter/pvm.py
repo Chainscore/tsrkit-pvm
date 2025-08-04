@@ -53,16 +53,8 @@ class Interpreter(PVM):
         while True:
             try:
                 opcode = program.zeta[program_counter]
-
-                (status, program_counter, registers, memory), gas_cost = (
-                    inst_map.process_instruction(
-                        opcode, program, program_counter, registers, memory
-                    )
-                )
-
+                gas_cost = inst_map._dispatch_table[opcode].gas_cost
                 remaining_gas -= gas_cost
-
-                insts.add(inst_map._dispatch_table[opcode].name)
 
                 if remaining_gas < 0:
                     print(
@@ -82,7 +74,16 @@ class Interpreter(PVM):
                     status = OUT_OF_GAS
                     break
 
-                elif status == ExecutionStatus.HALT:
+
+                (status, program_counter, registers, memory), gas_cost = (
+                    inst_map.process_instruction(
+                        opcode, program, program_counter, registers, memory
+                    )
+                )
+
+                insts.add(inst_map._dispatch_table[opcode].name)
+                
+                if status == ExecutionStatus.HALT:
                     if logger:
                         logger.info(
                             "PVM - HALT",

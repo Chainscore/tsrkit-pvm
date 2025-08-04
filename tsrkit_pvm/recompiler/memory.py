@@ -83,7 +83,7 @@ class REC_Memory:
         # mprotect returns 0 on success, -1 on failure
         if res != 0:
             error = ctypes.get_errno()
-            print(f"Warning: mprotect failed for address {hex(start_addr)}: {error}")
+            print(f"Warning: mprotect failed for address {hex(start_addr)}: {error}, {len_}")
             # Continue without failing - the memory might still be usable
         
         # Update the page tracking to match the memory protection
@@ -188,6 +188,24 @@ class REC_Memory:
         except (IndexError, ValueError):
             # Return zeros if out of bounds (similar to interpreter behavior)
             return bytes(length)
+
+    def write(self, address: int, data: bytes) -> None:
+        """Write data to guest memory"""
+        if not data:
+            return
+        
+        length = len(data)
+        
+        # For the recompiler, we can write directly to the buffer
+        # The guest memory starts at vm_size offset in the buffer
+        vm_size = self.offset - self.buf_start
+        buffer_offset = vm_size + address
+        
+        try:
+            self.buf[buffer_offset:buffer_offset + length] = data
+        except (IndexError, ValueError) as e:
+            # Raise an exception if write is out of bounds
+            raise IndexError(f"Memory write out of bounds: address={address}, length={length}") from e
 
 
 # Alias for compatibility

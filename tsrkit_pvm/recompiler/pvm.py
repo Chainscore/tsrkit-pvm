@@ -3,6 +3,7 @@ from typing import Tuple
 from tsrkit_types import U64, TypedArray
 
 from tsrkit_pvm.core.ipvm import PVM
+from tsrkit_pvm.common.constants import PVM_MEMORY_PAGE_SIZE
 from tsrkit_pvm.recompiler.memory import REC_Memory
 from tsrkit_pvm.recompiler.program import REC_Program
 from tsrkit_pvm.recompiler.segwrap.sig_handler import ProgramData
@@ -97,12 +98,14 @@ class Recompiler(PVM):
             ):
                 # We need imm, Calc the PVM instruction against current rip
                 pvm_pc = program.msn_to_pvm_index(pg_data.rip - code_pointer)
-                imm = program.instruction_set[pvm_pc + 1]
+                # sbrk is 2 bytes long, and rip is at the next instruction
+                sbrk_pc = pvm_pc - 2
+                imm = program.instruction_set[sbrk_pc + 1]
                 rd, ra = min(12, imm % 16), min(12, imm // 16)
-                # Pages to add
+                # Bytes to add
                 req = updated_regs[ra]
                 updated_regs[rd] = vm_ctx.heap_start + req
-
+                
                 memory.alter_accessibility(vm_ctx.heap_start, req)
                 print("ASM_SBRK")
 
@@ -140,8 +143,8 @@ class Recompiler(PVM):
 
 
         # Clean up
-        code_buf.close()
-        memory.buf.close()
+        # code_buf.close()
+        # memory.buf.close()
 
         return status, final_pc, gas, updated_regs, memory
     
@@ -246,9 +249,7 @@ class Recompiler(PVM):
                             \t RCX \t {pg_data.rcx}
                     """)
                 if pg_data.status == 0:
-                    updated_vm_ctx = VMContext.from_pointer(
-                        vm_pointer, len(vm_ctx.jump_table)
-                    )
+                    updated_vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
                     return HOST(pg_data.si_data), [int(r) for r in updated_vm_ctx.regs], pg_data
                 elif pg_data.status == 1:
                     return PAGE_FAULT(pg_data.vm_fault_addr()), pg_data.vm_regs(), pg_data
