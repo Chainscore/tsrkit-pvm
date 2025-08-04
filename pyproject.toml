@@ -44,6 +44,7 @@ classifiers = [
 ]
 dependencies = [
     "tsrkit-types>=0.1.0",
+    "tsrkit-asm>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -79,7 +80,7 @@ include = ["tsrkit_pvm*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-"tsrkit_pvm" = ["py.typed"]
+"tsrkit_pvm" = ["py.typed", "recompiler/segwrap/libsegwrap.so"]
 
 [tool.black]
 line-length = 88

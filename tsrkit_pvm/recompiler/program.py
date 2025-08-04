@@ -29,6 +29,8 @@ class REC_Program(Program):
 
     _skip_cache: Dict[int, int]
 
+    is_recompiler = True
+
     def __post_init__(self):
         super().__post_init__()
         self._skip_cache: Dict[int, int] = {}
@@ -140,9 +142,18 @@ class REC_Program(Program):
         while len(target) != 1:
             res = len(target) // 2
             target = (
-                target[:res] if msn_offset < self.pvm_msn_map[res] else target[res:]
+                target[:res] if msn_offset < target[res] else target[res:]
             )
-        return res
+        pvm_inst_index = self.pvm_msn_map.index(target[0])
+
+        inst_index = 0
+        for i, bm in enumerate(self.offset_bitmask):
+            if bm:
+                if inst_index == pvm_inst_index:
+                    return i
+                inst_index += 1
+                
+
 
     def pvm_to_msn_index(self, pvm_offset: int) -> int:
         """Input any index of PVM inst start [from inst set], and this will return its machine inst start"""

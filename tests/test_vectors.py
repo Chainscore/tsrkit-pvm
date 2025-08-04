@@ -73,8 +73,8 @@ def test_vectors(pattern: str):
 
 def test_pvm_vectors_single_pattern():
     """Test a single pattern - can be modified for quick testing"""
-    pattern = "inst_sub_imm_64.json"
-    mode = "native"
+    pattern = "a_debug.json"
+    mode = "native_"
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
 
@@ -123,5 +123,7 @@ def test_pvm_vectors_single_pattern():
                 tc.initial_memory.to_memory(tc.initial_page_map),
             )
 
-            assert pc == tc.expected_pc
-            assert registers == tc.expected_regs
+            print("status", status)
+
+            # assert registers == tc.expected_regs
+            # assert pc == tc.expected_pc

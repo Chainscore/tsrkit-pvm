@@ -26,8 +26,8 @@ class WArgsOneOffset(InstructionTable):
         }
 
     def jump(self, asm):
-        """Generate x86 code for PVM jump instruction"""
-        # Get the target address and find the corresponding label
+        """Jump to vx"""
+        # asm.ud2()
         target_addr = self.vx
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]

@@ -1,9 +1,8 @@
 from dataclasses import field
-from jam.execution.pvm.memory import Memory
-from jam.types.protocol.core import Gas, Register
 from tsrkit_types import (
     U32,
     U8,
+    U64,
     Bool,
     Bytes,
     String,
@@ -12,6 +11,10 @@ from tsrkit_types import (
     structure,
 )
 
+from tsrkit_pvm.interpreter.memory import INT_Memory
+
+Gas = U64 
+Register = U64
 
 @structure
 class Page:
@@ -33,7 +36,7 @@ class MemoryData:
 
 
 class MemoryChunk(TypedVector[MemoryData]):
-    def to_memory(self, page_map: PageMap) -> Memory:
+    def to_memory(self, page_map: PageMap) -> INT_Memory:
         memory_data = {}
         allowed_read_pages = []
         allowed_write_pages = []
@@ -47,7 +50,7 @@ class MemoryChunk(TypedVector[MemoryData]):
             else:
                 allowed_read_pages.append(page.address // 2**12)
 
-        memory = Memory(memory_data, allowed_read_pages, allowed_write_pages)
+        memory = INT_Memory(memory_data, allowed_read_pages, allowed_write_pages)
         return memory
 
 

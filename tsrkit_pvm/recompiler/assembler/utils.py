@@ -25,7 +25,6 @@ def load_all_regs(asm):
                 offset=(regs_offset + i * 8),
             ),
         )
-
 def push_all_regs(asm):
     for i in r_map:
         asm.push(i)

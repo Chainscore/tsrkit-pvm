@@ -13,8 +13,11 @@ else:
 
 class REC_Memory:
     buf: mmap.mmap
+    buf_start = 0
     offset = -1
     heap_start = 0
+    _r_pages: set[int]  # Track readable pages
+    _w_pages: set[int]  # Track writable pages
 
     def __init__(self, vm_size: int, heap_start = 0):
         """
@@ -29,6 +32,8 @@ class REC_Memory:
         self.buf_start = ctypes.addressof(ctypes.c_char.from_buffer(self.buf))
         self.offset = self.buf_start + vm_size
         self.heap_start = heap_start
+        self._r_pages = set()
+        self._w_pages = set()
 
     @classmethod
     def from_initial(cls, initial_page_map: list, initial_data: list, vm_size: int):
@@ -36,7 +41,15 @@ class REC_Memory:
 
         mem = cls(vm_size)
 
-        # Set up memory protections for mapped pages
+        # Initialize memory data first
+        for data in initial_data:
+            # Use offset from VMContext to write to the correct location in guest memory
+            guest_offset = vm_size + data["address"]
+            mem.buf[guest_offset : guest_offset + len(data["contents"])] = bytes(
+                data["contents"]
+            )
+
+        # Now, set up memory protections for mapped pages
         for pm in initial_page_map:
             prot = mmap.PROT_READ | mmap.PROT_WRITE
             # Calculate the actual memory address within our buffer
@@ -55,14 +68,6 @@ class REC_Memory:
                 )
                 # Continue without failing - the memory might still be usable
 
-        # Initialize memory data
-        for data in initial_data:
-            # Use offset from VMContext to write to the correct location in guest memory
-            guest_offset = vm_size + data["address"]
-            mem.buf[guest_offset : guest_offset + len(data["contents"])] = bytes(
-                data["contents"]
-            )
-
         return mem
 
     def alter_accessibility(self, start: int, len_: int, is_write=True):
@@ -80,11 +85,20 @@ class REC_Memory:
             error = ctypes.get_errno()
             print(f"Warning: mprotect failed for address {hex(start_addr)}: {error}")
             # Continue without failing - the memory might still be usable
+        
+        # Update the page tracking to match the memory protection
+        from tsrkit_pvm.common.utils import get_pages
+        pages = get_pages(start, len_)
+        if is_write:
+            self._w_pages.update(pages)
+        else:
+            self._r_pages.update(pages)
 
     @classmethod
-    def from_pc(cls, read: bytes, write: bytes, args: bytes, z: int, s: int, vm_size: int = 1024):
+    def from_pc(cls, read: bytes, write: bytes, args: bytes, z: int, s: int, vm_size: int):
         """Creates memory as per GP"""
         mem = cls(vm_size)
+        
         PAGE_SIZE = PVM_MEMORY_PAGE_SIZE
         
         # Calculate memory layout
@@ -108,25 +122,8 @@ class REC_Memory:
         arg_start = 2**32 - PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE
         arg_pages = get_pages(arg_start, total_page_size(len(args)))
         read_pages.extend(arg_pages)
-        
-        # Set up memory protections for read pages
-        for pg in read_pages:
-            start_addr = mem.offset + pg * PAGE_SIZE
-            aligned_addr = (start_addr // 4096) * 4096
-            res = libc.mprotect(ctypes.c_void_p(aligned_addr), PAGE_SIZE, mmap.PROT_READ)
-            if res != 0:
-                error = ctypes.get_errno()
-                print(f"Warning: mprotect failed for read page {pg}: {error}")
-        
-        # Set up memory protections for write pages
-        for pg in write_pages:
-            start_addr = mem.offset + pg * PAGE_SIZE
-            aligned_addr = (start_addr // 4096) * 4096
-            res = libc.mprotect(ctypes.c_void_p(aligned_addr), PAGE_SIZE, mmap.PROT_READ | mmap.PROT_WRITE)
-            if res != 0:
-                error = ctypes.get_errno()
-                print(f"Warning: mprotect failed for write page {pg}: {error}")
-        
+
+        # Write data FIRST before setting memory protections
         # Write read data
         guest_offset = vm_size + read_start
         mem.buf[guest_offset:guest_offset + len(read)] = read
@@ -138,8 +135,59 @@ class REC_Memory:
         # Write args data
         guest_offset = vm_size + arg_start
         mem.buf[guest_offset:guest_offset + len(args)] = args
+
+        # Set up memory protections for read pages (and make them executable)
+        # Only set protection on pages that actually contain data or are explicitly needed
+        for pg in read_pages:
+            start_addr = mem.offset + pg * PAGE_SIZE
+            # Page should already be aligned, but ensure it is
+            aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
+            
+            res = libc.mprotect(ctypes.c_void_p(aligned_addr), PAGE_SIZE, mmap.PROT_READ)
+            if res != 0:
+                error = ctypes.get_errno()
+                print(f"Warning: mprotect failed for read page {pg}: {error}")
+        
+        # Set up memory protections for write pages
+        for pg in write_pages:
+            start_addr = mem.offset + pg * PAGE_SIZE
+            aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
+            
+            res = libc.mprotect(ctypes.c_void_p(aligned_addr), PAGE_SIZE, mmap.PROT_READ | mmap.PROT_WRITE)
+            if res != 0:
+                error = ctypes.get_errno()
+                print(f"Warning: mprotect failed for write page {pg}: {error}")
+               
+        # Track accessible pages for compatibility
+        mem._r_pages.update(read_pages)
+        mem._w_pages.update(write_pages)
         
         return mem
+
+    def is_accessible(self, address: int, length: int, for_write: bool = False) -> bool:
+        """Check if memory range is accessible"""
+        if length <= 0:
+            return True
+        pages = get_pages(address, length)
+        if for_write:
+            return all(pg in self._w_pages for pg in pages)
+        return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
+
+    def read(self, address: int, length: int) -> bytes:
+        """Read data from guest memory"""
+        if length <= 0:
+            return b""
+        
+        # For the recompiler, we can read directly from the buffer
+        # The guest memory starts at vm_size offset in the buffer
+        vm_size = self.offset - self.buf_start
+        buffer_offset = vm_size + address
+        
+        try:
+            return bytes(self.buf[buffer_offset:buffer_offset + length])
+        except (IndexError, ValueError):
+            # Return zeros if out of bounds (similar to interpreter behavior)
+            return bytes(length)
 
 
 # Alias for compatibility

@@ -12,6 +12,7 @@ PVM_MEMORY_PAGE_SIZE = 2**12
 # Z_Z — PVM init zone size. See A.7
 PVM_INIT_ZONE_SIZE = 2**16
 
+# 4 GB PVM Memory Size
 PVM_MEMORY_TOTAL_SIZE = 4 * (1024**3)
 
 # Z_R — Number of registers in the standard PVM

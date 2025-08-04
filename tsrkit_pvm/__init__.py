@@ -2,47 +2,78 @@
 
 A PVM implementation with interpreter and recompiler
 for the Tessera client.
-
-This package provides:
-- An interpreter for executing PVM bytecode
-- A recompiler for optimizing PVM bytecode execution
-- Memory management and program handling
-- Status and error handling utilities
 """
 
 __version__ = "0.1.0"
 __author__ = "Chainscore Labs"
 
-# Import key components from interpreter
-from .interpreter import (
+# Import common constants and utilities
+from .core.memory import Memory
+from .core.program_base import Program 
+from .core.ipvm import PVM
+from .core.code import Code, y_function
+from .common.status import (
     CONTINUE,
     HALT,
     HOST,
     OUT_OF_GAS,
     PAGE_FAULT,
     PANIC,
-    PVM,
     ExecutionStatus,
-    Memory,
-    Program,
     PvmError,
+    HostStatus
 )
+from .common.types import Accessibility
+
+from .common.constants import (
+    PVM_ADDR_ALIGNMENT,
+    PVM_INIT_DATA_SIZE,
+    PVM_MEMORY_PAGE_SIZE,
+    PVM_INIT_ZONE_SIZE,
+    REGISTER_COUNT,
+)
+
+from .interpreter.memory import INT_Memory
+from .interpreter.program import INT_Program
+from .interpreter.pvm import Interpreter
+
+from .recompiler.memory import REC_Memory
+from .recompiler.program import REC_Program
+from .recompiler.pvm import Recompiler
 
 
 __all__ = [
-    # Core classes
+    # Core
+    "Memory",
     "PVM",
     "Program",
-    "Memory",
-    # Status and errors
-    "ExecutionStatus",
-    "PvmError",
+    "Code",
+    "y_function",
+    # PVM
+    "INT_Memory",
+    "INT_Program",
+    "Interpreter",
+    "REC_Memory",
+    "REC_Program",
+    "Recompiler",
+    # Common constants
+    "PVM_ADDR_ALIGNMENT",
+    "PVM_INIT_DATA_SIZE",
+    "PVM_INIT_ZONE_SIZE",
+    "PVM_MEMORY_PAGE_SIZE",
+    "REGISTER_COUNT",
+    # Execution status and errors
     "CONTINUE",
     "HALT",
-    "PANIC",
+    "HOST",
     "OUT_OF_GAS",
     "PAGE_FAULT",
-    "HOST",
+    "PANIC",
+    "ExecutionStatus",
+    "PvmError",
+    "HostStatus",
+    # Types
+    "Accessibility",
     # Metadata
     "__version__",
     "__author__",

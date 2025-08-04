@@ -9,6 +9,14 @@ from tests.types import PvmTestcase
 from tsrkit_pvm.recompiler.assembler.inst_map import inst_map
 from tsrkit_pvm.recompiler.vm_context import VMContext
 
+from tsrkit_pvm.interpreter.pvm import Interpreter
+from tsrkit_pvm.interpreter.program import INT_Program
+from tsrkit_pvm.interpreter.memory import INT_Memory
+from tsrkit_pvm.recompiler.program import REC_Program
+from tsrkit_pvm.recompiler.pvm import Recompiler
+from tsrkit_pvm.recompiler.memory import REC_Memory
+
+
 PVM_ROOT = Path(__file__).parent / "ext" / "pvm" / "programs"
 
 
@@ -16,7 +24,7 @@ def fetch_vectors(pattern: str):
     return [(f.name, json.load(open(f))) for f in PVM_ROOT.glob(pattern)]
 
 
-@pytest.mark.skip
+@pytest.mark.skipif("PTRN" not in os.environ, reason="Pattern not found")
 def test_debug_mismatch():
     """Test a single pattern - can be modified for quick testing"""
     pattern = os.environ["PTRN"] or "riscv_rv64ui_lw.json"
@@ -28,10 +36,9 @@ def test_debug_mismatch():
     print(f"\n ⏭️Running test case {name} ...")
     print(f"Processing test case: {vector['name']}")
 
-    from tsrkit_pvm.interpreter.program import Program
 
     tc = PvmTestcase.from_json(vector)
-    tc_prog = Program.decode(tc.program)
+    tc_prog = INT_Program.decode(tc.program)
 
     c = 0
     for i, inst in enumerate(tc_prog.instruction_set):
@@ -43,9 +50,8 @@ def test_debug_mismatch():
     while True:
         print(f"|------ Step {steps} ------|")
         print(f"[1] Running in PVM mode...")
-        from tsrkit_pvm.interpreter.pvm import PVM
 
-        i_status, i_pc, i_gas, i_registers, i_memory = PVM.execute(
+        i_status, i_pc, i_gas, i_registers, i_memory = Interpreter.execute(
             tc_prog,
             int(tc.initial_pc),
             deepcopy(steps),
@@ -54,23 +60,19 @@ def test_debug_mismatch():
         )
 
         print(f"[2] Running in native mode...")
-        from tsrkit_pvm.recompiler.program import Program
-        from tsrkit_pvm.recompiler.pvm import PVM
-        from tsrkit_pvm.recompiler.memory import GuestMemory
-
-        program = Program.decode(bytes(vector["program"]))
-        mem = GuestMemory.from_initial(
+        program = REC_Program.decode(bytes(vector["program"]))
+        mem = REC_Memory.from_initial(
             vector["initial-page-map"],
             vector["initial-memory"],
             VMContext.calculate_size(len(program.jump_table)),
         )
 
-        r_status, r_counter, r_gas, r_registers = PVM.execute(
+        r_status, r_counter, r_gas, r_registers, r_mem = Recompiler.execute(
             program,
-            mem,
             int(vector["initial-pc"]),
-            vector["initial-regs"],
             deepcopy(steps),
+            vector["initial-regs"],
+            mem,
         )
 
         assert r_status == i_status, "Should have same status"

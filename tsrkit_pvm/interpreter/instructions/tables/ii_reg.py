@@ -83,6 +83,7 @@ class InstructionsWArgs2Reg(InstructionTable):
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     def sbrk(self, registers: list, memory: Memory) -> OpReturn:
+        print("SBRK")
         req = registers[self.ra]  # bytes requested
         memory.alter_accessibility(memory.heap_break, req, "write")
         memory.heap_break = memory.heap_break + req

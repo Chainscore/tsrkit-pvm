@@ -1,5 +1,7 @@
 from typing import Tuple
 
+from tsrkit_types import U64, TypedArray
+
 from tsrkit_pvm.core.ipvm import PVM
 from tsrkit_pvm.recompiler.memory import REC_Memory
 from tsrkit_pvm.recompiler.program import REC_Program
@@ -49,7 +51,7 @@ class Recompiler(PVM):
         memory: REC_Memory,
         logger=None,
     ) -> Tuple[ExecutionStatus, int, int, list, REC_Memory]:
-        
+
         if not program.msn_code:
             program.assemble(logger)
 
@@ -61,14 +63,15 @@ class Recompiler(PVM):
             [program.pvm_to_msn_index(j) + code_pointer for j in program.jump_table],
             registers,
             gas,
+            heap_start=memory.heap_start
         )
         vm_pointer, vm_size = vm_ctx.store(memory)
+        assert vm_pointer == memory.buf_start
 
         # Create callable function - pass memory.offset (guest memory pointer)
         addr, _ = cls.create_caller(
             code_pointer + program.pvm_to_msn_index(program_counter),
-            memory.offset,
-            vm_size,
+            memory.offset
         )
         # Install safe signal handler
         cls.init_sig_handlers()
@@ -76,7 +79,7 @@ class Recompiler(PVM):
         # Execute the compiled code with segfault protection
         if logger:
             logger.debug(
-                f"Assmbling completed | Time {(time.time_ns() - start_time_ns) / (10**6)} ms"
+                f"Assmbling completed! \n\t Time \t {(time.time_ns() - start_time_ns) / (10**6)} ms \n\t Caller \t {addr} \n\t Program \t {code_pointer} \n\t Memory offset \t {memory.offset}"
             )
         asm_time_ns = time.time_ns()
 
@@ -101,16 +104,14 @@ class Recompiler(PVM):
                 updated_regs[rd] = vm_ctx.heap_start + req
 
                 memory.alter_accessibility(vm_ctx.heap_start, req)
+                print("ASM_SBRK")
 
                 # Create callable function - pass memory.offset (guest memory pointer)
-                vm_ctx = VMContext(
-                    vm_ctx.jump_table,
-                    updated_regs,
-                    gas,
-                    heap_start=(vm_ctx.heap_start + req),
-                )
+                vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
+                vm_ctx.regs = TypedArray[U64, 13]([U64(r) for r in updated_regs])
+                vm_ctx.heap_start += req
                 _, _ = vm_ctx.store(memory)
-                addr, _ = cls.create_caller(pg_data.rip, memory.offset, vm_size)
+                addr, _ = cls.create_caller(pg_data.rip, memory.offset)
                 # Run from last return
                 status, updated_regs, pg_data = cls.run_code(
                     addr, vm_ctx, vm_pointer, code_pointer + program.halt_offset, logger
@@ -119,25 +120,24 @@ class Recompiler(PVM):
             raise ValueError(f"Page Fault {e}")
         finally:
             cls.cleanup_sig_state()
-
+        
         final_pc = program.msn_to_pvm_index(pg_data.rip - code_pointer)
 
         if logger:
             logger.debug(
-                f"Execution completed | Time: {(time.time_ns() - asm_time_ns) / (10**6)} ms"
+                f"Execution completed \n\t Time: {(time.time_ns() - asm_time_ns) / (10**6)} ms \n\t Status: {status._value_} \n\t Registers: {updated_regs} \n\t Gas: {gas} \n\t PC: {final_pc}"
             )
 
         gas = int(VMContext.from_pointer(vm_pointer, len(program.jump_table)).gas)
 
         # Adjust overflow
         if status._value_.name == "out-of-gas":
-            print("Ran OOG", gas)
             gas -= 2**32
+            final_pc = program.msn_to_pvm_index(pg_data.si_data - code_pointer)
 
-        if logger:
-            logger.debug(
-                f"Status: {status._value_} | Registers: {updated_regs} | Gas: {gas}"
-            )
+        # if status._value_.name == "page-fault":
+        #     status._value_.register -= memory.offset
+
 
         # Clean up
         code_buf.close()
@@ -146,7 +146,7 @@ class Recompiler(PVM):
         return status, final_pc, gas, updated_regs, memory
     
     @classmethod
-    def create_caller(cls, code_pointer: int, mem_pointer: int, vm_size: int):
+    def create_caller(cls, code_pointer: int, mem_pointer: int):
         """Create a caller function that executes generated code."""
         asm = PyAssembler()
 
@@ -187,7 +187,7 @@ class Recompiler(PVM):
 
         # Change protection to RX
         addr = ctypes.addressof(ctypes.c_char.from_buffer(buf))
-        prot_rx = mmap.PROT_EXEC | mmap.ACCESS_WRITE
+        prot_rx = mmap.PROT_READ | mmap.PROT_EXEC
         # Align address to page boundary for mprotect
         aligned_addr = addr & ~(page_size - 1)
         res = libc.mprotect(
@@ -239,16 +239,19 @@ class Recompiler(PVM):
             # Segfault occurred - get register state
             if segwrap.get_program_status(ctypes.byref(pg_data)) == 0:
                 if logger:
-                    logger.debug(
-                        f"Faulted! \n\t Status \t {pg_data.status} \n\t SI Data \t {pg_data.si_data} \n\t RIP \t {pg_data.rip} \n\t Fault \t {pg_data.si_data} \n\t R15 \t {pg_data.r15} \n\t RCX \t {pg_data.rcx}"
-                    )
+                    logger.debug(f"""Faulted! {pg_data.status}
+                            \t SI \t {pg_data.si_data} 
+                            \t RIP \t {pg_data.rip} 
+                            \t R15 \t {pg_data.r15} 
+                            \t RCX \t {pg_data.rcx}
+                    """)
                 if pg_data.status == 0:
                     updated_vm_ctx = VMContext.from_pointer(
                         vm_pointer, len(vm_ctx.jump_table)
                     )
                     return HOST(pg_data.si_data), [int(r) for r in updated_vm_ctx.regs], pg_data
                 elif pg_data.status == 1:
-                    return PAGE_FAULT(pg_data.si_data), pg_data.vm_regs(), pg_data
+                    return PAGE_FAULT(pg_data.vm_fault_addr()), pg_data.vm_regs(), pg_data
                 elif pg_data.status == 2:
                     if pg_data.si_data == halt_addr:
                         return HALT, pg_data.vm_regs(), pg_data

@@ -33,21 +33,12 @@ static struct pg_data program_status;
 static uint64_t host_call_offset = 1000;
 
 static void syscall_handler(int sig, siginfo_t *si, void *ctx_) {
-  printf("=== SIGSYS HANDLER CALLED ===\n");
   fflush(stdout);
   ucontext_t *uc = (ucontext_t *)ctx_;
 #if defined(__x86_64__)
     greg_t *g = uc->uc_mcontext.gregs;
-    program_status.r8  = g[REG_R8];  program_status.r9  = g[REG_R9];
-    program_status.r10 = g[REG_R10]; program_status.r11 = g[REG_R11];
-    program_status.r12 = g[REG_R12]; program_status.r13 = g[REG_R13];
-    program_status.r14 = g[REG_R14]; program_status.r15 = g[REG_R15];
-    program_status.rdi = g[REG_RDI]; program_status.rsi = g[REG_RSI];
-    program_status.rbp = g[REG_RBP]; program_status.rbx = g[REG_RBX];
-    program_status.rdx = g[REG_RDX]; 
-    // NOTE: Every PVM syscall shall move RAX value to RCX since we need RAX to store sys call id
-    // We restore the value here
-    program_status.rax = g[REG_RCX];
+    // NOTE: RCX and R11 gets clobbered during syscall, so we cannot restore their value.
+    // For simplicity, we store all regs in memory before syscall and restore from there instead here
     program_status.rcx = g[REG_RCX]; program_status.rsp = g[REG_RSP];
     program_status.rip = g[REG_RIP]; program_status.eflags = g[REG_EFL];
     program_status.si_data = si->si_value.sival_int - host_call_offset;
@@ -126,7 +117,6 @@ int get_program_status(struct pg_data *out) {
 
 // --- Handlers --- //
 int init_syscall_handler(void) {
-    printf("=== INSTALLING SYSCALL HANDLER ===\n");
     fflush(stdout);
     
     // Set up signal handler first
@@ -140,7 +130,6 @@ int init_syscall_handler(void) {
         perror("sigaction");
         return -1;
     }
-    printf("SIGSYS handler installed\n");
     
     // Prevent gaining new privileges
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1) {
@@ -182,7 +171,6 @@ int init_syscall_handler(void) {
         return -3;
     }
     
-    printf("Seccomp filter installed.\n");
     return 0;
 }
 

@@ -16,7 +16,6 @@ class ExtendedList(list):
         elif isinstance(index, slice):
             # Handle slice objects properly
             start, stop, step = index.indices(len(self))
-            print(f"ExtendedList slice: {start}, {stop}, {step}")
             res = []
             for i in range(start, stop, step):
                 res.append(self.__getitem__(i))
