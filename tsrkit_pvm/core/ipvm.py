@@ -11,4 +11,5 @@ from .memory import Memory
 
 class PVM(ABC):
     """Abstract base class for PVM implementations."""
+
     ...

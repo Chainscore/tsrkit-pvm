@@ -1,7 +1,11 @@
 from __future__ import annotations
 from typing import Dict, List, Self, Sequence, TYPE_CHECKING
 from tsrkit_pvm.common.utils import get_pages, total_page_size, total_zone_size
-from tsrkit_pvm.common.constants import PVM_INIT_DATA_SIZE, PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
+from tsrkit_pvm.common.constants import (
+    PVM_INIT_DATA_SIZE,
+    PVM_INIT_ZONE_SIZE,
+    PVM_MEMORY_PAGE_SIZE,
+)
 from tsrkit_pvm.common.status import PAGE_FAULT, ExecutionStatus, PvmError
 
 ADDR_MOD = 2**32

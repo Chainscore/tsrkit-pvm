@@ -562,7 +562,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra (32-bit)
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Mask shift amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         # Shift left by cl (using shl_cl method) - 32-bit operation
         asm.shl_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -575,7 +577,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra (32-bit)
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Mask shift amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         # Shift right logical by cl (using shr_cl method) - 32-bit operation
         asm.shr_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -588,7 +592,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra (32-bit)
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Mask shift amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         # Shift right arithmetic by cl (using sar_cl method) - 32-bit operation
         asm.sar_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -689,7 +695,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra
         asm.mov_imm64(r_map[self.ra], self.vx)
         # Mask shift amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         # Shift left by cl (using shl_cl method)
         asm.shl_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -700,7 +708,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra
         asm.mov_imm64(r_map[self.ra], self.vx)
         # Mask shift amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         # Shift right logical by cl (using shr_cl method)
         asm.shr_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -711,7 +721,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra
         asm.mov_imm64(r_map[self.ra], self.vx)
         # Mask shift amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         # Shift right arithmetic by cl (using sar_cl method)
         asm.sar_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -729,7 +741,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra
         asm.mov_imm64(r_map[self.ra], self.vx)
         # Mask the rotate amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         # Rotate right by cl (using ror_cl method)
         asm.ror_cl(RegSize.R64, RegMem.Reg(r_map[self.ra]))
 
@@ -748,6 +762,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         # Load immediate into ra (32-bit)
         asm.mov_imm(RegMem.Reg(r_map[self.ra]), ImmKind.I32(self.vx & 0xFFFFFFFF))
         # Mask the rotate amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         # Rotate right by cl (using ror_cl method)
         asm.ror_cl(RegSize.R32, RegMem.Reg(r_map[self.ra]))

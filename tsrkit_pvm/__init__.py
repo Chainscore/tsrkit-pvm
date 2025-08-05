@@ -9,7 +9,7 @@ __author__ = "Chainscore Labs"
 
 # Import common constants and utilities
 from .core.memory import Memory
-from .core.program_base import Program 
+from .core.program_base import Program
 from .core.ipvm import PVM
 from .core.code import Code, y_function
 from .common.status import (
@@ -21,7 +21,7 @@ from .common.status import (
     PANIC,
     ExecutionStatus,
     PvmError,
-    HostStatus
+    HostStatus,
 )
 from .common.types import Accessibility
 

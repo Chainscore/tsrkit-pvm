@@ -3,11 +3,12 @@ from typing import List, Union, Tuple
 from tsrkit_types import Bits, Uint, structure
 from tsrkit_pvm.common.extended import ExtendedList
 
+
 @structure
 class Program:
     """
     Abstract base class for Program implementations.
-    
+
     Args:
         z: Size of jump-table entries
         jump_table: sequence of NN, each of size z

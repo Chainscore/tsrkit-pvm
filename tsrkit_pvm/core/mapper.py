@@ -10,6 +10,7 @@ from typing import Callable, List
 
 from tsrkit_pvm.core.instruction_table import InstructionTable
 
+
 @dataclass
 class InstructionHandler:
     """Optimized instruction handler data."""
@@ -79,5 +80,3 @@ class InstMapper:
     def is_terminating(self, opcode: int) -> bool:
         """Check if an opcode is terminating with direct lookup."""
         return bool((self._terminating_mask >> opcode) & 1)
-
-

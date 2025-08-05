@@ -12,6 +12,7 @@ def save_all_regs(asm):
             reg=reg,
         )
 
+
 def load_all_regs(asm):
     for i, reg in enumerate(r_map):
         # Load value from offset+i_bytes -> mapped register
@@ -25,6 +26,8 @@ def load_all_regs(asm):
                 offset=(regs_offset + i * 8),
             ),
         )
+
+
 def push_all_regs(asm):
     for i in r_map:
         asm.push(i)

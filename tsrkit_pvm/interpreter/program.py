@@ -63,9 +63,7 @@ class INT_Program(Program):
             a == 0
             or index > len(self.jump_table)
             or a % PVM_ADDR_ALIGNMENT != 0
-            or self.jump_table[index]
-            not in self._basic_blocks_set
+            or self.jump_table[index] not in self._basic_blocks_set
         ):
             raise PvmError(PANIC)
         return CONTINUE, self.jump_table[index]
-

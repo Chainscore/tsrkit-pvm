@@ -1,4 +1,4 @@
-from typing import Dict, Tuple 
+from typing import Dict, Tuple
 from tsrkit_pvm.core.program_base import Program
 from tsrkit_pvm.recompiler.assembler.context import AssemblerContext
 from tsrkit_pvm.recompiler.vm_context import gas_offset
@@ -34,7 +34,7 @@ class REC_Program(Program):
     def __post_init__(self):
         super().__post_init__()
         self._skip_cache: Dict[int, int] = {}
-        self._precompute_skip_values()        
+        self._precompute_skip_values()
         basic_blocks = [0]
         for n in range(len(self.instruction_set)):
             if self.offset_bitmask[n] and inst_map.is_terminating(
@@ -42,7 +42,12 @@ class REC_Program(Program):
             ):
                 basic_blocks.append(n + 1 + self.skip(n))
         self.basic_blocks = basic_blocks
-        self.msn_code, self.pvm_msn_map, self.panic_offset, self.halt_offset = None, None, None, None
+        self.msn_code, self.pvm_msn_map, self.panic_offset, self.halt_offset = (
+            None,
+            None,
+            None,
+            None,
+        )
 
     def _precompute_skip_values(self):
         """Pre-compute skip values for all positions to eliminate runtime overhead."""
@@ -85,7 +90,7 @@ class REC_Program(Program):
                     logger.debug(
                         f"📍 {counter} \t Processing opcode \t {inst_map._dispatch_table[opcode].fn.__name__} ({opcode})"
                     )
-                
+
                 gas = inst_map._dispatch_table[opcode].gas_cost
                 # --- Gas Computation --- #
                 x61mov_imm = -gas_offset + 0x61
@@ -106,10 +111,8 @@ class REC_Program(Program):
                 asm.add(
                     Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
                 )
-                
-                _, gas = inst_map.process_instruction(opcode, self, counter, asm_ctx)
 
-                
+                _, gas = inst_map.process_instruction(opcode, self, counter, asm_ctx)
 
             counter += 1
 
@@ -125,16 +128,14 @@ class REC_Program(Program):
         asm.ud2()
 
         if logger:
-            logger.debug(
-                f"🧩 Assembled program size: {asm.len()} "
-            )
+            logger.debug(f"🧩 Assembled program size: {asm.len()} ")
 
-        (
-            self.msn_code, 
-            self.pvm_msn_map, 
-            self.panic_offset, 
-            self.halt_offset
-        ) = asm.finalize(), pvm_table, panic_addr, halt_addr
+        (self.msn_code, self.pvm_msn_map, self.panic_offset, self.halt_offset) = (
+            asm.finalize(),
+            pvm_table,
+            panic_addr,
+            halt_addr,
+        )
 
     def msn_to_pvm_index(self, msn_offset: int):
         """Input any location from native code, and this will return its PVM inst start"""
@@ -143,9 +144,7 @@ class REC_Program(Program):
         # Binary search to find
         while len(target) != 1:
             res = len(target) // 2
-            target = (
-                target[:res] if msn_offset < target[res] else target[res:]
-            )
+            target = target[:res] if msn_offset < target[res] else target[res:]
         pvm_inst_index = self.pvm_msn_map.index(target[0])
 
         inst_index = 0
@@ -154,7 +153,6 @@ class REC_Program(Program):
                 if inst_index == pvm_inst_index:
                     return i
                 inst_index += 1
-                
 
     def pvm_to_msn_index(self, pvm_offset: int) -> int:
         """Input any index of PVM inst start [from inst set], and this will return its machine inst start"""
@@ -163,4 +161,3 @@ class REC_Program(Program):
 
     def skip(self, pc) -> int:
         return self._skip_cache.get(pc, 0)
-

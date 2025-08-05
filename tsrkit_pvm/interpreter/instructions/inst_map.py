@@ -13,18 +13,20 @@ from .tables.ii_reg_ii_imm import InstructionsWArgs2Reg2Imm
 from .tables.iii_reg import InstructionsWArgs3Reg
 from .tables.wo_args import InstructionsWoArgs
 
-inst_map = InstMapper([
-    InstructionsWoArgs,
-    InstructionsWArgs1Imm,
-    InstructionsWArgs1Imm1EwImm,
-    InstructionsWArgs2Imm,
-    WArgsOneOffset,
-    InstructionsWArgs1Reg1Imm,
-    InstructionsWArgs1Reg2Imm,
-    InstructionsWArgs1Reg1Imm1Offset,
-    InstructionsWArgs2Reg,
-    InstructionsWArgs2Reg1Imm,
-    InstructionsWArgs2Reg1Offset,
-    InstructionsWArgs2Reg2Imm,
-    InstructionsWArgs3Reg,
-])
+inst_map = InstMapper(
+    [
+        InstructionsWoArgs,
+        InstructionsWArgs1Imm,
+        InstructionsWArgs1Imm1EwImm,
+        InstructionsWArgs2Imm,
+        WArgsOneOffset,
+        InstructionsWArgs1Reg1Imm,
+        InstructionsWArgs1Reg2Imm,
+        InstructionsWArgs1Reg1Imm1Offset,
+        InstructionsWArgs2Reg,
+        InstructionsWArgs2Reg1Imm,
+        InstructionsWArgs2Reg1Offset,
+        InstructionsWArgs2Reg2Imm,
+        InstructionsWArgs3Reg,
+    ]
+)

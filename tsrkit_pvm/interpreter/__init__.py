@@ -28,7 +28,7 @@ from ..common.status import (
 __all__ = [
     # Core execution engine
     "PVM",
-    "Program", 
+    "Program",
     "Memory",
     # Status and error handling
     "ExecutionStatus",
@@ -46,4 +46,3 @@ __all__ = [
     "PVM_INIT_ZONE_SIZE",
     "REGISTER_COUNT",
 ]
-

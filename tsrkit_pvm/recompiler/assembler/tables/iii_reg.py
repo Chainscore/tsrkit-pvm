@@ -635,7 +635,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Mask shift amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         # Shift left by cl
         asm.shl_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -653,7 +655,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Mask shift amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         # Shift left by cl
         asm.shl_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
 
@@ -668,7 +672,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Normal case: load ra into rd, then rb into rcx
             asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         asm.shr_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
         asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
@@ -684,7 +690,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Normal case: load ra into rd, then rb into rcx
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         asm.shr_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
 
     def shar_r_32(self, asm):
@@ -698,7 +706,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Normal case: load ra into rd, then rb into rcx
             asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         asm.sar_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
         asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
@@ -714,7 +724,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             # Normal case: load ra into rd, then rb into rcx
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         asm.sar_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
 
     def and_op(self, asm):
@@ -990,7 +1002,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Mask the rotate amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         # Rotate left by cl
         asm.rol_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
 
@@ -1006,7 +1020,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Mask the rotate amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         # Rotate left by cl
         asm.rol_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
@@ -1024,7 +1040,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Mask the rotate amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
+        )
         # Rotate right by cl
         asm.ror_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
 
@@ -1040,7 +1058,9 @@ class InstructionsWArgs3Reg(InstructionTable):
             asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
         # Mask the rotate amount
-        asm.and_(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F)))
+        asm.and_(
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
+        )
         # Rotate right by cl
         asm.ror_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)

@@ -53,11 +53,11 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
             72: OpCode("store_imm_ind_u32", cls.store_imm_ind(Size.U32), 1, False),
             73: OpCode("store_imm_ind_u64", cls.store_imm_ind(Size.U64), 1, False),
         }
-    
+
     @staticmethod
     def store_imm_ind(size: Size):
         def store_imm_ind(self, asm: PyAssembler):
-            """ u<size>[ra + vx] = vy """
+            """u<size>[ra + vx] = vy"""
             asm.mov_imm64(TEMP_REG, self.vy)
             # Store immediate value to calculated address
             asm.store(

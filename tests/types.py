@@ -13,8 +13,9 @@ from tsrkit_types import (
 
 from tsrkit_pvm.interpreter.memory import INT_Memory
 
-Gas = U64 
+Gas = U64
 Register = U64
+
 
 @structure
 class Page:

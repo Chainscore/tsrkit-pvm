@@ -64,15 +64,14 @@ class Recompiler(PVM):
             [program.pvm_to_msn_index(j) + code_pointer for j in program.jump_table],
             registers,
             gas,
-            heap_start=memory.heap_start
+            heap_start=memory.heap_start,
         )
         vm_pointer, vm_size = vm_ctx.store(memory)
         assert vm_pointer == memory.buf_start
 
         # Create callable function - pass memory.offset (guest memory pointer)
         addr, _ = cls.create_caller(
-            code_pointer + program.pvm_to_msn_index(program_counter),
-            memory.offset
+            code_pointer + program.pvm_to_msn_index(program_counter), memory.offset
         )
         # Install safe signal handler
         cls.init_sig_handlers()
@@ -105,7 +104,7 @@ class Recompiler(PVM):
                 # Bytes to add
                 req = updated_regs[ra]
                 updated_regs[rd] = vm_ctx.heap_start + req
-                
+
                 memory.alter_accessibility(vm_ctx.heap_start, req)
 
                 # Create callable function - pass memory.offset (guest memory pointer)
@@ -133,7 +132,6 @@ class Recompiler(PVM):
 
         gas = int(VMContext.from_pointer(vm_pointer, len(program.jump_table)).gas)
 
-
         # Adjust overflow
         if status._value_.name == "out-of-gas":
             gas -= 2**32
@@ -142,13 +140,12 @@ class Recompiler(PVM):
         # if status._value_.name == "page-fault":
         #     status._value_.register -= memory.offset
 
-
         # Clean up
         # code_buf.close()
         # memory.buf.close()
 
         return status, final_pc, gas, updated_regs, memory
-    
+
     @classmethod
     def create_caller(cls, code_pointer: int, mem_pointer: int):
         """Create a caller function that executes generated code."""
@@ -178,7 +175,7 @@ class Recompiler(PVM):
         thunk = asm.finalize()
         buf, addr = cls.allocate_executable_memory(thunk)
         return addr, buf
-    
+
     @classmethod
     def allocate_executable_memory(cls, code: bytes, logger=None):
         """Allocate RWX memory and copy machine code"""
@@ -204,7 +201,7 @@ class Recompiler(PVM):
         if logger:
             logger.debug(f"Executable of size {size} stored at {addr}")
         return buf, addr
-    
+
     @classmethod
     def init_sig_handlers(cls):
         """Install the C signal handlers"""
@@ -214,12 +211,7 @@ class Recompiler(PVM):
 
     @classmethod
     def run_code(
-        cls, 
-        addr: int, 
-        vm_ctx: VMContext, 
-        vm_pointer: int, 
-        halt_addr: int, 
-        logger=None
+        cls, addr: int, vm_ctx: VMContext, vm_pointer: int, halt_addr: int, logger=None
     ) -> tuple[ExecutionStatus, list[int], ProgramData]:
         """
         Run code at given address with segfault protection.
@@ -243,23 +235,35 @@ class Recompiler(PVM):
             # Segfault occurred - get register state
             if segwrap.get_program_status(ctypes.byref(pg_data)) == 0:
                 if logger:
-                    logger.debug(f"""Faulted! {pg_data.status}
+                    logger.debug(
+                        f"""Faulted! {pg_data.status}
                             \t SI \t {pg_data.si_data} 
                             \t RIP \t {pg_data.rip} 
                             \t R15 \t {pg_data.r15} 
                             \t RCX \t {pg_data.rcx}
-                    """)
+                    """
+                    )
                 if pg_data.status == 0:
-                    updated_vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
-                    return HOST(pg_data.si_data), [int(r) for r in updated_vm_ctx.regs], pg_data
+                    updated_vm_ctx = VMContext.from_pointer(
+                        vm_pointer, len(vm_ctx.jump_table)
+                    )
+                    return (
+                        HOST(pg_data.si_data),
+                        [int(r) for r in updated_vm_ctx.regs],
+                        pg_data,
+                    )
                 elif pg_data.status == 1:
-                    return PAGE_FAULT(pg_data.vm_fault_addr()), pg_data.vm_regs(), pg_data
+                    return (
+                        PAGE_FAULT(pg_data.vm_fault_addr()),
+                        pg_data.vm_regs(),
+                        pg_data,
+                    )
                 elif pg_data.status == 2:
                     if pg_data.si_data == halt_addr:
                         return HALT, pg_data.vm_regs(), pg_data
                     else:
                         return OUT_OF_GAS, pg_data.vm_regs(), pg_data
-                    
+
         pg_data.rip = ret_val
         return PANIC, [0] * len(pg_data.vm_regs()), pg_data
 

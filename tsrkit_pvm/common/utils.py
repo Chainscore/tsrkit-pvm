@@ -2,7 +2,7 @@
 
 from .constants import PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
 from math import ceil
-import math 
+import math
 from typing import List
 
 
@@ -22,6 +22,7 @@ def get_pages(start_index: int, length: int) -> list[int]:
     end_index = start_index + max(length, 1) - 1
     end = end_index // PVM_MEMORY_PAGE_SIZE
     return list(range(start, end + 1))
+
 
 # --- Inst utils --- #
 def chi(value: int, n: int) -> int:

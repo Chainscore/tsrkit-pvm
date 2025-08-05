@@ -64,7 +64,7 @@ def test_vectors(pattern: str):
             int(vector["initial-pc"]),
             int(vector["initial-gas"]),
             vector["initial-regs"],
-            mem
+            mem,
         )
 
         assert registers == vector["expected-regs"], f"Register mismatch in {name}"

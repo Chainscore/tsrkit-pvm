@@ -36,7 +36,6 @@ def test_debug_mismatch():
     print(f"\n ⏭️Running test case {name} ...")
     print(f"Processing test case: {vector['name']}")
 
-
     tc = PvmTestcase.from_json(vector)
     tc_prog = INT_Program.decode(tc.program)
 

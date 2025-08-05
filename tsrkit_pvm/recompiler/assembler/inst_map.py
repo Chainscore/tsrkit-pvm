@@ -15,18 +15,20 @@ from .tables.iii_reg import InstructionsWArgs3Reg
 
 
 # Global dispatcher instance - created once at init
-inst_map = InstMapper([
-    InstructionsWoArgs,
-    InstructionsWArgs1Imm1EwImm,
-    WArgsOneOffset,
-    InstructionsWArgs1Reg1Imm,
-    InstructionsWArgs1Reg1Imm1Offset,
-    InstructionsWArgs2Imm,
-    InstructionsWArgs2Reg1Imm,
-    InstructionsWArgs2Reg1Offset,
-    InstructionsWArgs1Imm,
-    InstructionsWArgs1Reg2Imm,
-    InstructionsWArgs2Reg,
-    InstructionsWArgs2Reg2Imm,
-    InstructionsWArgs3Reg,
-])
+inst_map = InstMapper(
+    [
+        InstructionsWoArgs,
+        InstructionsWArgs1Imm1EwImm,
+        WArgsOneOffset,
+        InstructionsWArgs1Reg1Imm,
+        InstructionsWArgs1Reg1Imm1Offset,
+        InstructionsWArgs2Imm,
+        InstructionsWArgs2Reg1Imm,
+        InstructionsWArgs2Reg1Offset,
+        InstructionsWArgs1Imm,
+        InstructionsWArgs1Reg2Imm,
+        InstructionsWArgs2Reg,
+        InstructionsWArgs2Reg2Imm,
+        InstructionsWArgs3Reg,
+    ]
+)

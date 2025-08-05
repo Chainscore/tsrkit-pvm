@@ -20,5 +20,3 @@ class AssemblerContext:
     def __getattr__(self, name):
         # Delegate all other attributes to the underlying assembler
         return getattr(self.asm, name)
-
-

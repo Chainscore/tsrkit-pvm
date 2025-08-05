@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Tuple
-from tsrkit_pvm.core.ipvm import PVM 
+from tsrkit_pvm.core.ipvm import PVM
 from .instructions.inst_map import inst_map
 from .memory import INT_Memory
 from .program import INT_Program
@@ -74,7 +74,6 @@ class Interpreter(PVM):
                     status = OUT_OF_GAS
                     break
 
-
                 (status, program_counter, registers, memory), gas_cost = (
                     inst_map.process_instruction(
                         opcode, program, program_counter, registers, memory
@@ -82,7 +81,7 @@ class Interpreter(PVM):
                 )
 
                 insts.add(inst_map._dispatch_table[opcode].name)
-                
+
                 if status == ExecutionStatus.HALT:
                     if logger:
                         logger.info(

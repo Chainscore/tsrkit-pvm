@@ -87,9 +87,12 @@ def regs_from_pc(args) -> list:
     result[8] = len(args)
     return result
 
-def y_function(bytecode: bytes, args: bytes, mode = "recompiler") -> Tuple[bytes, list, Memory]:
+
+def y_function(
+    bytecode: bytes, args: bytes, mode="recompiler"
+) -> Tuple[bytes, list, Memory]:
     """Extract program components from bytecode.
-    
+
     Returns:
         Tuple of (program_code, registers, memory_data)
     """
@@ -98,7 +101,14 @@ def y_function(bytecode: bytes, args: bytes, mode = "recompiler") -> Tuple[bytes
     program_ = program_base.Program.decode_from(code.code)[0]
 
     if mode == "recompiler":
-        memory = REC_Memory.from_pc(code.read, code.r_write, args, code.z, code.s, VMContext.calculate_size(len(program_.jump_table)))
+        memory = REC_Memory.from_pc(
+            code.read,
+            code.r_write,
+            args,
+            code.z,
+            code.s,
+            VMContext.calculate_size(len(program_.jump_table)),
+        )
     else:
         memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
 
