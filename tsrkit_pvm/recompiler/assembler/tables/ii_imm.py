@@ -39,15 +39,11 @@ class InstructionsWArgs2Imm(InstructionTable):
 
     @staticmethod
     def store_imm(bit_size: int) -> Callable[[Any, "PyAssembler"], None]:
-        from tsrkit_asm import (
-            PyAssembler,
-        )  # local import to avoid heavy import for type checking
         from tsrkit_asm import Size, RegSize
 
         size_map = {8: Size.U8, 16: Size.U16, 32: Size.U32, 64: Size.U64}
 
-        def impl(self: "InstructionsWArgs2Imm", asm: PyAssembler):  # noqa: N802
-            # Use RCX as a scratch register (not part of guest mapping)
+        def impl(self, asm):
             imm_val = int(self.vy % (2**bit_size))
             asm.mov_imm64(TEMP_REG, imm_val)
 

@@ -33,6 +33,5 @@ class InstructionsWArgs1Imm(InstructionTable):
         # pop_all_regs(asm)  # This is safe to do so, not doing this also works
         # Load rax in rcx
 
-        print(f"Calling host function with vx={self.vx} (offset {PVM_SYS_CALL_OFFSET + self.vx})")
         asm.mov_imm64(Reg.rax, PVM_SYS_CALL_OFFSET + self.vx)
         asm.syscall()

@@ -3,7 +3,7 @@ from typing import Tuple
 from tsrkit_types import U64, TypedArray
 
 from tsrkit_pvm.core.ipvm import PVM
-from tsrkit_pvm.common.constants import PVM_MEMORY_PAGE_SIZE
+from tsrkit_pvm.recompiler.assembler.inst_map import inst_map
 from tsrkit_pvm.recompiler.memory import REC_Memory
 from tsrkit_pvm.recompiler.program import REC_Program
 from tsrkit_pvm.recompiler.segwrap.sig_handler import ProgramData
@@ -107,7 +107,6 @@ class Recompiler(PVM):
                 updated_regs[rd] = vm_ctx.heap_start + req
                 
                 memory.alter_accessibility(vm_ctx.heap_start, req)
-                print("ASM_SBRK")
 
                 # Create callable function - pass memory.offset (guest memory pointer)
                 vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
@@ -119,11 +118,12 @@ class Recompiler(PVM):
                 status, updated_regs, pg_data = cls.run_code(
                     addr, vm_ctx, vm_pointer, code_pointer + program.halt_offset, logger
                 )
+
         except Exception as e:
             raise ValueError(f"Page Fault {e}")
         finally:
             cls.cleanup_sig_state()
-        
+
         final_pc = program.msn_to_pvm_index(pg_data.rip - code_pointer)
 
         if logger:
@@ -132,6 +132,7 @@ class Recompiler(PVM):
             )
 
         gas = int(VMContext.from_pointer(vm_pointer, len(program.jump_table)).gas)
+
 
         # Adjust overflow
         if status._value_.name == "out-of-gas":

@@ -494,6 +494,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         """ra = (vx - rb) % 2^32"""
         if self.ra == self.rb:
             asm.neg(Size.U32, RegMem.Reg(r_map[self.ra]))
+
             asm.add(
                 Operands.RegMem_Imm(
                     reg_mem=RegMem.Reg(r_map[self.ra]),
@@ -666,7 +667,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
             asm.neg(Size.U64, RegMem.Reg(r_map[self.ra]))
             asm.add(
                 Operands.RegMem_Imm(
-                    reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                    reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(z(self.vx, 8))
                 )
             )
         else:

@@ -153,7 +153,7 @@ int init_syscall_handler(void) {
         // Check if syscall number >= 999
         BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 999, 0, 2),
         // Check if syscall number <= 1050
-        BPF_JUMP(BPF_JMP | BPF_JGT | BPF_K, 1050, 1, 0),
+        BPF_JUMP(BPF_JMP | BPF_JGT | BPF_K, 1101, 1, 0),
         // If in range [999, 1050], trap it
         BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
         

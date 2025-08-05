@@ -72,23 +72,19 @@ class REC_Memory:
 
     def alter_accessibility(self, start: int, len_: int, is_write=True):
         prot = mmap.PROT_READ | mmap.PROT_WRITE
-        # Calculate the actual memory address within our buffer
-        start_addr = self.offset + start
+        PAGE_SIZE = PVM_MEMORY_PAGE_SIZE
 
-        # Ensure the address is page-aligned
-        page_size = 4096  # Standard page size
-        aligned_addr = (start_addr // page_size) * page_size
-
-        res = libc.mprotect(ctypes.c_void_p(aligned_addr), len_, prot)
-        # mprotect returns 0 on success, -1 on failure
-        if res != 0:
-            error = ctypes.get_errno()
-            print(f"Warning: mprotect failed for address {hex(start_addr)}: {error}, {len_}")
-            # Continue without failing - the memory might still be usable
-        
-        # Update the page tracking to match the memory protection
-        from tsrkit_pvm.common.utils import get_pages
         pages = get_pages(start, len_)
+
+        for pg in pages:
+            start_addr = self.offset + pg * PAGE_SIZE
+            aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
+            
+            res = libc.mprotect(ctypes.c_void_p(aligned_addr), PAGE_SIZE, prot)
+            if res != 0:
+                error = ctypes.get_errno()
+                print(f"Warning: mprotect failed for write page {pg}: {error}")
+        
         if is_write:
             self._w_pages.update(pages)
         else:
@@ -161,7 +157,9 @@ class REC_Memory:
         # Track accessible pages for compatibility
         mem._r_pages.update(read_pages)
         mem._w_pages.update(write_pages)
+
         
+        print("r", mem._r_pages, "w", mem._w_pages)
         return mem
 
     def is_accessible(self, address: int, length: int, for_write: bool = False) -> bool:
