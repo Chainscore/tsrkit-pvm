@@ -60,7 +60,7 @@ class REC_Program(Program):
 
             self._skip_cache[i] = min(24, skip_value)
 
-    def assemble(self, logger=None) -> Tuple[bytes, dict, int, int]:
+    def assemble(self, gas_enabled = True, logger=None) -> Tuple[bytes, dict, int, int]:
         asm = PyAssembler()
 
         # Create labels for all basic blocks (jump targets)
@@ -91,27 +91,28 @@ class REC_Program(Program):
                         f"📍 {counter} \t Processing opcode \t {inst_map._dispatch_table[opcode].fn.__name__} ({opcode})"
                     )
 
-                gas = inst_map._dispatch_table[opcode].gas_cost
-                # --- Gas Computation --- #
-                x61mov_imm = -gas_offset + 0x61
-                asm.sub(
-                    Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
-                )
-                asm.sub(
-                    Operands.RegMem_Imm(
-                        RegMem.Mem(
-                            MemOp.BaseOffset(
-                                seg=None, size=RegSize.R64, base=Reg.r15, offset=0x61
-                            )
-                        ),
-                        ImmKind.I32(gas),
+                if gas_enabled:
+                    gas = inst_map._dispatch_table[opcode].gas_cost
+                    # --- Gas Computation --- #
+                    x61mov_imm = -gas_offset + 0x61
+                    asm.sub(
+                        Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
                     )
-                )
-                asm.jcc_rel32(Condition.Sign, -2)
-                asm.add(
-                    Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
-                )
-
+                    asm.sub(
+                        Operands.RegMem_Imm(
+                            RegMem.Mem(
+                                MemOp.BaseOffset(
+                                    seg=None, size=RegSize.R64, base=Reg.r15, offset=0x61
+                                )
+                            ),
+                            ImmKind.I32(gas),
+                        )
+                    )
+                    asm.jcc_rel32(Condition.Sign, -2)
+                    asm.add(
+                        Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
+                    )
+                # Process the instruction
                 _, gas = inst_map.process_instruction(opcode, self, counter, asm_ctx)
 
             counter += 1

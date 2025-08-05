@@ -57,13 +57,6 @@ class Interpreter(PVM):
                 remaining_gas -= gas_cost
 
                 if remaining_gas < 0:
-                    print(
-                        f"\tRan OOG during: {inst_map._dispatch_table[opcode].name} ({opcode} | {inst_map._dispatch_table[opcode].table_class.__name__}) | All Instructions: {insts}"
-                    )
-                    next_opc = program.zeta[program_counter]
-                    print(
-                        f"\tNext: {inst_map._dispatch_table[next_opc].name} ({next_opc} | {inst_map._dispatch_table[next_opc].table_class.__name__})"
-                    )
 
                     if logger:
                         logger.warning(

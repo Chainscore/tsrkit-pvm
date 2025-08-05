@@ -54,7 +54,7 @@ class Recompiler(PVM):
     ) -> Tuple[ExecutionStatus, int, int, list, REC_Memory]:
 
         if not program.msn_code:
-            program.assemble(logger)
+            program.assemble(logger=logger)
 
         start_time_ns = time.time_ns()
         code_buf, code_pointer = cls.allocate_executable_memory(program.msn_code)
