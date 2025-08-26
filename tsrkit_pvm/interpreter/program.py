@@ -18,9 +18,7 @@ class INT_Program(Program):
         self._precompute_skip_values()
         basic_blocks = [0]
         for n in range(len(self.instruction_set)):
-            if self.offset_bitmask[n] and inst_map.is_terminating(
-                self.instruction_set[n]
-            ):
+            if self.offset_bitmask[n] and inst_map.is_terminating(self.instruction_set[n]) and inst_map._dispatch_table[n] != None):
                 basic_blocks.append(n + 1 + self.skip(n))
         self.basic_blocks = basic_blocks
         self._basic_blocks_set = set(self.basic_blocks)
