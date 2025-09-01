@@ -28,7 +28,7 @@ class InstMapper:
     into a single dispatch table for efficient performance.
     """
 
-    _dispatch_table: List[InstructionHandler | None] = []
+    _dispatch_table: List[InstructionHandler | None] = [None] * 256
     _gas_costs: bytes = b""
     _terminating_mask: int = 0
 

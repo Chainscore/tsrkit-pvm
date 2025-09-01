@@ -12,6 +12,7 @@ from .core.memory import Memory
 from .core.program_base import Program
 from .core.ipvm import PVM
 from .core.code import Code, y_function
+from .common.types import Accessibility
 from .common.status import (
     CONTINUE,
     HALT,
@@ -23,7 +24,6 @@ from .common.status import (
     PvmError,
     HostStatus,
 )
-from .common.types import Accessibility
 
 from .common.constants import (
     PVM_ADDR_ALIGNMENT,

@@ -1,6 +1,7 @@
 import ctypes
 import mmap
 import os
+from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.common.utils import get_pages, total_page_size, total_zone_size
 from tsrkit_pvm.common.constants import (
     PVM_INIT_DATA_SIZE,
@@ -75,13 +76,38 @@ class REC_Memory:
 
         return mem
 
-    def alter_accessibility(self, start: int, len_: int, is_write=True):
-        prot = mmap.PROT_READ | mmap.PROT_WRITE
+    def zero_memory_range(self, start_page: int, num_pages: int):
+        if num_pages <= 0:
+            return
+ 
+        start_addr = self.offset + start_page * PVM_MEMORY_PAGE_SIZE
+        size = num_pages * PVM_MEMORY_PAGE_SIZE
+        self.buf[start_addr: start_addr + size] = bytes([0] * size)
+
+    def alter_accessibility(self, start: int, len_: int, access: Accessibility):
+ 
+        if access == Accessibility.WRITE:
+            prot = mmap.PROT_WRITE
+        elif access == Accessibility.READ:
+            prot = mmap.PROT_READ
+        else:
+            prot = mmap.MAP_PRIVATE
+
         PAGE_SIZE = PVM_MEMORY_PAGE_SIZE
 
         pages = get_pages(start, len_)
 
         for pg in pages:
+            if access == Accessibility.WRITE:
+                self._w_pages.add(pg)
+                self._r_pages.discard(pg)
+            elif access == Accessibility.READ:
+                self._r_pages.add(pg)
+                self._w_pages.discard(pg)
+            else:
+                self._r_pages.discard(pg)
+                self._w_pages.discard(pg)
+
             start_addr = self.offset + pg * PAGE_SIZE
             aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
 
@@ -90,10 +116,6 @@ class REC_Memory:
                 error = ctypes.get_errno()
                 print(f"Warning: mprotect failed for write page {pg}: {error}")
 
-        if is_write:
-            self._w_pages.update(pages)
-        else:
-            self._r_pages.update(pages)
 
     @classmethod
     def from_pc(
@@ -176,14 +198,17 @@ class REC_Memory:
         print("r", mem._r_pages, "w", mem._w_pages)
         return mem
 
-    def is_accessible(self, address: int, length: int, for_write: bool = False) -> bool:
+    def is_accessible(self, address: int, length: int, access: Accessibility = Accessibility.READ) -> bool:
         """Check if memory range is accessible"""
         if length <= 0:
             return True
         pages = get_pages(address, length)
-        if for_write:
+        if access == Accessibility.WRITE:
             return all(pg in self._w_pages for pg in pages)
-        return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
+        elif access == Accessibility.READ:
+            return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
+        return True
+
 
     def read(self, address: int, length: int) -> bytes:
         """Read data from guest memory"""

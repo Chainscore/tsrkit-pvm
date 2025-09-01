@@ -1,5 +1,4 @@
 from typing import Optional
-
 from tsrkit_types.enum import Enum
 from tsrkit_types.struct import structure
 

@@ -84,7 +84,7 @@ class InstructionsWArgs2Reg(InstructionTable):
 
     def sbrk(self, registers: list, memory: Memory) -> OpReturn:
         req = registers[self.ra]  # bytes requested
-        memory.alter_accessibility(memory.heap_break, req, "write")
+        memory.alter_accessibility(memory.heap_break, req, Accessibility.WRITE)
         memory.heap_break = memory.heap_break + req
 
         # out of address space

@@ -37,8 +37,14 @@ class REC_Program(Program):
         self._precompute_skip_values()
         basic_blocks = [0]
         for n in range(len(self.instruction_set)):
-            if self.offset_bitmask[n] and inst_map.is_terminating(self.instruction_set[n]) and inst_map._dispatch_table[n] != None:
+            if (
+                self.offset_bitmask[n] and 
+                inst_map.is_terminating(self.instruction_set[n]) and 
+                n < 256 and
+                inst_map._dispatch_table[n] != None
+            ):
                 basic_blocks.append(n + 1 + self.skip(n))
+
         self.basic_blocks = basic_blocks
         self.msn_code, self.pvm_msn_map, self.panic_offset, self.halt_offset = (
             None,

@@ -2,6 +2,7 @@
 
 from .constants import *
 from .utils import *
+from .types import Accessibility
 
 __all__ = [
     "PVM_ADDR_ALIGNMENT",
@@ -12,4 +13,5 @@ __all__ = [
     "REGISTER_COUNT",
     "total_page_size",
     "get_pages",
+    "Accessibility"
 ]

@@ -2,6 +2,7 @@ from typing import Tuple
 
 from tsrkit_types import U64, TypedArray
 
+from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.core.ipvm import PVM
 from tsrkit_pvm.recompiler.assembler.inst_map import inst_map
 from tsrkit_pvm.recompiler.memory import REC_Memory
@@ -97,6 +98,8 @@ class Recompiler(PVM):
             ):
                 # We need imm, Calc the PVM instruction against current rip
                 pvm_pc = program.msn_to_pvm_index(pg_data.rip - code_pointer)
+                if pvm_pc == None:
+                    raise ValueError("Unable to map Machine code to PVM")
                 # sbrk is 2 bytes long, and rip is at the next instruction
                 sbrk_pc = pvm_pc - 2
                 imm = program.instruction_set[sbrk_pc + 1]
@@ -105,7 +108,7 @@ class Recompiler(PVM):
                 req = updated_regs[ra]
                 updated_regs[rd] = vm_ctx.heap_start + req
 
-                memory.alter_accessibility(vm_ctx.heap_start, req)
+                memory.alter_accessibility(vm_ctx.heap_start, req, Accessibility.WRITE)
 
                 # Create callable function - pass memory.offset (guest memory pointer)
                 vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))

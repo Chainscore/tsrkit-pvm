@@ -57,7 +57,6 @@ class Interpreter(PVM):
                 remaining_gas -= gas_cost
 
                 if remaining_gas < 0:
-
                     if logger:
                         logger.warning(
                             "PVM - OUT_OF_GAS",
@@ -66,6 +65,8 @@ class Interpreter(PVM):
                         )
                     status = OUT_OF_GAS
                     break
+
+                # if logger: logger.info("Processing inst", opcode=opcode, pc=program_counter)
 
                 (status, program_counter, registers, memory), gas_cost = (
                     inst_map.process_instruction(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Dict, List, Self, Sequence, TYPE_CHECKING
+from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.common.utils import get_pages, total_page_size, total_zone_size
 from tsrkit_pvm.common.constants import (
     PVM_INIT_DATA_SIZE,
@@ -135,13 +136,15 @@ class INT_Memory:
         """Get list of page numbers spanning a memory range."""
         return get_pages(address, length)
 
-    def is_accessible(self, address: int, length: int, for_write: bool = False) -> bool:
+    def is_accessible(self, address: int, length: int, access: Accessibility = Accessibility.READ) -> bool:
         if length <= 0:
             return True
         pages = self.get_pages(address, length)
-        if for_write:
+        if access == Accessibility.WRITE:
             return all(pg in self._w_pages for pg in pages)
-        return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
+        elif access == Accessibility.READ:
+            return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
+        return True
 
     def dump_memory(self, start: int, end: int):  # debug helper
         return [
@@ -212,24 +215,27 @@ class INT_Memory:
 
         return cls(memory, read_pages, write_pages, heap=heap)
 
-    def zero_memory_range(self, start_address: int, offset: int):
-        if offset <= 0:
+    def zero_memory_range(self, start_page: int, num_pages: int):
+        if num_pages <= 0:
             return
-        end_address = start_address + offset
-        while start_address < end_address:
+        while num_pages != 0:
+            start_address = start_page * PVM_MEMORY_PAGE_SIZE
             dst = self._page_for(start_address, create=True)
-            pg_off = start_address % PAGE_SIZE
-            chunk = min(PAGE_SIZE - pg_off, end_address - start_address)
-            dst[pg_off : pg_off + chunk] = b"\x00" * chunk
-            start_address += chunk
+            dst[start_address : start_address + PVM_MEMORY_PAGE_SIZE] = b"\x00" * PVM_MEMORY_PAGE_SIZE
+            start_address += PVM_MEMORY_PAGE_SIZE
+            num_pages -= 1
 
-    def alter_accessibility(self, start_address: int, length: int, access_type: str):
-        for pg in get_pages(start_address, length):
-            if access_type == "write":
+    def alter_accessibility(self, start: int, len_: int, access: Accessibility):
+        for pg in get_pages(start, len_):
+            if access == Accessibility.WRITE:
                 self._w_pages.add(pg)
-            else:
+                self._r_pages.discard(pg)
+            elif access == Accessibility.READ:
                 self._r_pages.add(pg)
-
+                self._w_pages.discard(pg)
+            else:
+                self._r_pages.discard(pg)
+                self._w_pages.discard(pg)
 
 _ZERO_PAGE = bytes(PAGE_SIZE)
 
