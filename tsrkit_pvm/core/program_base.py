@@ -23,8 +23,8 @@ class Program:
 
     def __post_init__(self):
         # Pre-compute and cache frequently accessed values
-        self._extended_bitmask = ExtendedList(self.offset_bitmask, default=True)
-        self.zeta = ExtendedList(self.instruction_set, default=0)
+        self._extended_bitmask = self.offset_bitmask + [True] * 1000 # ExtendedList(self.offset_bitmask, default=True)
+        self.zeta = self.instruction_set + bytes([0] * 1000) # ExtendedList(self.instruction_set, default=0)
 
     def skip(self, pc: int) -> int:
         """Calculate skip value for instruction at pc. Default implementation returns 0."""

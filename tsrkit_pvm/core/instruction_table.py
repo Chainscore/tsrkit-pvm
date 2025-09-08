@@ -19,7 +19,7 @@ class InstructionTable(Protocol):
 
     @property
     def skip_index(self):
-        return self.program.skip(self.counter)
+        return self.program._skip_cache.get(self.counter)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]: ...
