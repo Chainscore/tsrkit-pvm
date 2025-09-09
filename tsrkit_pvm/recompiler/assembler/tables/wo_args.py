@@ -5,6 +5,8 @@ from ....core.opcode import OpCode
 
 
 class InstructionsWoArgs(InstructionTable):
+    def get_props(self):
+        return ()
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {

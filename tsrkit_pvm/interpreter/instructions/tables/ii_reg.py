@@ -3,19 +3,21 @@ from typing import Any, Callable, Dict
 from ...memory import Memory
 from ....common.status import CONTINUE
 from ....common.types import Accessibility
-from ....common.utils import b, z, z_inv
+from ....common.utils import b, b_inv, chi, compare, compare_bits_vectorized, z, z_inv, clamp_12
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs2Reg(InstructionTable):
-    @property
-    def rd(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] // 16)
+    def get_props(self):
+        # Slice zeta once for better performance with large arrays
+        zeta_slice = self.program.zeta[self.counter + 1:self.counter + 2]
+        
+        # Cache the byte value and use bit operations for faster parsing
+        byte_val = zeta_slice[0]  # equivalent to self.program.zeta[self.counter + 1]
+        rd = clamp_12(byte_val & 0x0F)  # Lower 4 bits (equivalent to % 16)
+        ra = clamp_12(byte_val >> 4)    # Upper 4 bits (equivalent to // 16)
+        return (rd, ra)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -78,73 +80,73 @@ class InstructionsWArgs2Reg(InstructionTable):
             ),
         }
 
-    def move_reg(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = registers[self.ra]
+    def move_reg(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+        registers[rd] = registers[ra]
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def sbrk(self, registers: list, memory: Memory) -> OpReturn:
-        req = registers[self.ra]  # bytes requested
+    def sbrk(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+        req = registers[ra]  # bytes requested
         memory.alter_accessibility(memory.heap_break, req, Accessibility.WRITE)
         memory.heap_break = memory.heap_break + req
 
         # out of address space
-        registers[self.rd] = memory.heap_break
+        registers[rd] = memory.heap_break
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
-    def count_set_bits(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def count_set_bits_impl(self, registers: list, memory: Memory) -> OpReturn:
-            registers[self.rd] = sum(
-                b(int(registers[self.ra]) % 2**bitsize, bitsize // 8)[:bitsize]
+    def count_set_bits(bitsize: int) -> Callable[[Any, list, Memory, int, int], OpReturn]:
+        def count_set_bits_impl(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+            registers[rd] = sum(
+                b(int(registers[ra]) % 2**bitsize, bitsize // 8)[:bitsize]
             )
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
         return count_set_bits_impl
 
     @staticmethod
-    def leading_zero_bits(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def leading_zero_bits_impl(self, registers: list, memory: Memory) -> OpReturn:
+    def leading_zero_bits(bitsize: int) -> Callable[[Any, list, Memory, int, int], OpReturn]:
+        def leading_zero_bits_impl(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
             try:
                 leading_zeroes = b(
-                    int(registers[self.ra]) % 2**bitsize, bitsize // 8
+                    int(registers[ra]) % 2**bitsize, bitsize // 8
                 )[::-1].index(True)
             except ValueError:
                 leading_zeroes = bitsize
-            registers[self.rd] = leading_zeroes
+            registers[rd] = leading_zeroes
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
         return leading_zero_bits_impl
 
     @staticmethod
-    def trailing_zero_bits(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def trailing_zero_impl(self, registers: list, memory: Memory) -> OpReturn:
+    def trailing_zero_bits(bitsize: int) -> Callable[[Any, list, Memory, int, int], OpReturn]:
+        def trailing_zero_impl(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
             try:
                 trailing_zeroes = b(
-                    registers[self.ra] % 2**bitsize, bitsize // 8
+                    registers[ra] % 2**bitsize, bitsize // 8
                 ).index(True)
             except ValueError:
                 trailing_zeroes = bitsize
-            registers[self.rd] = trailing_zeroes
+            registers[rd] = trailing_zeroes
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
         return trailing_zero_impl
 
     @staticmethod
-    def sign_extend(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def sign_extend_impl(self, registers: list, memory: Memory) -> OpReturn:
-            registers[self.rd] = z_inv(
-                z(registers[self.ra] % 2**bitsize, bitsize // 8), 8
+    def sign_extend(bitsize: int) -> Callable[[Any, list, Memory, int, int], OpReturn]:
+        def sign_extend_impl(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+            registers[rd] = z_inv(
+                z(registers[ra] % 2**bitsize, bitsize // 8), 8
             )
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
         return sign_extend_impl
 
-    def zero_extend_16(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = int(registers[self.ra]) % 2**16
+    def zero_extend_16(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+        registers[rd] = int(registers[ra]) % 2**16
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def reverse_bytes(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = int.from_bytes(
-            registers[self.ra].to_bytes(8, "little")[::-1], "little"
+    def reverse_bytes(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+        registers[rd] = int.from_bytes(
+            registers[ra].to_bytes(8, "little")[::-1], "little"
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory

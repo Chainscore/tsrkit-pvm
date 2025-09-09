@@ -7,39 +7,30 @@ from ...vm_context import r_map
 
 
 class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) % 16)
-
-    @property
-    def length_info(self) -> int:
-        """Extract length encoding from register byte"""
-        return int(self.program.zeta[self.counter + 1]) // 16
-
-    @property
-    def lx(self) -> int:
-        """Length of immediate value in bytes"""
-        return self.length_info
-
-    @property
-    def vx(self) -> int:
-        """Immediate value"""
+    def get_props(self):
+        ra = min(12, int(self.program.zeta[self.counter + 1]) % 16)
+        
+        # Extract length encoding from register byte
+        length_info = int(self.program.zeta[self.counter + 1]) // 16
+        
+        # Length of immediate value in bytes
+        lx = length_info
+        
+        # Immediate value
         start = self.counter + 2
-        end = start + self.lx
-        return z(int.from_bytes(self.program.zeta[start:end], "little"), self.lx)
-
-    @property
-    def ly(self) -> int:
-        """Length of offset value in bytes"""
-        return self.skip_index - 1 - self.lx
-
-    @property
-    def vy(self) -> int:
-        """Target address (current position + offset)"""
-        start = self.counter + 2 + self.lx
-        end = start + self.ly
-        offset = z(int.from_bytes(self.program.zeta[start:end], "little"), self.ly)
-        return self.counter + offset
+        end = start + lx
+        vx = z(int.from_bytes(self.program.zeta[start:end], "little"), lx)
+        
+        # Length of offset value in bytes
+        ly = self.skip_index - 1 - lx
+        
+        # Target address (current position + offset)
+        start = self.counter + 2 + lx
+        end = start + ly
+        offset = z(int.from_bytes(self.program.zeta[start:end], "little"), ly)
+        vy = self.counter + offset
+        
+        return (ra, length_info, lx, vx, ly, vy)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -103,13 +94,13 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             ),
         }
 
-    def load_imm_jump(self, asm):
+    def load_imm_jump(self, asm, ra, length_info, lx, vx, ly, vy):
         """Load immediate value into register and jump to target address"""
         # Load immediate value into register
-        asm.mov_imm64(r_map[self.ra], self.vx)
+        asm.mov_imm64(r_map[ra], vx)
 
         # Jump to target address
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jmp_label32(target_label)
@@ -117,17 +108,17 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             # Fallback if label not found
             asm.ud2()  # This shouldn't happen in a well-formed program
 
-    def branch_eq_imm(self, asm):
+    def branch_eq_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register equals immediate value"""
         # Compare register to immediate value
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
         # Get the target address and find the corresponding label
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Equal, target_label)
@@ -136,15 +127,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_ne_imm(self, asm):
+    def branch_ne_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register not equals immediate value"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.NotEqual, target_label)
@@ -153,15 +144,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_lt_u_imm(self, asm):
+    def branch_lt_u_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register less than immediate value (unsigned)"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Below, target_label)
@@ -170,15 +161,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_lt_s_imm(self, asm):
+    def branch_lt_s_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register less than immediate value (signed)"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Less, target_label)
@@ -187,15 +178,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_ge_u_imm(self, asm):
+    def branch_ge_u_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register greater than or equal to immediate value (unsigned)"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.AboveOrEqual, target_label)
@@ -204,15 +195,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_ge_s_imm(self, asm):
+    def branch_ge_s_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register greater than or equal to immediate value (signed)"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.GreaterOrEqual, target_label)
@@ -221,15 +212,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_gt_u_imm(self, asm):
+    def branch_gt_u_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register greater than immediate value (unsigned)"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Above, target_label)
@@ -238,15 +229,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_gt_s_imm(self, asm):
+    def branch_gt_s_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register greater than immediate value (signed)"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Greater, target_label)
@@ -255,15 +246,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_le_u_imm(self, asm):
+    def branch_le_u_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register less than or equal to immediate value (unsigned)"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.BelowOrEqual, target_label)
@@ -272,15 +263,15 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_le_s_imm(self, asm):
+    def branch_le_s_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register less than or equal to immediate value (signed)"""
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I64(self.vx)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I64(vx)
             )
         )
 
-        target_addr = self.vy
+        target_addr = vy
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.LessOrEqual, target_label)

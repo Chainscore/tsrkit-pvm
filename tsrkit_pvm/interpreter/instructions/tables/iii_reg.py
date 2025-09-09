@@ -4,24 +4,22 @@ from typing import Any, Callable, Dict
 
 from ...memory import Memory
 from ....common.status import CONTINUE
-from ....common.utils import b, b_inv, chi, compare, smod, z, z_inv
+from ....common.utils import b, b_inv, chi, compare, compare_bits_vectorized, smod, z, z_inv, clamp_12
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs3Reg(InstructionTable):
-
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def rb(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] // 16)
-
-    @property
-    def rd(self) -> int:
-        return min(12, self.program.zeta[self.counter + 2])
+    def get_props(self):
+        # Slice zeta once for better performance with large arrays  
+        zeta_slice = self.program.zeta[self.counter + 1:self.counter + 3]
+        
+        # Cache the byte values and use bit operations for faster parsing
+        byte_val = zeta_slice[0]  # equivalent to self.program.zeta[self.counter + 1]
+        ra = clamp_12(byte_val & 0x0F)  # Lower 4 bits (equivalent to % 16)
+        rb = clamp_12(byte_val >> 4)    # Upper 4 bits (equivalent to // 16)
+        rd = clamp_12(zeta_slice[1])     # equivalent to self.program.zeta[self.counter + 2]
+        return (ra, rb, rd)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -99,55 +97,55 @@ class InstructionsWArgs3Reg(InstructionTable):
             230: OpCode(name="min_u", fn=cls._min_u, gas=1, is_terminating=False),
         }
 
-    def add_32(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = chi(
-            (int(registers[self.ra]) + int(registers[self.rb])) % 2**32, 4
+    def add_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = chi(
+            (int(registers[ra]) + int(registers[rb])) % 2**32, 4
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def add_64(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = (int(registers[self.ra]) + int(registers[self.rb])) % 2**64
+    def add_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = (int(registers[ra]) + int(registers[rb])) % 2**64
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def sub_32(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = chi(
-            (registers[self.ra] + 2**32 - (registers[self.rb] % 2**32)) % 2**32, 4
+    def sub_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = chi(
+            (registers[ra] + 2**32 - (registers[rb] % 2**32)) % 2**32, 4
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def sub_64(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = (registers[self.ra] + 2**64 - registers[self.rb]) % 2**64
+    def sub_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = (registers[ra] + 2**64 - registers[rb]) % 2**64
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def mul_32(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = chi((registers[self.ra] * registers[self.rb]) % 2**32, 4)
+    def mul_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = chi((registers[ra] * registers[rb]) % 2**32, 4)
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def mul_64(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = (int(registers[self.ra]) * int(registers[self.rb])) % 2**64
+    def mul_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = (int(registers[ra]) * int(registers[rb])) % 2**64
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def div_u_32(self, registers: list, memory: Memory) -> OpReturn:
-        if (registers[self.rb] % 2**32) == 0:
+    def div_u_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        if (registers[rb] % 2**32) == 0:
             value = 2**64 - 1
         else:
-            value = chi((registers[self.ra] % 2**32) // (registers[self.rb] % 2**32), 4)
+            value = chi((registers[ra] % 2**32) // (registers[rb] % 2**32), 4)
 
-        registers[self.rd] = value
+        registers[rd] = value
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def div_u_64(self, registers: list, memory: Memory) -> OpReturn:
-        if registers[self.rb] == 0:
+    def div_u_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        if registers[rb] == 0:
             value = 2**64 - 1
         else:
-            value = trunc(Decimal(int(registers[self.ra])) / int(registers[self.rb]))
+            value = trunc(Decimal(int(registers[ra])) / int(registers[rb]))
 
-        registers[self.rd] = value
+        registers[rd] = value
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def div_s_32(self, registers: list, memory: Memory) -> OpReturn:
-        a = z(registers[self.ra] % 2**32, 4)
-        b = z(registers[self.rb] % 2**32, 4)
+    def div_s_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        a = z(registers[ra] % 2**32, 4)
+        b = z(registers[rb] % 2**32, 4)
         if b == 0:
             value = 2**64 - 1
         elif a == -(2**31) and b == -1:
@@ -155,189 +153,196 @@ class InstructionsWArgs3Reg(InstructionTable):
         else:
             value = z_inv(trunc(a / b), 8)
 
-        registers[self.rd] = value
+        registers[rd] = value
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def div_s_64(self, registers: list, memory: Memory) -> OpReturn:
-        if registers[self.rb] == 0:
+    def div_s_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        if registers[rb] == 0:
             value = 2**64 - 1
         else:
-            a = z(registers[self.ra], 8)
-            b = z(registers[self.rb], 8)
+            a = z(registers[ra], 8)
+            b = z(registers[rb], 8)
             if a == -(2**63) and b == -1:
-                value = registers[self.ra]
+                value = registers[ra]
             else:
                 value = z_inv(trunc(Decimal(a) / b), 8)
 
-        registers[self.rd] = value
+        registers[rd] = value
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def rem_u_32(self, registers: list, memory: Memory) -> OpReturn:
-        a = registers[self.ra] % 2**32
-        b = registers[self.rb] % 2**32
-        registers[self.rd] = chi(a if b == 0 else a % b, 4)
+    def rem_u_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        a = registers[ra] % 2**32
+        b = registers[rb] % 2**32
+        registers[rd] = chi(a if b == 0 else a % b, 4)
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def rem_u_64(self, registers: list, memory: Memory) -> OpReturn:
-        a = registers[self.ra]
-        b = registers[self.rb]
-        registers[self.rd] = a if b == 0 else a % b
+    def rem_u_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        a = registers[ra]
+        b = registers[rb]
+        registers[rd] = a if b == 0 else a % b
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def rem_s_32(self, registers: list, memory: Memory) -> OpReturn:
-        a = z(registers[self.ra] % 2**32, 4)
-        b = z(registers[self.rb] % 2**32, 4)
+    def rem_s_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        a = z(registers[ra] % 2**32, 4)
+        b = z(registers[rb] % 2**32, 4)
         if a == -(2**31) and b == -1:
-            registers[self.rd] = 0
+            registers[rd] = 0
         else:
-            registers[self.rd] = z_inv(smod(a, b), 8)
+            registers[rd] = z_inv(smod(a, b), 8)
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def rem_s_64(self, registers: list, memory: Memory) -> OpReturn:
-        a = z(registers[self.ra], 8)
-        b = z(registers[self.rb], 8)
+    def rem_s_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        a = z(registers[ra], 8)
+        b = z(registers[rb], 8)
         if a == -(2**31) and b == -1:
-            registers[self.rd] = 0
+            registers[rd] = 0
         else:
-            registers[self.rd] = z_inv(smod(a, b), 8)
+            registers[rd] = z_inv(smod(a, b), 8)
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def shlo_l_32(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = chi(
-            (int(registers[self.ra]) * 2 ** (int(registers[self.rb]) % 32)) % 2**32, 4
+    def shlo_l_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = chi(
+            (int(registers[ra]) * 2 ** (int(registers[rb]) % 32)) % 2**32, 4
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def shlo_l_64(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = (
-            int(registers[self.ra]) * 2 ** (int(registers[self.rb]) % 64)
+    def shlo_l_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = (
+            int(registers[ra]) * 2 ** (int(registers[rb]) % 64)
         ) % 2**64
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def shlo_r_32(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = chi(
-            (registers[self.ra] % 2**32) // 2 ** (int(registers[self.rb]) % 32), 4
+    def shlo_r_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = chi(
+            (registers[ra] % 2**32) // 2 ** (int(registers[rb]) % 32), 4
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def shlo_r_64(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = (int(registers[self.ra]) % 2**64) // 2 ** (
-            int(registers[self.rb]) % 64
+    def shlo_r_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = (int(registers[ra]) % 2**64) // 2 ** (
+            int(registers[rb]) % 64
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def shar_r_32(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = z_inv(
-            z(registers[self.ra] % 2**32, 4) // 2 ** (int(registers[self.rb]) % 32), 8
+    def shar_r_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = z_inv(
+            z(registers[ra] % 2**32, 4) // 2 ** (int(registers[rb]) % 32), 8
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def shar_r_64(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = z_inv(
-            z(registers[self.ra] % 2**64, 8) // 2 ** (int(registers[self.rb]) % 64), 8
+    def shar_r_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = z_inv(
+            z(registers[ra] % 2**64, 8) // 2 ** (int(registers[rb]) % 64), 8
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     def _op(op: str, inv_a=False, inv_b=False, inv_res=False):
-        def op_impl(self, registers: list, memory: Memory) -> OpReturn:
-            ba = b(int(registers[self.ra]), 8)
-            bb = b(int(registers[self.rb]), 8)
-            result = [0] * 64
-            for i in range(64):
-                a_val = (not ba[i]) if inv_a else ba[i]
-                b_val = (not bb[i]) if inv_b else bb[i]
-                result[i] = compare(a_val, b_val, op)
-                if inv_res:
-                    result[i] = not result[i]
-            registers[self.rd] = b_inv(result)
+        def op_impl(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+            ba = b(int(registers[ra]), 8)
+            bb = b(int(registers[rb]), 8)
+            
+            # Apply inversions if needed
+            if inv_a:
+                ba = [not bit for bit in ba]
+            if inv_b:
+                bb = [not bit for bit in bb]
+            
+            # Use vectorized comparison for massive performance boost
+            result = compare_bits_vectorized(ba, bb, op)
+            
+            # Apply result inversion if needed
+            if inv_res:
+                result = [not bit for bit in result]
+                
+            registers[rd] = b_inv(result)
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
         return op_impl
 
-    def mul_upper_s_s(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = z_inv(
-            z(registers[self.ra], 8) * z(registers[self.rb], 8) // 2**64, 8
+    def mul_upper_s_s(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = z_inv(
+            z(registers[ra], 8) * z(registers[rb], 8) // 2**64, 8
         )
 
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def mul_upper_u_u(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = (
-            int(registers[self.ra]) * int(registers[self.rb])
+    def mul_upper_u_u(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = (
+            int(registers[ra]) * int(registers[rb])
         ) // 2**64
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def mul_upper_s_u(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = z_inv(
-            z(int(registers[self.ra]), 8) * int(registers[self.rb]) // 2**64, 8
+    def mul_upper_s_u(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = z_inv(
+            z(int(registers[ra]), 8) * int(registers[rb]) // 2**64, 8
         )
 
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def set_lt_u(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = int(registers[self.ra] < registers[self.rb])
+    def set_lt_u(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = int(registers[ra] < registers[rb])
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def set_lt_s(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = int(z(registers[self.ra], 8) < z(registers[self.rb], 8))
+    def set_lt_s(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = int(z(registers[ra], 8) < z(registers[rb], 8))
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def cmov_iz(self, registers: list, memory: Memory) -> OpReturn:
-        if registers[self.rb] == 0:
-            registers[self.rd] = registers[self.ra]
+    def cmov_iz(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        if registers[rb] == 0:
+            registers[rd] = registers[ra]
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def cmov_nz(self, registers: list, memory: Memory) -> OpReturn:
-        if registers[self.rb] != 0:
-            registers[self.rd] = registers[self.ra]
+    def cmov_nz(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        if registers[rb] != 0:
+            registers[rd] = registers[ra]
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def _max(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = z_inv(
-            max(z(registers[self.ra], 8), z(registers[self.rb], 8)), 8
+    def _max(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = z_inv(
+            max(z(registers[ra], 8), z(registers[rb], 8)), 8
         )
 
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def _max_u(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = max(registers[self.ra], registers[self.rb])
+    def _max_u(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = max(registers[ra], registers[rb])
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def _min(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = z_inv(
-            min(z(registers[self.ra], 8), z(registers[self.rb], 8)), 8
+    def _min(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = z_inv(
+            min(z(registers[ra], 8), z(registers[rb], 8)), 8
         )
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def _min_u(self, registers: list, memory: Memory) -> OpReturn:
-        registers[self.rd] = min(registers[self.ra], registers[self.rb])
+    def _min_u(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+        registers[rd] = min(registers[ra], registers[rb])
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def rot_l_64(self, registers: list, memory: Memory) -> OpReturn:
+    def rot_l_64(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
         x = [False] * 64
-        ba = b(registers[self.ra], 8)
+        ba = b(registers[ra], 8)
         for i in range(64):
-            x[(i + int(registers[self.rb])) % 64] = ba[i]
-        registers[self.rd] = b_inv(x)
+            x[(i + int(registers[rb])) % 64] = ba[i]
+        registers[rd] = b_inv(x)
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
-    def rot_r(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def rot_r_impl(self, registers: list, memory: Memory) -> OpReturn:
-            a_bits = b(int(registers[self.ra]) % 2 ** (bitsize), bitsize // 8)
-            b_val = registers[self.rb] % 2 ** (bitsize)
+    def rot_r(bitsize: int) -> Callable[[Any, list, Memory, int, int, int], OpReturn]:
+        def rot_r_impl(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
+            a_bits = b(int(registers[ra]) % 2 ** (bitsize), bitsize // 8)
+            b_val = registers[rb] % 2 ** (bitsize)
             x = b_inv([a_bits[(i + b_val) % bitsize] for i in range(bitsize)])
             if bitsize < 64:
                 x = chi(x, bitsize // 8)
-            registers[self.rd] = x
+            registers[rd] = x
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
         return rot_r_impl
 
-    def rot_l_32(self, registers: list, memory: Memory) -> OpReturn:
+    def rot_l_32(self, registers: list, memory: Memory, ra: int, rb: int, rd: int) -> OpReturn:
         x = [False] * 32
-        ba = b(int(registers[self.ra]) % 2**32, 4)
+        ba = b(int(registers[ra]) % 2**32, 4)
         for i in range(32):
-            x[(i + int(registers[self.rb])) % 32] = ba[i]
-        registers[self.rd] = chi(b_inv(x), 4)
+            x[(i + int(registers[rb])) % 32] = ba[i]
+        registers[rd] = chi(b_inv(x), 4)
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory

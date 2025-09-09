@@ -9,12 +9,11 @@ from .instructions.inst_map import inst_map
 class INT_Program(Program):
     """This is the program blob which the PVM will execute."""
 
-    _skip_cache: Dict[int, int]
+    _skip_cache: list[int]
     _basic_blocks_set: set[int]
 
     def __post_init__(self):
         super().__post_init__()
-        self._skip_cache: Dict[int, int] = {}
         self._precompute_skip_values()
         basic_blocks = [0]
         for n in range(len(self.instruction_set)):
@@ -31,13 +30,16 @@ class INT_Program(Program):
 
     def _precompute_skip_values(self):
         """Pre-compute skip values for all positions to eliminate runtime overhead."""
-        for i in range(len(self.offset_bitmask)):
-            skip_value = len(self.offset_bitmask)
-            for j in range(i + 1, len(self.offset_bitmask) + 1):
+        # Use list instead of dict for faster indexed access
+        bitmask_len = len(self.offset_bitmask)
+        self._skip_cache = [0] * bitmask_len
+        
+        for i in range(bitmask_len):
+            skip_value = bitmask_len
+            for j in range(i + 1, bitmask_len + 1):
                 if self._extended_bitmask[j]:
                     skip_value = j - i - 1
                     break
-
             self._skip_cache[i] = min(24, skip_value)
 
     def skip(self, pc) -> int:
@@ -48,7 +50,8 @@ class INT_Program(Program):
         Returns:
             Distance to the next opcode.
         """
-        return self._skip_cache.get(pc, 0)
+        # Direct list access is faster than dict.get()
+        return self._skip_cache[pc] if pc < len(self._skip_cache) else 0
 
     def branch(
         self, counter: int, branch: int, condition: bool

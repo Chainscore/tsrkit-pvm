@@ -2,39 +2,31 @@ from typing import Any, Callable, Dict
 
 from ...memory import Memory
 from ....common.status import CONTINUE
-from ....common.utils import chi
+from ....common.utils import chi, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs2Imm(InstructionTable):
-    @property
-    def lx(self) -> int:
-        return min(4, self.program.zeta[self.counter + 1])
-
-    @property
-    def ly(self) -> int:
-        return min(4, max(0, self.skip_index - int(self.lx) - 1))
-
-    @property
-    def vx(self) -> int:
+    def get_props(self):
+        lx = clamp_4(self.program.zeta[self.counter + 1])
+        ly = clamp_4_max0(self.skip_index - int(lx) - 1)
+        
         start = self.counter + 2
-        end = start + self.lx
-        val = int.from_bytes(self.program.zeta[start:end], "little")
-        return chi(
-            val,
-            self.lx,
+        end = start + lx
+        vx = chi(
+            int.from_bytes(self.program.zeta[start:end], "little"),
+            lx,
         )
-
-    @property
-    def vy(self) -> int:
-        start = self.counter + 2 + self.lx
-        end = start + self.ly
-        val = int.from_bytes(self.program.zeta[start:end], "little")
-        return chi(
-            val,
-            self.ly,
+        
+        start = self.counter + 2 + lx
+        end = start + ly
+        vy = chi(
+            int.from_bytes(self.program.zeta[start:end], "little"),
+            ly,
         )
+        
+        return (lx, ly, vx, vy)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -54,7 +46,7 @@ class InstructionsWArgs2Imm(InstructionTable):
         }
 
     @staticmethod
-    def store_imm(bit_size: int) -> Callable[[Any, list, Memory], OpReturn]:
+    def store_imm(bit_size: int) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
         """Store an immediate value into memory. Implements the store_imm_u8, store_imm_u16, store_imm_u32, and store_imm_u64 instructions.
 
         Args:
@@ -64,9 +56,9 @@ class InstructionsWArgs2Imm(InstructionTable):
             Callable[[Registers, Memory], Tuple[ExecutionStatus, Registers, Memory]]: The function to store the immediate value into memory.
         """
 
-        def store_imm_impl(self, registers: list, memory: Memory) -> OpReturn:
+        def store_imm_impl(self, registers: list, memory: Memory, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
             memory.write(
-                self.vx, int(self.vy % 2**bit_size).to_bytes(bit_size // 8, "little")
+                vx, int(vy % 2**bit_size).to_bytes(bit_size // 8, "little")
             )
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 

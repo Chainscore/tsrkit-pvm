@@ -24,19 +24,13 @@ from tsrkit_asm import (
 
 
 class InstructionsWArgs1Reg1Imm(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) % 16)
-
-    @property
-    def lx(self) -> int:
-        return min(4, max(0, self.skip_index - 1))
-
-    @property
-    def vx(self) -> int:
+    def get_props(self):
+        ra = min(12, int(self.program.zeta[self.counter + 1]) % 16)
+        lx = min(4, max(0, self.skip_index - 1))
         start = self.counter + 2
-        end = start + self.lx
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.lx)
+        end = start + lx
+        vx = chi(int.from_bytes(self.program.zeta[start:end], "little"), lx)
+        return (ra, lx, vx)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -56,20 +50,20 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
             62: OpCode(name="store_u64", fn=cls.store_u64, gas=1, is_terminating=False),
         }
 
-    def jump_ind(self, asm):
+    def jump_ind(self, asm, ra: int, lx: int, vx: int):
         """Indirect jump to address stored in register ra plus immediate vx."""
         # Part 1: Load immediate vx into register ra
         # Part 2: Calculate the PVM address: rb + vy
         # Use rcx as temp register for address calculation
-        if self.vx != 0:
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
+        if vx != 0:
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[ra])
             asm.add(
                 Operands.RegMem_Imm(
-                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(self.vx)
+                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(vx)
                 )
             )
         else:
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[ra])
 
         # Ensure 32-bit wrap: rcx = rcx % 2**32
         asm.mov(size=RegSize.R32, a=TEMP_REG, b=TEMP_REG)
@@ -121,61 +115,61 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
             )
         )
 
-    def load_imm(self, asm):
+    def load_imm(self, asm, ra: int, lx: int, vx: int):
         """Load immediate value vx into register ra."""
-        asm.mov_imm64(r_map[self.ra], z_inv(self.vx, 8))
+        asm.mov_imm64(r_map[ra], z_inv(vx, 8))
 
-    def load_u8(self, asm):
+    def load_u8(self, asm, ra: int, lx: int, vx: int):
         """Load unsigned 8-bit value from memory address vx into register ra."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.load(kind=LoadKind.U8, reg=r_map[self.ra], mem=mem)
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.load(kind=LoadKind.U8, reg=r_map[ra], mem=mem)
 
-    def load_i8(self, asm):
+    def load_i8(self, asm, ra: int, lx: int, vx: int):
         """Load signed 8-bit value from memory address vx into register ra (sign extended)."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.load(kind=LoadKind.I8, reg=r_map[self.ra], mem=mem)
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.load(kind=LoadKind.I8, reg=r_map[ra], mem=mem)
 
-    def load_u16(self, asm):
+    def load_u16(self, asm, ra: int, lx: int, vx: int):
         """Load unsigned 16-bit value from memory address vx into register ra."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.load(kind=LoadKind.U16, reg=r_map[self.ra], mem=mem)
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.load(kind=LoadKind.U16, reg=r_map[ra], mem=mem)
 
-    def load_i16(self, asm):
+    def load_i16(self, asm, ra: int, lx: int, vx: int):
         """Load signed 16-bit value from memory address vx into register ra (sign extended)."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.load(kind=LoadKind.I16, reg=r_map[self.ra], mem=mem)
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.load(kind=LoadKind.I16, reg=r_map[ra], mem=mem)
 
-    def load_u32(self, asm):
+    def load_u32(self, asm, ra: int, lx: int, vx: int):
         """Load unsigned 32-bit value from memory address vx into register ra."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.load(kind=LoadKind.U32, reg=r_map[self.ra], mem=mem)
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.load(kind=LoadKind.U32, reg=r_map[ra], mem=mem)
 
-    def load_i32(self, asm):
+    def load_i32(self, asm, ra: int, lx: int, vx: int):
         """Load signed 32-bit value from memory address vx into register ra (sign extended)."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.load(kind=LoadKind.I32, reg=r_map[self.ra], mem=mem)
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.load(kind=LoadKind.I32, reg=r_map[ra], mem=mem)
 
-    def load_u64(self, asm):
+    def load_u64(self, asm, ra: int, lx: int, vx: int):
         """Load unsigned 64-bit value from memory address vx into register ra."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.load(kind=LoadKind.U64, reg=r_map[self.ra], mem=mem)
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.load(kind=LoadKind.U64, reg=r_map[ra], mem=mem)
 
-    def store_u8(self, asm):
+    def store_u8(self, asm, ra: int, lx: int, vx: int):
         """Store register ra as unsigned 8-bit value to memory address vx."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.store(size=Size.U8, mem=mem, reg=r_map[self.ra])
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.store(size=Size.U8, mem=mem, reg=r_map[ra])
 
-    def store_u16(self, asm):
+    def store_u16(self, asm, ra: int, lx: int, vx: int):
         """Store register ra as unsigned 16-bit value to memory address vx."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.store(size=Size.U16, mem=mem, reg=r_map[self.ra])
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.store(size=Size.U16, mem=mem, reg=r_map[ra])
 
-    def store_u32(self, asm):
+    def store_u32(self, asm, ra: int, lx: int, vx: int):
         """Store register ra as unsigned 32-bit value to memory address vx."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.store(size=Size.U32, mem=mem, reg=r_map[self.ra])
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.store(size=Size.U32, mem=mem, reg=r_map[ra])
 
-    def store_u64(self, asm):
+    def store_u64(self, asm, ra: int, lx: int, vx: int):
         """Store register ra as unsigned 64-bit value to memory address vx."""
-        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=self.vx)
-        asm.store(size=Size.U64, mem=mem, reg=r_map[self.ra])
+        mem = MemOp.BaseOffset(seg=None, size=RegSize.R64, base=Reg.r15, offset=vx)
+        asm.store(size=Size.U64, mem=mem, reg=r_map[ra])

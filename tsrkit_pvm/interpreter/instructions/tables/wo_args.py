@@ -7,6 +7,9 @@ from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWoArgs(InstructionTable):
+    def get_props(self):
+        return ()
+    
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {

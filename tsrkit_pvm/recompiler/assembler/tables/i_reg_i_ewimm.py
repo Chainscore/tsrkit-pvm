@@ -6,16 +6,12 @@ from ...vm_context import r_map
 
 
 class InstructionsWArgs1Imm1EwImm(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def vx(self) -> int:
-        value = int.from_bytes(
+    def get_props(self):
+        ra = min(12, self.program.zeta[self.counter + 1] % 16)
+        vx = int.from_bytes(
             bytes(self.program.zeta[self.counter + 2 : self.counter + 10]), "little"
         )
-        return value
+        return (ra, vx)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -25,6 +21,6 @@ class InstructionsWArgs1Imm1EwImm(InstructionTable):
             )
         }
 
-    def load_imm_64(self, asm):
+    def load_imm_64(self, asm, ra: int, vx: int):
         # Load 64-bit immediate value into register
-        asm.mov_imm64(r_map[self.ra], self.vx)  # mov ra, vx (64-bit)
+        asm.mov_imm64(r_map[ra], vx)  # mov ra, vx (64-bit)

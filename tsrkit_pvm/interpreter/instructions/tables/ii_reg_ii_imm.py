@@ -2,39 +2,39 @@ from math import floor
 from typing import Dict
 
 from ...memory import Memory
-from ....common.utils import chi
+from ....common.utils import chi, compare, z, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs2Reg2Imm(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def rb(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) // 16)
-
-    @property
-    def lx(self) -> int:
-        return min(4, int(self.program.zeta[self.counter + 2]) % 8)
-
-    @property
-    def ly(self) -> int:
-        return min(4, max(0, int(self.skip_index) - self.lx - 2))
-
-    @property
-    def vx(self) -> int:
-        start = self.counter + 3
-        end = start + self.lx
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.lx)
-
-    @property
-    def vy(self) -> int:
-        start = self.counter + 3 + self.lx
-        end = start + self.ly
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.ly)
+    def get_props(self):
+        # Slice zeta once for better performance with large arrays
+        zeta_slice = self.program.zeta[self.counter + 1:self.counter + 10]
+        
+        # Cache byte values and use bit operations for faster parsing
+        byte_val1 = zeta_slice[0]  # equivalent to self.program.zeta[self.counter + 1]
+        ra = clamp_12(byte_val1 & 0x0F)  # Lower 4 bits (equivalent to % 16)
+        rb = clamp_12(byte_val1 >> 4)    # Upper 4 bits (equivalent to // 16)
+        
+        byte_val2 = int(zeta_slice[1])  # equivalent to self.program.zeta[self.counter + 2]
+        lx = clamp_4(byte_val2 & 0x07)   # Lower 3 bits (equivalent to % 8)
+        ly = clamp_4_max0(int(self.skip_index) - lx - 2)
+        
+        # Use sliced array for immediate values
+        if lx > 0:
+            imm1_slice = zeta_slice[2:2+lx]
+            vx = chi(int.from_bytes(imm1_slice, "little"), lx)
+        else:
+            vx = 0
+        
+        if ly > 0:
+            imm2_slice = zeta_slice[2+lx:2+lx+ly]
+            vy = chi(int.from_bytes(imm2_slice, "little"), ly)
+        else:
+            vy = 0
+        
+        return (ra, rb, lx, ly, vx, vy)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -47,8 +47,8 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
             ),
         }
 
-    def load_imm_jump_ind(self, registers: list, memory: Memory) -> OpReturn:
-        wb = registers[self.rb]
-        registers[self.ra] = self.vx
-        status, counter = self.program.djump(self.counter, floor(wb + self.vy) % 2**32)
+    def load_imm_jump_ind(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
+        wb = registers[rb]
+        registers[ra] = vx
+        status, counter = self.program.djump(self.counter, floor(wb + vy) % 2**32)
         return status, counter, registers, memory

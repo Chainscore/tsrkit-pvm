@@ -21,29 +21,20 @@ from tsrkit_asm import (
 
 
 class InstructionsWArgs1Reg2Imm(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def lx(self) -> int:
-        return min(4, (self.program.zeta[self.counter + 1] // 16) % 8)
-
-    @property
-    def ly(self) -> int:
-        return min(4, max(0, int(self.skip_index) - self.lx - 1))
-
-    @property
-    def vx(self) -> int:
+    def get_props(self):
+        ra = min(12, self.program.zeta[self.counter + 1] % 16)
+        lx = min(4, (self.program.zeta[self.counter + 1] // 16) % 8)
+        ly = min(4, max(0, int(self.skip_index) - lx - 1))
+        
         start = self.counter + 2
-        end = start + self.lx
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.lx)
-
-    @property
-    def vy(self) -> int:
-        start = self.counter + 2 + self.lx
-        end = start + self.ly
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.ly)
+        end = start + lx
+        vx = chi(int.from_bytes(self.program.zeta[start:end], "little"), lx)
+        
+        start = self.counter + 2 + lx
+        end = start + ly
+        vy = chi(int.from_bytes(self.program.zeta[start:end], "little"), ly)
+        
+        return (ra, lx, ly, vx, vy)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -58,7 +49,7 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
     def store_imm_ind(size: Size):
         def store_imm_ind(self, asm: PyAssembler):
             """u<size>[ra + vx] = vy"""
-            asm.mov_imm64(TEMP_REG, self.vy)
+            asm.mov_imm64(TEMP_REG, vy)
             # Store immediate value to calculated address
             asm.store(
                 size,
@@ -66,9 +57,9 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
                     seg=None,
                     size=RegSize.R64,
                     base=Reg.r15,
-                    index=rindex_map[self.ra],
+                    index=rindex_map[ra],
                     scale=Scale.x1,
-                    offset=z(self.vx, 8),
+                    offset=z(vx, 8),
                 ),
                 TEMP_REG,
             )

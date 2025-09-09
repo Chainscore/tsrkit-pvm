@@ -4,19 +4,17 @@ from ...memory import Memory
 from ....common.status import CONTINUE
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....common.utils import clamp_12
 
 
 class InstructionsWArgs1Imm1EwImm(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def vx(self) -> int:
-        value = int.from_bytes(
-            bytes(self.program.zeta[self.counter + 2 : self.counter + 10]), "little"
+    def get_props(self):
+        zeta_arr = self.program.zeta[self.counter + 1: self.counter + 10]
+        ra = clamp_12(zeta_arr[0] % 16)
+        vx = int.from_bytes(
+            bytes(zeta_arr[1:9]), "little"
         )
-        return value
+        return (ra, vx)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -26,10 +24,9 @@ class InstructionsWArgs1Imm1EwImm(InstructionTable):
             )
         }
 
-    def load_imm_64(self, registers: list, memory: Memory) -> OpReturn:
+    def load_imm_64(self, registers: list, memory: Memory, ra: int, vx: int) -> OpReturn:
         """
         OPC20: Load a 64-bit immediate value into a register.
         """
-        _vx = self.vx
-        registers[self.ra] = _vx
+        registers[ra] = vx
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory

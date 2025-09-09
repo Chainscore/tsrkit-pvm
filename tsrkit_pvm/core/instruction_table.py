@@ -16,10 +16,11 @@ class InstructionTable(Protocol):
     def __init__(self, counter: int, program: "Program"):
         self.counter = counter
         self.program = program
-
-    @property
-    def skip_index(self):
-        return self.program._skip_cache.get(self.counter)
+        # Inline skip calculation for maximum performance
+        if hasattr(program, '_skip_cache') and counter < len(program._skip_cache):
+            self.skip_index = program._skip_cache[counter]
+        else:
+            self.skip_index = 0
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]: ...

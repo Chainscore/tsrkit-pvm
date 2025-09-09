@@ -3,25 +3,18 @@ from typing import Any, Callable, Dict
 
 from ...memory import Memory
 from ....common.status import CONTINUE
-from ....common.utils import chi
+from ....common.utils import chi, clamp_12, clamp_4
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs1Reg1Imm(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) % 16)
-
-    @property
-    def lx(self) -> int:
-        return min(4, max(0, self.skip_index - 1))
-
-    @property
-    def vx(self) -> int:
-        start = self.counter + 2
-        end = start + self.lx
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.lx)
+    def get_props(self):
+        lx = clamp_4(max(0, self.skip_index - 1))
+        zeta_arr = self.program.zeta[self.counter + 1: self.counter + 1 + 1 + lx]
+        ra = clamp_12(zeta_arr[0] % 16)
+        vx = chi(int.from_bytes(zeta_arr[1:9], "little"), lx)
+        return (ra, lx, vx)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -47,45 +40,45 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
             ),
         }
 
-    def jump_ind(self, registers: list, memory: Memory) -> OpReturn:
+    def jump_ind(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
         status, counter = self.program.djump(
-            self.counter, floor(int(registers[self.ra]) + self.vx) % 2**32
+            self.counter, floor(int(registers[ra]) + vx) % 2**32
         )
         return status, counter, registers, memory
 
-    def load_imm(self, registers: list, memory: Memory) -> OpReturn:
+    def load_imm(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
         """
         OPC20: Load a 64-bit immediate value into a register.
         """
-        registers[self.ra] = self.vx
+        registers[ra] = vx
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
-    def load_u(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def load_u_impl(self, registers: list, memory: Memory) -> OpReturn:
-            registers[self.ra] = int.from_bytes(
-                memory.read(self.vx, bitsize // 8), "little"
+    def load_u(bitsize: int) -> Callable[[Any, list, Memory, int, int, int], OpReturn]:
+        def load_u_impl(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
+            registers[ra] = int.from_bytes(
+                memory.read(vx, bitsize // 8), "little"
             )
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
         return load_u_impl
 
     @staticmethod
-    def store_u(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def store_u_impl(self, registers: list, memory: Memory) -> OpReturn:
+    def store_u(bitsize: int) -> Callable[[Any, list, Memory, int, int, int], OpReturn]:
+        def store_u_impl(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
             memory.write(
-                self.vx,
-                int(registers[self.ra] % (2**bitsize)).to_bytes(bitsize // 8, "little"),
+                vx,
+                int(registers[ra] % (2**bitsize)).to_bytes(bitsize // 8, "little"),
             )
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
         return store_u_impl
 
     @staticmethod
-    def load_i(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def load_i_impl(self, registers: list, memory: Memory) -> OpReturn:
-            registers[self.ra] = chi(
-                int.from_bytes(memory.read(self.vx, bitsize // 8), "little"),
+    def load_i(bitsize: int) -> Callable[[Any, list, Memory, int, int, int], OpReturn]:
+        def load_i_impl(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
+            registers[ra] = chi(
+                int.from_bytes(memory.read(vx, bitsize // 8), "little"),
                 bitsize // 8,
             )
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory

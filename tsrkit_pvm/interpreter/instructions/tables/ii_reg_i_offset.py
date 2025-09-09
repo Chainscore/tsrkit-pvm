@@ -2,31 +2,30 @@ from typing import Any, Callable, Dict
 
 from ...memory import Memory
 from ....common.status import CONTINUE
-from ....common.utils import compare, z
+from ....common.utils import b, b_inv, chi, compare, z, z_inv, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs2Reg1Offset(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) % 16)
 
-    @property
-    def rb(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) // 16)
-
-    @property
-    def lx(self) -> int:
-        return min(4, max(0, self.skip_index - 1))
-
-    @property
-    def vx(self) -> int:
-        start = self.counter + 2
-        end = start + self.lx
-        return self.counter + z(
-            int.from_bytes(self.program.zeta[start:end], "little"), self.lx
-        )
+    def get_props(self):
+        # Slice zeta once for better performance with large arrays
+        zeta_slice = self.program.zeta[self.counter + 1:self.counter + 7]
+        
+        # Cache the byte value and use bit operations for faster parsing
+        byte_val = int(zeta_slice[0])  # equivalent to self.program.zeta[self.counter + 1]
+        ra = clamp_12(byte_val & 0x0F)  # Lower 4 bits (equivalent to % 16)
+        rb = clamp_12(byte_val >> 4)    # Upper 4 bits (equivalent to // 16)
+        lx = clamp_4_max0(self.skip_index - 1)
+        
+        # Use sliced array for offset value
+        if lx > 0:
+            offset_slice = zeta_slice[1:1+lx]
+            vx = int(self.counter) + z(int.from_bytes(offset_slice, "little"), lx)
+        else:
+            vx = int(self.counter)
+        return (ra, rb, lx, vx)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -59,12 +58,12 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
 
     @staticmethod
     def branch(op: str, signed=False) -> Callable[[Any, list, Memory], OpReturn]:
-        def branch_impl(self, registers: list, memory: Memory) -> OpReturn:
+        def branch_impl(self, registers: list, memory: Memory, ra, rb, lx, vx) -> OpReturn:
 
-            a = z(registers[self.ra], 8) if signed else registers[self.ra]
-            b = z(registers[self.rb], 8) if signed else registers[self.rb]
+            a = z(registers[ra], 8) if signed else registers[ra]
+            b = z(registers[rb], 8) if signed else registers[rb]
             status, counter = self.program.branch(
-                self.counter, self.vx, compare(a, b, op)
+                self.counter, vx, compare(a, b, op)
             )
             if status == CONTINUE and counter != self.counter:
                 return status, counter, registers, memory

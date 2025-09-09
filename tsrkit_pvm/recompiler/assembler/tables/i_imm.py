@@ -9,15 +9,12 @@ from ....core.opcode import OpCode
 
 
 class InstructionsWArgs1Imm(InstructionTable):
-    @property
-    def lx(self) -> int:
-        return min(4, self.skip_index)
-
-    @property
-    def vx(self) -> int:
+    def get_props(self):
+        lx = min(4, self.skip_index)
         start = self.counter + 1
-        end = start + self.lx
-        return int.from_bytes(self.program.zeta[start:end], "little", signed=False)
+        end = start + lx
+        vx = int.from_bytes(self.program.zeta[start:end], "little", signed=False)
+        return (lx, vx)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -25,7 +22,7 @@ class InstructionsWArgs1Imm(InstructionTable):
             10: OpCode(name="ecalli", fn=cls.ecalli, gas=1, is_terminating=False),
         }
 
-    def ecalli(self, asm):  # noqa: D401
+    def ecalli(self, asm, lx: int, vx: int):  # noqa: D401
         """Host call invocation"""
         PVM_SYS_CALL_OFFSET = 1000
         # Save all regs before exiting
@@ -33,5 +30,5 @@ class InstructionsWArgs1Imm(InstructionTable):
         # pop_all_regs(asm)  # This is safe to do so, not doing this also works
         # Load rax in rcx
 
-        asm.mov_imm64(Reg.rax, PVM_SYS_CALL_OFFSET + self.vx)
+        asm.mov_imm64(Reg.rax, PVM_SYS_CALL_OFFSET + vx)
         asm.syscall()

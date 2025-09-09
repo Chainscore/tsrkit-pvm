@@ -2,35 +2,28 @@ from typing import Any, Callable, Dict
 
 from ...memory import Memory
 from ....common.status import CONTINUE
-from ....common.utils import chi
+from ....common.utils import chi, compare, z, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs1Reg2Imm(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def lx(self) -> int:
-        return min(4, (self.program.zeta[self.counter + 1] // 16) % 8)
-
-    @property
-    def ly(self) -> int:
-        return min(4, max(0, self.skip_index - self.lx - 1))
-
-    @property
-    def vx(self) -> int:
+    def get_props(self):
+        # Cache the byte value and use bit operations for faster parsing
+        byte_val = self.program.zeta[self.counter + 1]
+        ra = clamp_12(byte_val & 0x0F)           # Lower 4 bits (equivalent to % 16)
+        lx = clamp_4((byte_val >> 4) & 0x07)     # Next 3 bits (equivalent to (// 16) % 8)
+        ly = clamp_4_max0(self.skip_index - lx - 1)
+        
         start = self.counter + 2
-        end = start + self.lx
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.lx)
-
-    @property
-    def vy(self) -> int:
-        start = self.counter + 2 + self.lx
-        end = start + self.ly
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.ly)
+        end = start + lx
+        vx = chi(int.from_bytes(self.program.zeta[start:end], "little"), lx)
+        
+        start = self.counter + 2 + lx
+        end = start + ly
+        vy = chi(int.from_bytes(self.program.zeta[start:end], "little"), ly)
+        
+        return (ra, lx, ly, vx, vy)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -62,11 +55,11 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
         }
 
     @staticmethod
-    def store_imm_ind_u(bitsize: int) -> Callable[[Any, list, Memory], OpReturn]:
-        def store_u_impl(self, registers: list, memory: Memory) -> OpReturn:
+    def store_imm_ind_u(bitsize: int) -> Callable[[Any, list, Memory, int, int, int, int, int], OpReturn]:
+        def store_u_impl(self, registers: list, memory: Memory, ra: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
             memory.write(
-                registers[self.ra] + self.vx,
-                int(self.vy % (2**bitsize)).to_bytes(bitsize // 8, "little"),
+                registers[ra] + vx,
+                int(vy % (2**bitsize)).to_bytes(bitsize // 8, "little"),
             )
             return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 

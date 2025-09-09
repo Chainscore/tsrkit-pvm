@@ -6,17 +6,11 @@ from tsrkit_asm import RegSize, RegMem, Operands, Reg, Condition, Size, ImmKind,
 
 
 class InstructionsWArgs3Reg(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def rb(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] // 16)
-
-    @property
-    def rd(self) -> int:
-        return min(12, self.program.zeta[self.counter + 2])
+    def get_props(self):
+        ra = min(12, self.program.zeta[self.counter + 1] % 16)
+        rb = min(12, self.program.zeta[self.counter + 1] // 16)
+        rd = min(12, self.program.zeta[self.counter + 2])
+        return (ra, rb, rd)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -82,153 +76,153 @@ class InstructionsWArgs3Reg(InstructionTable):
             230: OpCode(name="min_u", fn=cls.min_u, gas=1, is_terminating=False),
         }
 
-    def add_32(self, asm):
+    def add_32(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra + rb) % 2^32, then sign-extend to 64 bits"""
-        if self.rd == self.rb:
+        if rd == rb:
             asm.add(
                 Operands.RegMem_Reg(
                     size=Size.U32,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.ra],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[ra],
                 )
             )
-        elif self.rd == self.ra:
+        elif rd == ra:
             asm.add(
                 Operands.RegMem_Reg(
                     size=Size.U32,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         else:
             # Load ra into rd
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
             # Add rb to rd
             asm.add(
                 Operands.RegMem_Reg(
                     size=Size.U32,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
+        asm.movsxd_32_to_64(r_map[rd], r_map[rd])
 
-    def add_64(self, asm):
+    def add_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra + rb (64-bit)"""
-        if self.rd == self.rb:
+        if rd == rb:
             asm.add(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.ra],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[ra],
                 )
             )
-        elif self.rd == self.ra:
+        elif rd == ra:
             asm.add(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         else:
             # Load ra into rd
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             # Add rb to rd
             asm.add(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
 
-    def sub_32(self, asm):
+    def sub_32(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra - rb) % 2^32, then sign-extend to 64 bits"""
-        if self.ra == self.rd:
+        if ra == rd:
             asm.sub(
                 Operands.RegMem_Reg(
                     size=Size.U32,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
-        elif self.rb == self.rd:
-            asm.neg(Size.U32, RegMem.Reg(r_map[self.rd]))
+        elif rb == rd:
+            asm.neg(Size.U32, RegMem.Reg(r_map[rd]))
             asm.add(
                 Operands.RegMem_Reg(
-                    Size.U32, RegMem.Reg(r_map[self.rd]), r_map[self.ra]
+                    Size.U32, RegMem.Reg(r_map[rd]), r_map[ra]
                 )
             )
         else:
             # Load ra into rd
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
             # Subtract rb from rd
             asm.sub(
                 Operands.RegMem_Reg(
                     size=Size.U32,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
+        asm.movsxd_32_to_64(r_map[rd], r_map[rd])
 
-    def sub_64(self, asm):
+    def sub_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra - rb (64-bit)"""
-        if self.ra == self.rd:
+        if ra == rd:
             asm.sub(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
-        elif self.rb == self.rd:
-            asm.neg(Size.U64, RegMem.Reg(r_map[self.rd]))
+        elif rb == rd:
+            asm.neg(Size.U64, RegMem.Reg(r_map[rd]))
             asm.add(
                 Operands.RegMem_Reg(
-                    Size.U64, RegMem.Reg(r_map[self.rd]), r_map[self.ra]
+                    Size.U64, RegMem.Reg(r_map[rd]), r_map[ra]
                 )
             )
         else:
             # Load ra into rd
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             # Subtract rb from rd
             asm.sub(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
 
-    def mul_32(self, asm):
+    def mul_32(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra * rb) % 2^32"""
-        if self.rd == self.rb:
-            asm.imul(RegSize.R32, r_map[self.rd], RegMem.Reg(r_map[self.ra]))
-        elif self.rd == self.ra:
-            asm.imul(RegSize.R32, r_map[self.rd], RegMem.Reg(r_map[self.rb]))
+        if rd == rb:
+            asm.imul(RegSize.R32, r_map[rd], RegMem.Reg(r_map[ra]))
+        elif rd == ra:
+            asm.imul(RegSize.R32, r_map[rd], RegMem.Reg(r_map[rb]))
         else:
             # Load ra into rd
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
             # Add rb to rd
-            asm.imul(RegSize.R32, r_map[self.rd], RegMem.Reg(r_map[self.rb]))
+            asm.imul(RegSize.R32, r_map[rd], RegMem.Reg(r_map[rb]))
 
-    def mul_64(self, asm):
+    def mul_64(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra * rb) % 2^64"""
-        if self.rd == self.rb:
-            asm.imul(RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.ra]))
-        elif self.rd == self.ra:
-            asm.imul(RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.rb]))
+        if rd == rb:
+            asm.imul(RegSize.R64, r_map[rd], RegMem.Reg(r_map[ra]))
+        elif rd == ra:
+            asm.imul(RegSize.R64, r_map[rd], RegMem.Reg(r_map[rb]))
         else:
             # Load ra into rd
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             # Add rb to rd
-            asm.imul(RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.rb]))
+            asm.imul(RegSize.R64, r_map[rd], RegMem.Reg(r_map[rb]))
 
-    def div_u_32(self, asm):
+    def div_u_32(self, asm, ra: int, rb: int, rd: int):
         """rd = ra / rb (unsigned 32-bit), rd = 0xffffffff if rb == 0"""
         # Save rax and rdx since they're guest registers and division clobbers them
         asm.push(Reg.rax)
@@ -237,7 +231,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Simple check for zero divisor
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U32, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U32, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
 
@@ -247,24 +241,24 @@ class InstructionsWArgs3Reg(InstructionTable):
         asm.jcc_label32(Condition.Equal, zero_label)
 
         # Normal division: use direct div instruction
-        asm.mov(size=RegSize.R32, a=Reg.rax, b=r_map[self.ra])  # Load dividend
+        asm.mov(size=RegSize.R32, a=Reg.rax, b=r_map[ra])  # Load dividend
         asm.xor_(
             Operands.RegMem_Reg(size=Size.U32, reg_mem=RegMem.Reg(Reg.rdx), reg=Reg.rdx)
         )  # Clear rdx
-        asm.div(RegSize.R32, RegMem.Reg(r_map[self.rb]))  # Direct division
-        asm.movsxd_32_to_64(r_map[self.rd], Reg.rax)  # Sign-extend result
+        asm.div(RegSize.R32, RegMem.Reg(r_map[rb]))  # Direct division
+        asm.movsxd_32_to_64(r_map[rd], Reg.rax)  # Sign-extend result
         asm.jmp_label32(end_label)
 
         # Division by zero case
         asm.define_label(zero_label)
-        asm.mov_imm64(r_map[self.rd], 0xFFFFFFFFFFFFFFFF)
+        asm.mov_imm64(r_map[rd], 0xFFFFFFFFFFFFFFFF)
 
         asm.define_label(end_label)
         # Restore rax and rdx
         asm.pop(Reg.rdx)
         asm.pop(Reg.rax)
 
-    def div_s_32(self, asm):
+    def div_s_32(self, asm, ra: int, rb: int, rd: int):
         """rd = ra / rb (signed 32-bit), rd = -1 if rb == 0"""
         # Save rax and rdx since they're guest registers and division clobbers them
         asm.push(Reg.rax)
@@ -279,7 +273,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Simple check for zero divisor
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U32, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U32, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
         asm.jcc_label32(Condition.Equal, zero_label)
@@ -288,7 +282,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Compare ra with INT32_MIN (0x80000000)
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I32(0x80000000)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I32(0x80000000)
             )
         )
         asm.jcc_label32(Condition.NotEqual, normal_div_label)
@@ -296,34 +290,34 @@ class InstructionsWArgs3Reg(InstructionTable):
         # ra == INT32_MIN, now check if rb == -1 (0xffffffff in 32-bit)
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.rb]), imm=ImmKind.I32(0xFFFFFFFF)
+                reg_mem=RegMem.Reg(r_map[rb]), imm=ImmKind.I32(0xFFFFFFFF)
             )
         )
         asm.jcc_label32(Condition.Equal, overflow_label)
 
         # Normal division
         asm.define_label(normal_div_label)
-        asm.mov(size=RegSize.R32, a=Reg.rax, b=r_map[self.ra])  # Load dividend
+        asm.mov(size=RegSize.R32, a=Reg.rax, b=r_map[ra])  # Load dividend
         asm.cdq()  # Sign extend eax to edx:eax
-        asm.idiv(RegSize.R32, RegMem.Reg(r_map[self.rb]))  # Direct signed division
-        asm.movsxd_32_to_64(r_map[self.rd], Reg.rax)  # Sign extend result to 64-bit
+        asm.idiv(RegSize.R32, RegMem.Reg(r_map[rb]))  # Direct signed division
+        asm.movsxd_32_to_64(r_map[rd], Reg.rax)  # Sign extend result to 64-bit
         asm.jmp_label32(end_label)
 
         # Overflow case: INT32_MIN / -1 = INT32_MIN (sign-extended to 64-bit)
         asm.define_label(overflow_label)
-        asm.mov_imm64(r_map[self.rd], 0xFFFFFFFF80000000)  # INT32_MIN sign-extended
+        asm.mov_imm64(r_map[rd], 0xFFFFFFFF80000000)  # INT32_MIN sign-extended
         asm.jmp_label32(end_label)
 
         # Division by zero case
         asm.define_label(zero_label)
-        asm.mov_imm64(r_map[self.rd], 0xFFFFFFFFFFFFFFFF)  # -1
+        asm.mov_imm64(r_map[rd], 0xFFFFFFFFFFFFFFFF)  # -1
 
         asm.define_label(end_label)
         # Restore rax and rdx
         asm.pop(Reg.rdx)
         asm.pop(Reg.rax)
 
-    def div_u_64(self, asm):
+    def div_u_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra / rb (unsigned 64-bit), rd = -1 if rb == 0"""
         # Save rax and rdx since they're guest registers and division clobbers them
         asm.push(Reg.rax)
@@ -332,7 +326,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Simple check for zero divisor
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
 
@@ -342,24 +336,24 @@ class InstructionsWArgs3Reg(InstructionTable):
         asm.jcc_label32(Condition.Equal, zero_label)
 
         # Normal division: use direct div instruction
-        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[self.ra])  # Load dividend
+        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[ra])  # Load dividend
         asm.xor_(
             Operands.RegMem_Reg(size=Size.U64, reg_mem=RegMem.Reg(Reg.rdx), reg=Reg.rdx)
         )  # Clear rdx
-        asm.div(RegSize.R64, RegMem.Reg(r_map[self.rb]))  # Direct division
-        asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rax)  # Result
+        asm.div(RegSize.R64, RegMem.Reg(r_map[rb]))  # Direct division
+        asm.mov(size=RegSize.R64, a=r_map[rd], b=Reg.rax)  # Result
         asm.jmp_label32(end_label)
 
         # Division by zero case
         asm.define_label(zero_label)
-        asm.mov_imm64(r_map[self.rd], 0xFFFFFFFFFFFFFFFF)
+        asm.mov_imm64(r_map[rd], 0xFFFFFFFFFFFFFFFF)
 
         asm.define_label(end_label)
         # Restore rax and rdx in reverse order
         asm.pop(Reg.rdx)
         asm.pop(Reg.rax)
 
-    def div_s_64(self, asm):
+    def div_s_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra / rb (signed 64-bit), rd = -1 if rb == 0"""
         # Save rax and rdx since they're guest registers and division clobbers them
         asm.push(Reg.rax)
@@ -374,7 +368,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Simple check for zero divisor
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
         asm.jcc_label32(Condition.Equal, zero_label)
@@ -384,40 +378,40 @@ class InstructionsWArgs3Reg(InstructionTable):
         asm.mov_imm64(TEMP_REG, 0x8000000000000000)
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=TEMP_REG
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=TEMP_REG
             )
         )
         asm.jcc_label32(Condition.NotEqual, normal_div_label)
 
         # ra == INT64_MIN, now check if rb == -1
         asm.cmp(
-            Operands.RegMem_Imm(reg_mem=RegMem.Reg(r_map[self.rb]), imm=ImmKind.I64(-1))
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(r_map[rb]), imm=ImmKind.I64(-1))
         )
         asm.jcc_label32(Condition.Equal, overflow_label)
 
         # Normal division
         asm.define_label(normal_div_label)
-        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[self.ra])  # Load dividend
+        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[ra])  # Load dividend
         asm.cqo()  # Sign-extend rax into rdx:rax
-        asm.idiv(RegSize.R64, RegMem.Reg(r_map[self.rb]))  # Direct signed division
-        asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rax)  # Result
+        asm.idiv(RegSize.R64, RegMem.Reg(r_map[rb]))  # Direct signed division
+        asm.mov(size=RegSize.R64, a=r_map[rd], b=Reg.rax)  # Result
         asm.jmp_label32(end_label)
 
         # Overflow case: INT64_MIN / -1 = INT64_MIN
         asm.define_label(overflow_label)
-        asm.mov_imm64(r_map[self.rd], 0x8000000000000000)
+        asm.mov_imm64(r_map[rd], 0x8000000000000000)
         asm.jmp_label32(end_label)
 
         # Division by zero case
         asm.define_label(zero_label)
-        asm.mov_imm64(r_map[self.rd], 0xFFFFFFFFFFFFFFFF)  # -1
+        asm.mov_imm64(r_map[rd], 0xFFFFFFFFFFFFFFFF)  # -1
 
         asm.define_label(end_label)
         # Restore rax and rdx in reverse order
         asm.pop(Reg.rdx)
         asm.pop(Reg.rax)
 
-    def rem_u_32(self, asm):
+    def rem_u_32(self, asm, ra: int, rb: int, rd: int):
         """rd = ra % rb (unsigned 32-bit), rd = ra if rb == 0"""
         # Save rax and rdx since they\'re guest registers and division clobbers them
         asm.push(Reg.rax)
@@ -426,7 +420,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Simple check for zero divisor - use 32-bit test for unsigned operation
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U32, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U32, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
 
@@ -438,7 +432,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Normal remainder: use direct div instruction
         # For unsigned 32-bit remainder, we need to treat inputs as 32-bit unsigned values
         asm.mov(
-            size=RegSize.R32, a=Reg.rax, b=r_map[self.ra]
+            size=RegSize.R32, a=Reg.rax, b=r_map[ra]
         )  # Load dividend (auto-zeros upper 32 bits)
         asm.xor_(
             Operands.RegMem_Reg(size=Size.U32, reg_mem=RegMem.Reg(Reg.rdx), reg=Reg.rdx)
@@ -446,27 +440,27 @@ class InstructionsWArgs3Reg(InstructionTable):
 
         # Ensure divisor is treated as 32-bit unsigned by using a temp register
         asm.mov(
-            size=RegSize.R32, a=TEMP_REG, b=r_map[self.rb]
+            size=RegSize.R32, a=TEMP_REG, b=r_map[rb]
         )  # Load divisor as 32-bit (auto-zeros upper 32 bits)
         asm.div(
             RegSize.R32, RegMem.Reg(TEMP_REG)
         )  # Direct division (32-bit) using temp register
         asm.mov(
-            size=RegSize.R32, a=r_map[self.rd], b=Reg.rdx
+            size=RegSize.R32, a=r_map[rd], b=Reg.rdx
         )  # Remainder in rdx, auto-zeros upper 32 bits
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
+        asm.movsxd_32_to_64(r_map[rd], r_map[rd])
         asm.jmp_label32(end_label)
 
         # Division by zero case - return dividend (sign-extended from 32-bit)
         asm.define_label(zero_label)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.ra])
+        asm.movsxd_32_to_64(r_map[rd], r_map[ra])
 
         asm.define_label(end_label)
         # Restore rax and rdx in reverse order
         asm.pop(Reg.rdx)
         asm.pop(Reg.rax)
 
-    def rem_s_32(self, asm):
+    def rem_s_32(self, asm, ra: int, rb: int, rd: int):
         """rd = ra % rb (signed 32-bit), rd = ra if rb == 0"""
         # Save rax and rdx since they're guest registers and division clobbers them
         asm.push(Reg.rax)
@@ -475,7 +469,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Simple check for zero divisor
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
 
@@ -490,7 +484,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Check for overflow case: INT32_MIN % -1
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.ra]), imm=ImmKind.I32(0x80000000)
+                reg_mem=RegMem.Reg(r_map[ra]), imm=ImmKind.I32(0x80000000)
             )
         )
         asm.jcc_label32(
@@ -499,36 +493,36 @@ class InstructionsWArgs3Reg(InstructionTable):
 
         asm.cmp(
             Operands.RegMem_Imm(
-                reg_mem=RegMem.Reg(r_map[self.rb]), imm=ImmKind.I32(0xFFFFFFFF)
+                reg_mem=RegMem.Reg(r_map[rb]), imm=ImmKind.I32(0xFFFFFFFF)
             )
         )
         asm.jcc_label32(Condition.Equal, overflow_label)
 
         asm.define_label(normal_label)
         # Normal remainder: use direct idiv instruction
-        asm.mov(size=RegSize.R32, a=Reg.rax, b=r_map[self.ra])  # Load dividend
+        asm.mov(size=RegSize.R32, a=Reg.rax, b=r_map[ra])  # Load dividend
         asm.cdq()  # Sign-extend eax into edx:eax
-        asm.idiv(RegSize.R32, RegMem.Reg(r_map[self.rb]))  # Direct signed division
+        asm.idiv(RegSize.R32, RegMem.Reg(r_map[rb]))  # Direct signed division
         asm.movsxd_32_to_64(
-            r_map[self.rd], Reg.rdx
+            r_map[rd], Reg.rdx
         )  # Remainder in rdx, sign-extend to 64-bit
         asm.jmp_label32(end_label)
 
         # Overflow case: INT32_MIN % -1 = 0
         asm.define_label(overflow_label)
-        asm.mov_imm64(r_map[self.rd], 0)
+        asm.mov_imm64(r_map[rd], 0)
         asm.jmp_label32(end_label)
 
         # Division by zero case - return dividend (sign-extended)
         asm.define_label(zero_label)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.ra])
+        asm.movsxd_32_to_64(r_map[rd], r_map[ra])
 
         asm.define_label(end_label)
         # Restore rax and rdx in reverse order
         asm.pop(Reg.rdx)
         asm.pop(Reg.rax)
 
-    def rem_u_64(self, asm):
+    def rem_u_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra % rb (unsigned 64-bit), rd = ra if rb == 0"""
         # Save rax and rdx since they\'re guest registers and division clobbers them
         asm.push(Reg.rax)
@@ -537,7 +531,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Simple check for zero divisor
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
 
@@ -547,24 +541,24 @@ class InstructionsWArgs3Reg(InstructionTable):
         asm.jcc_label32(Condition.Equal, zero_label)
 
         # Normal remainder: use direct div instruction
-        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[self.ra])  # Load dividend
+        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[ra])  # Load dividend
         asm.xor_(
             Operands.RegMem_Reg(size=Size.U64, reg_mem=RegMem.Reg(Reg.rdx), reg=Reg.rdx)
         )  # Clear rdx
-        asm.div(RegSize.R64, RegMem.Reg(r_map[self.rb]))  # Direct division
-        asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rdx)  # Remainder in rdx
+        asm.div(RegSize.R64, RegMem.Reg(r_map[rb]))  # Direct division
+        asm.mov(size=RegSize.R64, a=r_map[rd], b=Reg.rdx)  # Remainder in rdx
         asm.jmp_label32(end_label)
 
         # Division by zero case - return dividend
         asm.define_label(zero_label)
-        asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+        asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
 
         asm.define_label(end_label)
         # Restore rax and rdx in reverse order
         asm.pop(Reg.rdx)
         asm.pop(Reg.rax)
 
-    def rem_s_64(self, asm):
+    def rem_s_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra % rb (signed 64-bit), rd = ra if rb == 0"""
         # Save rax and rdx since they're guest registers and division clobbers them
         asm.push(Reg.rax)
@@ -573,7 +567,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         # Simple check for zero divisor
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
 
@@ -589,7 +583,7 @@ class InstructionsWArgs3Reg(InstructionTable):
         asm.mov_imm64(TEMP_REG, 0x8000000000000000)  # INT64_MIN
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=TEMP_REG
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=TEMP_REG
             )
         )
         asm.jcc_label32(
@@ -597,267 +591,267 @@ class InstructionsWArgs3Reg(InstructionTable):
         )  # Skip overflow check if not INT64_MIN
 
         asm.cmp(
-            Operands.RegMem_Imm(reg_mem=RegMem.Reg(r_map[self.rb]), imm=ImmKind.I64(-1))
+            Operands.RegMem_Imm(reg_mem=RegMem.Reg(r_map[rb]), imm=ImmKind.I64(-1))
         )
         asm.jcc_label32(Condition.Equal, overflow_label)
 
         asm.define_label(normal_label)
         # Normal remainder: use direct idiv instruction
-        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[self.ra])  # Load dividend
+        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[ra])  # Load dividend
         asm.cqo()  # Sign-extend rax into rdx:rax
-        asm.idiv(RegSize.R64, RegMem.Reg(r_map[self.rb]))  # Direct signed division
-        asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rdx)  # Remainder in rdx
+        asm.idiv(RegSize.R64, RegMem.Reg(r_map[rb]))  # Direct signed division
+        asm.mov(size=RegSize.R64, a=r_map[rd], b=Reg.rdx)  # Remainder in rdx
         asm.jmp_label32(end_label)
 
         # Overflow case: INT64_MIN % -1 = 0
         asm.define_label(overflow_label)
-        asm.mov_imm64(r_map[self.rd], 0)
+        asm.mov_imm64(r_map[rd], 0)
         asm.jmp_label32(end_label)
 
         # Division by zero case - return dividend
         asm.define_label(zero_label)
-        asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+        asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
 
         asm.define_label(end_label)
         # Restore rax and rdx in reverse order
         asm.pop(Reg.rdx)
         asm.pop(Reg.rax)
 
-    def shlo_l_32(self, asm):
+    def shlo_l_32(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra << (rb % 32)) % 2^32"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save shift amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         # Mask shift amount
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
         )
         # Shift left by cl
-        asm.shl_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
+        asm.shl_cl(RegSize.R32, RegMem.Reg(r_map[rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
+        asm.movsxd_32_to_64(r_map[rd], r_map[rd])
 
-    def shlo_l_64(self, asm):
+    def shlo_l_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra << (rb % 64)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save shift amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         # Mask shift amount
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
         )
         # Shift left by cl
-        asm.shl_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
+        asm.shl_cl(RegSize.R64, RegMem.Reg(r_map[rd]))
 
-    def shlo_r_32(self, asm):
+    def shlo_r_32(self, asm, ra: int, rb: int, rd: int):
         """rd = ra >> (rb % 32) (logical right shift)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save shift amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
         )
-        asm.shr_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
+        asm.shr_cl(RegSize.R32, RegMem.Reg(r_map[rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
+        asm.movsxd_32_to_64(r_map[rd], r_map[rd])
 
-    def shlo_r_64(self, asm):
+    def shlo_r_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra >> (rb % 64) (logical right shift)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save shift amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
         )
-        asm.shr_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
+        asm.shr_cl(RegSize.R64, RegMem.Reg(r_map[rd]))
 
-    def shar_r_32(self, asm):
+    def shar_r_32(self, asm, ra: int, rb: int, rd: int):
         """rd = ra >> (rb % 32) (arithmetic right shift)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save shift amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
         )
-        asm.sar_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
+        asm.sar_cl(RegSize.R32, RegMem.Reg(r_map[rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
+        asm.movsxd_32_to_64(r_map[rd], r_map[rd])
 
-    def shar_r_64(self, asm):
+    def shar_r_64(self, asm, ra: int, rb: int, rd: int):
         """rd = ra >> (rb % 64) (arithmetic right shift)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save shift amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
         )
-        asm.sar_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
+        asm.sar_cl(RegSize.R64, RegMem.Reg(r_map[rd]))
 
-    def and_op(self, asm):
+    def and_op(self, asm, ra: int, rb: int, rd: int):
         """rd = ra & rb (bitwise AND)"""
-        if self.rd == self.rb:
+        if rd == rb:
             asm.and_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.ra],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[ra],
                 )
             )
-        elif self.rd == self.ra:
+        elif rd == ra:
             asm.and_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         else:
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.and_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
 
-    def xor_op(self, asm):
+    def xor_op(self, asm, ra: int, rb: int, rd: int):
         """rd = ra ^ rb (bitwise XOR)"""
-        if self.rd == self.rb:
+        if rd == rb:
             asm.xor_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.ra],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[ra],
                 )
             )
-        elif self.rd == self.ra:
+        elif rd == ra:
             asm.xor_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         else:
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.xor_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
 
-    def or_op(self, asm):
+    def or_op(self, asm, ra: int, rb: int, rd: int):
         """rd = ra | rb (bitwise OR)"""
-        if self.rd == self.rb:
+        if rd == rb:
             asm.or_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.ra],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[ra],
                 )
             )
-        elif self.rd == self.ra:
+        elif rd == ra:
             asm.or_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         else:
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.or_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
 
-    def mul_upper_s_s(self, asm):
+    def mul_upper_s_s(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra * rb) >> 64 (signed multiplication, upper 64 bits)"""
         asm.push(Reg.rax)
         asm.push(Reg.rdx)
 
-        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
-        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[ra])
+        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[rb])
         asm.imul_dx_ax(RegSize.R64, RegMem.Reg(TEMP_REG))
 
-        if self.rd == 1:  # rd is rax
+        if rd == 1:  # rd is rax
             asm.mov(size=RegSize.R64, a=Reg.rax, b=Reg.rdx)
             asm.pop(Reg.rdx)
             asm.add_imm8(Reg.rsp, 8)  # discard original rax
-        elif self.rd == 4:  # rd is rdx
+        elif rd == 4:  # rd is rdx
             asm.pop(Reg.rax)
             asm.add_imm8(Reg.rsp, 8)  # discard original rdx
         else:
-            if self.rd != 0:
-                asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rdx)
+            if rd != 0:
+                asm.mov(size=RegSize.R64, a=r_map[rd], b=Reg.rdx)
             asm.pop(Reg.rdx)
             asm.pop(Reg.rax)
 
-    def mul_upper_u_u(self, asm):
+    def mul_upper_u_u(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra * rb) >> 64 (unsigned multiplication, upper 64 bits)"""
         asm.push(Reg.rax)
         asm.push(Reg.rdx)
 
-        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
-        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[ra])
+        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[rb])
         asm.mul_dx_ax(RegSize.R64, RegMem.Reg(TEMP_REG))
 
-        if self.rd == 1:  # rd is rax
+        if rd == 1:  # rd is rax
             asm.mov(size=RegSize.R64, a=Reg.rax, b=Reg.rdx)
             asm.pop(Reg.rdx)
             asm.add_imm8(Reg.rsp, 8)  # discard original rax
-        elif self.rd == 4:  # rd is rdx
+        elif rd == 4:  # rd is rdx
             asm.pop(Reg.rax)
             asm.add_imm8(Reg.rsp, 8)  # discard original rdx
         else:
-            if self.rd != 0:
-                asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rdx)
+            if rd != 0:
+                asm.mov(size=RegSize.R64, a=r_map[rd], b=Reg.rdx)
             asm.pop(Reg.rdx)
             asm.pop(Reg.rax)
 
-    def mul_upper_s_u(self, asm):
+    def mul_upper_s_u(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra_signed * rb_unsigned) >> 64 (mixed multiplication, upper 64 bits)"""
         # This implements floor(signed(ra) * unsigned(rb) / 2**64).
         # For ra < 0, this is equivalent to -ceil(|ra| * rb / 2**64).
@@ -870,8 +864,8 @@ class InstructionsWArgs3Reg(InstructionTable):
         asm.push(TEMP_REG)
 
         # Load operands: ra (signed) into rcx, rb (unsigned) into rax.
-        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.ra])
-        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[self.rb])
+        asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[ra])
+        asm.mov(size=RegSize.R64, a=Reg.rax, b=r_map[rb])
 
         label_pos = asm.forward_declare_label()
         label_end = asm.forward_declare_label()
@@ -913,367 +907,367 @@ class InstructionsWArgs3Reg(InstructionTable):
         # The final result is in RDX.
         # Now, move it to the destination register `rd` and restore clobbered registers.
         # The stack contains: [original rcx], [original rdx], [original rax]
-        if self.rd == 1:  # rd is rax
+        if rd == 1:  # rd is rax
             asm.mov(size=RegSize.R64, a=Reg.rax, b=Reg.rdx)  # Move result to rax
             asm.pop(TEMP_REG)
             asm.pop(Reg.rdx)
             asm.add_imm8(Reg.rsp, 8)  # Discard original rax from stack
-        elif self.rd == 2:  # rd is rcx
+        elif rd == 2:  # rd is rcx
             asm.mov(size=RegSize.R64, a=TEMP_REG, b=Reg.rdx)  # Move result to rcx
             asm.add_imm8(Reg.rsp, 8)  # Discard original rcx from stack
             asm.pop(Reg.rdx)
             asm.pop(Reg.rax)
-        elif self.rd == 4:  # rd is rdx
+        elif rd == 4:  # rd is rdx
             # Result is already in rdx.
             asm.pop(TEMP_REG)
             asm.add_imm8(Reg.rsp, 8)  # Discard original rdx from stack
             asm.pop(Reg.rax)
         else:
             # No aliasing with rax, rdx, rcx.
-            if self.rd != 0:
-                asm.mov(size=RegSize.R64, a=r_map[self.rd], b=Reg.rdx)
+            if rd != 0:
+                asm.mov(size=RegSize.R64, a=r_map[rd], b=Reg.rdx)
             asm.pop(TEMP_REG)
             asm.pop(Reg.rdx)
             asm.pop(Reg.rax)
 
-    def set_lt_u(self, asm):
+    def set_lt_u(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra < rb) ? 1 : 0 (unsigned comparison)"""
-        if self.rd == 0:
+        if rd == 0:
             return
         # Compare ra with rb
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=r_map[rb]
             )
         )
         # Clear rd register first (setcc only sets the low 8 bits)
-        asm.mov_imm64(r_map[self.rd], 0)
+        asm.mov_imm64(r_map[rd], 0)
         # Set byte if below (unsigned less than)
-        asm.setcc(Condition.Below, RegMem.Reg(r_map[self.rd]))
+        asm.setcc(Condition.Below, RegMem.Reg(r_map[rd]))
 
-    def set_lt_s(self, asm):
+    def set_lt_s(self, asm, ra: int, rb: int, rd: int):
         """rd = (ra < rb) ? 1 : 0 (signed comparison)"""
         # Compare ra with rb
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=r_map[rb]
             )
         )
         # Clear rd register first (setcc only sets the low 8 bits)
-        asm.mov_imm64(r_map[self.rd], 0)
+        asm.mov_imm64(r_map[rd], 0)
         # Set byte if less (signed less than)
-        asm.setcc(Condition.Less, RegMem.Reg(r_map[self.rd]))
+        asm.setcc(Condition.Less, RegMem.Reg(r_map[rd]))
 
-    def cmov_iz(self, asm):
+    def cmov_iz(self, asm, ra: int, rb: int, rd: int):
         """rd = (rb == 0) ? ra : rd (conditional move if zero)"""
         # Test if rb is zero
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
         # Conditional move if zero
         asm.cmov(
-            Condition.Equal, RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.ra])
+            Condition.Equal, RegSize.R64, r_map[rd], RegMem.Reg(r_map[ra])
         )
 
-    def cmov_nz(self, asm):
+    def cmov_nz(self, asm, ra: int, rb: int, rd: int):
         """rd = (rb != 0) ? ra : rd (conditional move if not zero)"""
         # Test if rb is zero
         asm.test(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rb]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[rb]), reg=r_map[rb]
             )
         )
         # Conditional move if not zero
         asm.cmov(
-            Condition.NotEqual, RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.ra])
+            Condition.NotEqual, RegSize.R64, r_map[rd], RegMem.Reg(r_map[ra])
         )
 
-    def rot_l_64(self, asm):
+    def rot_l_64(self, asm, ra: int, rb: int, rd: int):
         """rd = rotate_left(ra, rb) (64-bit)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save rotate amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         # Mask the rotate amount
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
         )
         # Rotate left by cl
-        asm.rol_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
+        asm.rol_cl(RegSize.R64, RegMem.Reg(r_map[rd]))
 
-    def rot_l_32(self, asm):
+    def rot_l_32(self, asm, ra: int, rb: int, rd: int):
         """rd = rotate_left(ra, rb) (32-bit)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save rotate amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         # Mask the rotate amount
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
         )
         # Rotate left by cl
-        asm.rol_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
+        asm.rol_cl(RegSize.R32, RegMem.Reg(r_map[rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
+        asm.movsxd_32_to_64(r_map[rd], r_map[rd])
 
-    def rot_r_64(self, asm):
+    def rot_r_64(self, asm, ra: int, rb: int, rd: int):
         """rd = rotate_right(ra, rb) (64-bit)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save rotate amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         # Mask the rotate amount
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x3F))
         )
         # Rotate right by cl
-        asm.ror_cl(RegSize.R64, RegMem.Reg(r_map[self.rd]))
+        asm.ror_cl(RegSize.R64, RegMem.Reg(r_map[rd]))
 
-    def rot_r_32(self, asm):
+    def rot_r_32(self, asm, ra: int, rb: int, rd: int):
         """rd = rotate_right(ra, rb) (32-bit)"""
         # Handle register aliasing - save rb if it will be overwritten
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save rotate amount first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
         else:
             # Normal case: load ra into rd, then rb into rcx
-            asm.mov(size=RegSize.R32, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R32, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
         # Mask the rotate amount
         asm.and_(
             Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I8(0x1F))
         )
         # Rotate right by cl
-        asm.ror_cl(RegSize.R32, RegMem.Reg(r_map[self.rd]))
+        asm.ror_cl(RegSize.R32, RegMem.Reg(r_map[rd]))
         # Sign-extend 32-bit result to 64 bits (PVM requirement)
-        asm.movsxd_32_to_64(r_map[self.rd], r_map[self.rd])
+        asm.movsxd_32_to_64(r_map[rd], r_map[rd])
 
-    def and_inv(self, asm):
+    def and_inv(self, asm, ra: int, rb: int, rd: int):
         """rd = ra & (~rb) (AND with inverted second operand)"""
         # Handle register aliasing - need to be careful with rcx usage
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save and invert rb first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.not_(Size.U64, RegMem.Reg(TEMP_REG))
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.and_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[rd]), reg=TEMP_REG
                 )
             )
-        elif self.ra == self.rd:
+        elif ra == rd:
             # ra is already in rd, just invert rb and AND
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.not_(Size.U64, RegMem.Reg(TEMP_REG))
             asm.and_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[rd]), reg=TEMP_REG
                 )
             )
         else:
             # Normal case: load ra into rd, invert rb in temp, then AND
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.not_(Size.U64, RegMem.Reg(TEMP_REG))
             asm.and_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[rd]), reg=TEMP_REG
                 )
             )
 
-    def or_inv(self, asm):
+    def or_inv(self, asm, ra: int, rb: int, rd: int):
         """rd = ra | (~rb) (OR with inverted second operand)"""
         # Handle register aliasing - need to be careful with rcx usage
-        if self.rb == self.rd and self.rb != self.ra:
+        if rb == rd and rb != ra:
             # rb will be overwritten, save and invert rb first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.not_(Size.U64, RegMem.Reg(TEMP_REG))
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.or_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[rd]), reg=TEMP_REG
                 )
             )
-        elif self.ra == self.rd:
+        elif ra == rd:
             # ra is already in rd, just invert rb and OR
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.not_(Size.U64, RegMem.Reg(TEMP_REG))
             asm.or_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[rd]), reg=TEMP_REG
                 )
             )
         else:
             # Normal case: load ra into rd, invert rb in temp, then OR
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.not_(Size.U64, RegMem.Reg(TEMP_REG))
             asm.or_(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.rd]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[rd]), reg=TEMP_REG
                 )
             )
 
-    def xnor(self, asm):
+    def xnor(self, asm, ra: int, rb: int, rd: int):
         """rd = ~(ra ^ rb) (XOR then invert result)"""
         # Handle register aliasing for XOR operation
-        if self.rd == self.rb:
+        if rd == rb:
             asm.xor_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.ra],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[ra],
                 )
             )
-        elif self.rd == self.ra:
+        elif rd == ra:
             asm.xor_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         else:
             # Load ra into rd
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             # XOR with rb
             asm.xor_(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.rd]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[rd]),
+                    reg=r_map[rb],
                 )
             )
         # Invert result
-        asm.not_(Size.U64, RegMem.Reg(r_map[self.rd]))
+        asm.not_(Size.U64, RegMem.Reg(r_map[rd]))
 
-    def max_op(self, asm):
+    def max_op(self, asm, ra: int, rb: int, rd: int):
         """rd = max(ra, rb) (signed comparison)"""
         # Handle register aliasing by saving values if needed
-        if self.rb == self.rd and self.ra != self.rb:
+        if rb == rd and ra != rb:
             # rb will be overwritten, save rb value first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=TEMP_REG
                 )
             )
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.cmov(Condition.Less, RegSize.R64, r_map[self.rd], RegMem.Reg(TEMP_REG))
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.cmov(Condition.Less, RegSize.R64, r_map[rd], RegMem.Reg(TEMP_REG))
         else:
             # Normal case or ra == rd (which is fine)
             asm.cmp(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.ra]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[ra]),
+                    reg=r_map[rb],
                 )
             )
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.cmov(
-                Condition.Less, RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.rb])
+                Condition.Less, RegSize.R64, r_map[rd], RegMem.Reg(r_map[rb])
             )
 
-    def max_u(self, asm):
+    def max_u(self, asm, ra: int, rb: int, rd: int):
         """rd = max(ra, rb) (unsigned comparison)"""
         # Handle register aliasing by saving values if needed
-        if self.rb == self.rd and self.ra != self.rb:
+        if rb == rd and ra != rb:
             # rb will be overwritten, save rb value first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=TEMP_REG
                 )
             )
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.cmov(Condition.Below, RegSize.R64, r_map[self.rd], RegMem.Reg(TEMP_REG))
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.cmov(Condition.Below, RegSize.R64, r_map[rd], RegMem.Reg(TEMP_REG))
         else:
             # Normal case or ra == rd (which is fine)
             asm.cmp(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.ra]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[ra]),
+                    reg=r_map[rb],
                 )
             )
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.cmov(
-                Condition.Below, RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.rb])
+                Condition.Below, RegSize.R64, r_map[rd], RegMem.Reg(r_map[rb])
             )
 
-    def min_op(self, asm):
+    def min_op(self, asm, ra: int, rb: int, rd: int):
         """rd = min(ra, rb) (signed comparison)"""
         # Handle register aliasing by saving values if needed
-        if self.rb == self.rd and self.ra != self.rb:
+        if rb == rd and ra != rb:
             # rb will be overwritten, save rb value first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=TEMP_REG
                 )
             )
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.cmov(
-                Condition.Greater, RegSize.R64, r_map[self.rd], RegMem.Reg(TEMP_REG)
+                Condition.Greater, RegSize.R64, r_map[rd], RegMem.Reg(TEMP_REG)
             )
         else:
             # Normal case or ra == rd (which is fine)
             asm.cmp(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.ra]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[ra]),
+                    reg=r_map[rb],
                 )
             )
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.cmov(
                 Condition.Greater,
                 RegSize.R64,
-                r_map[self.rd],
-                RegMem.Reg(r_map[self.rb]),
+                r_map[rd],
+                RegMem.Reg(r_map[rb]),
             )
 
-    def min_u(self, asm):
+    def min_u(self, asm, ra: int, rb: int, rd: int):
         """rd = min(ra, rb) (unsigned comparison)"""
         # Handle register aliasing by saving values if needed
-        if self.rb == self.rd and self.ra != self.rb:
+        if rb == rd and ra != rb:
             # rb will be overwritten, save rb value first
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.cmp(
                 Operands.RegMem_Reg(
-                    size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=TEMP_REG
+                    size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=TEMP_REG
                 )
             )
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
-            asm.cmov(Condition.Above, RegSize.R64, r_map[self.rd], RegMem.Reg(TEMP_REG))
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
+            asm.cmov(Condition.Above, RegSize.R64, r_map[rd], RegMem.Reg(TEMP_REG))
         else:
             # Normal case or ra == rd (which is fine)
             asm.cmp(
                 Operands.RegMem_Reg(
                     size=Size.U64,
-                    reg_mem=RegMem.Reg(r_map[self.ra]),
-                    reg=r_map[self.rb],
+                    reg_mem=RegMem.Reg(r_map[ra]),
+                    reg=r_map[rb],
                 )
             )
-            asm.mov(size=RegSize.R64, a=r_map[self.rd], b=r_map[self.ra])
+            asm.mov(size=RegSize.R64, a=r_map[rd], b=r_map[ra])
             asm.cmov(
-                Condition.Above, RegSize.R64, r_map[self.rd], RegMem.Reg(r_map[self.rb])
+                Condition.Above, RegSize.R64, r_map[rd], RegMem.Reg(r_map[rb])
             )

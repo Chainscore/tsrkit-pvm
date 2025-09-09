@@ -70,7 +70,8 @@ class InstMapper:
             raise ValueError("Recompiler: Invalid opcode")
 
         table_instance = handler.table_class(counter=program_counter, program=program)
-        result = handler.fn(table_instance, *args)
+        props = table_instance.get_props()
+        result = handler.fn(table_instance, *args, *props)
         return result, handler.gas_cost
 
     def get_gas_cost(self, opcode: int) -> int:

@@ -8,25 +8,16 @@ from ...vm_context import r_map
 
 
 class InstructionsWArgs2Reg1Offset(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) % 16)
-
-    @property
-    def rb(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) // 16)
-
-    @property
-    def lx(self) -> int:
-        return min(4, max(0, self.skip_index - 1))
-
-    @property
-    def vx(self) -> int:
+    def get_props(self):
+        ra = min(12, int(self.program.zeta[self.counter + 1]) % 16)
+        rb = min(12, int(self.program.zeta[self.counter + 1]) // 16)
+        lx = min(4, max(0, self.skip_index - 1))
         start = self.counter + 2
-        end = start + self.lx
-        return self.counter + z(
-            int.from_bytes(self.program.zeta[start:end], "little"), self.lx
+        end = start + lx
+        vx = self.counter + z(
+            int.from_bytes(self.program.zeta[start:end], "little"), lx
         )
+        return (ra, rb, lx, vx)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -51,16 +42,16 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
             ),
         }
 
-    def branch_eq(self, asm):
+    def branch_eq(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if equal"""
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=r_map[rb]
             )
         )
 
         # Get the target address and find the corresponding label
-        target_addr = self.vx
+        target_addr = vx
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Equal, target_label)  # je target_label
@@ -70,16 +61,16 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_ne(self, asm):
+    def branch_ne(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if not equal"""
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=r_map[rb]
             )
         )
 
         # Get the target address and find the corresponding label
-        target_addr = self.vx
+        target_addr = vx
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.NotEqual, target_label)  # jne target_label
@@ -89,16 +80,16 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_lt_u(self, asm):
+    def branch_lt_u(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if ra < rb (unsigned)"""
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=r_map[rb]
             )
         )
 
         # Get the target address and find the corresponding label
-        target_addr = self.vx
+        target_addr = vx
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(
@@ -110,16 +101,16 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_lt_s(self, asm):
+    def branch_lt_s(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if ra < rb (signed)"""
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=r_map[rb]
             )
         )
 
         # Get the target address and find the corresponding label
-        target_addr = self.vx
+        target_addr = vx
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(
@@ -131,16 +122,16 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_ge_u(self, asm):
+    def branch_ge_u(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if ra >= rb (unsigned)"""
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=r_map[rb]
             )
         )
 
         # Get the target address and find the corresponding label
-        target_addr = self.vx
+        target_addr = vx
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(
@@ -152,16 +143,16 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 f"Warning: Branch target {target_addr} not found in labels, falling through"
             )
 
-    def branch_ge_s(self, asm):
+    def branch_ge_s(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if ra >= rb (signed)"""
         asm.cmp(
             Operands.RegMem_Reg(
-                size=Size.U64, reg_mem=RegMem.Reg(r_map[self.ra]), reg=r_map[self.rb]
+                size=Size.U64, reg_mem=RegMem.Reg(r_map[ra]), reg=r_map[rb]
             )
         )
 
         # Get the target address and find the corresponding label
-        target_addr = self.vx
+        target_addr = vx
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jcc_label32(

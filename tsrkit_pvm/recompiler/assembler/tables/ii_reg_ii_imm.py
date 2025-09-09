@@ -21,33 +21,21 @@ from ...vm_context import VMContext, r_map, TEMP_REG
 
 
 class InstructionsWArgs2Reg2Imm(InstructionTable):
-    @property
-    def ra(self) -> int:
-        return min(12, self.program.zeta[self.counter + 1] % 16)
-
-    @property
-    def rb(self) -> int:
-        return min(12, int(self.program.zeta[self.counter + 1]) // 16)
-
-    @property
-    def lx(self) -> int:
-        return min(4, int(self.program.zeta[self.counter + 2]) % 8)
-
-    @property
-    def ly(self) -> int:
-        return min(4, max(0, int(self.skip_index) - self.lx - 2))
-
-    @property
-    def vx(self) -> int:
+    def get_props(self):
+        ra = min(12, self.program.zeta[self.counter + 1] % 16)
+        rb = min(12, int(self.program.zeta[self.counter + 1]) // 16)
+        lx = min(4, int(self.program.zeta[self.counter + 2]) % 8)
+        ly = min(4, max(0, int(self.skip_index) - lx - 2))
+        
         start = self.counter + 3
-        end = start + self.lx
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.lx)
-
-    @property
-    def vy(self) -> int:
-        start = self.counter + 3 + self.lx
-        end = start + self.ly
-        return chi(int.from_bytes(self.program.zeta[start:end], "little"), self.ly)
+        end = start + lx
+        vx = chi(int.from_bytes(self.program.zeta[start:end], "little"), lx)
+        
+        start = self.counter + 3 + lx
+        end = start + ly
+        vy = chi(int.from_bytes(self.program.zeta[start:end], "little"), ly)
+        
+        return (ra, rb, lx, ly, vx, vy)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -60,7 +48,7 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
             ),
         }
 
-    def load_imm_jump_ind(self, asm):
+    def load_imm_jump_ind(self, asm, ra, rb, lx, ly, vx, vy):
         """Load immediate into ra, then jump to address loaded from jump table[rb + vy]
 
         This implements: registers[ra] = vx; djump(counter, (registers[rb] + vy) % 2**32)
@@ -69,17 +57,17 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
         # Part 2: Calculate the PVM address: rb + vy
         # Use rcx as temp register for address calculation
 
-        if self.vy != 0:
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+        if vy != 0:
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
             asm.add(
                 Operands.RegMem_Imm(
-                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(self.vy)
+                    reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I64(vy)
                 )
             )
         else:
-            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[self.rb])
+            asm.mov(size=RegSize.R64, a=TEMP_REG, b=r_map[rb])
 
-        asm.mov_imm64(r_map[self.ra], self.vx)
+        asm.mov_imm64(r_map[ra], vx)
         # Ensure 32-bit wrap: rcx = rcx % 2**32
         asm.mov(size=RegSize.R32, a=TEMP_REG, b=TEMP_REG)
 

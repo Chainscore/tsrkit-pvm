@@ -8,25 +8,19 @@ from ....core.opcode import OpCode
 
 
 class InstructionsWArgs2Imm(InstructionTable):
-    @property
-    def lx(self) -> int:
-        return min(4, self.program.zeta[self.counter + 1])
-
-    @property
-    def ly(self) -> int:
-        return min(4, max(0, self.skip_index - int(self.lx) - 1))
-
-    @property
-    def vx(self) -> int:
+    def get_props(self):
+        lx = min(4, self.program.zeta[self.counter + 1])
+        ly = min(4, max(0, self.skip_index - int(lx) - 1))
+        
         start = self.counter + 2
-        end = start + self.lx
-        return int.from_bytes(self.program.zeta[start:end], "little", signed=False)
-
-    @property
-    def vy(self) -> int:
-        start = self.counter + 2 + self.lx
-        end = start + self.ly
-        return int.from_bytes(self.program.zeta[start:end], "little", signed=False)
+        end = start + lx
+        vx = int.from_bytes(self.program.zeta[start:end], "little", signed=False)
+        
+        start = self.counter + 2 + lx
+        end = start + ly
+        vy = int.from_bytes(self.program.zeta[start:end], "little", signed=False)
+        
+        return (lx, ly, vx, vy)
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -38,20 +32,20 @@ class InstructionsWArgs2Imm(InstructionTable):
         }
 
     @staticmethod
-    def store_imm(bit_size: int) -> Callable[[Any, "PyAssembler"], None]:
+    def store_imm(bit_size: int) -> Callable[[Any, "PyAssembler", int, int, int, int], None]:
         from tsrkit_asm import Size, RegSize
 
         size_map = {8: Size.U8, 16: Size.U16, 32: Size.U32, 64: Size.U64}
 
-        def impl(self, asm):
-            imm_val = int(self.vy % (2**bit_size))
+        def impl(self, asm, lx: int, ly: int, vx: int, vy: int):
+            imm_val = int(vy % (2**bit_size))
             asm.mov_imm64(TEMP_REG, imm_val)
 
             mem = MemOp.BaseOffset(
                 seg=None,
                 size=RegSize.R64,
                 base=Reg.r15,  # R15 holds memory base pointer
-                offset=z(self.vx, 8),
+                offset=z(vx, 8),
             )
             asm.store(size_map[bit_size], mem=mem, reg=TEMP_REG)
 
