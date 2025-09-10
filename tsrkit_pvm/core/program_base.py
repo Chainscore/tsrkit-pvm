@@ -1,5 +1,5 @@
 from typing import List, Union, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from tsrkit_types import Bits, Uint
 from tsrkit_pvm.common.extended import ExtendedList
 
@@ -20,6 +20,7 @@ class Program:
     jump_table: List
     instruction_set: bytes
     offset_bitmask: List
+    basic_blocks: List[int] = field(default_factory=list, init=False)
 
     def __post_init__(self) -> None:
         # Pre-compute and cache frequently accessed values

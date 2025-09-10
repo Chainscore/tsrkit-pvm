@@ -26,8 +26,10 @@ class REC_Program(Program):
     halt_offset: int
     # Index to panic label
     panic_offset: int
-
+    # Skip values cache
     _skip_cache: list[int]
+    # Basic blocks start positions
+    basic_blocks: list[int]
 
     is_recompiler = True
 

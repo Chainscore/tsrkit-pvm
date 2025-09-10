@@ -1,18 +1,20 @@
 from dataclasses import dataclass
-from typing import Tuple, Type, Union
+import os
+from typing import Tuple, Union, Any
 
 from tsrkit_types.integers import Uint
 from tsrkit_types.itf.codable import Codable
-
-from tsrkit_pvm.core import program_base
-from tsrkit_pvm.core.memory import Memory
-from tsrkit_pvm.core.program_base import Program
-from tsrkit_pvm.interpreter.memory import INT_Memory
-from tsrkit_pvm.recompiler.memory import REC_Memory
 from tsrkit_pvm.recompiler.vm_context import VMContext
 
 from ..common.constants import PVM_INIT_DATA_SIZE, PVM_INIT_ZONE_SIZE
 
+# Import both classes to avoid MyPyC issues with conditional imports
+from tsrkit_pvm.recompiler.program import REC_Program
+from tsrkit_pvm.recompiler.memory import REC_Memory
+from tsrkit_pvm.interpreter.program import INT_Program
+from tsrkit_pvm.interpreter.memory import INT_Memory
+
+_PVM_MODE = os.environ.get("PVM_MODE", "interpreter")
 
 @dataclass
 class Code(Codable):
@@ -90,7 +92,7 @@ def regs_from_pc(args: bytes) -> list:
 
 def y_function(
     bytecode: bytes, args: bytes, mode: str = "recompiler"
-) -> Union[Tuple[bytes, list, Memory], None]:
+) -> Union[Tuple[Any, list, Any], None]:
     """Extract program components from bytecode.
 
     Returns:
@@ -100,9 +102,8 @@ def y_function(
     if not code:
         return None
 
-    program_ = program_base.Program.decode_from(code.code)[0]
-
-    if mode == "recompiler":
+    if _PVM_MODE == "recompiler":
+        program_ = REC_Program.decode_from(code.code)[0]
         memory = REC_Memory.from_pc(
             code.read,
             code.r_write,
@@ -112,10 +113,11 @@ def y_function(
             VMContext.calculate_size(len(program_.jump_table)),
         )
     else:
+        program_ = INT_Program.decode_from(code.code)[0]
         memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
 
     return (
-        code.code,
+        program_,
         regs_from_pc(args),
         memory,
     )
