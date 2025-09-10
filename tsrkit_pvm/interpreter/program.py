@@ -9,11 +9,12 @@ from .instructions.inst_map import inst_map
 class INT_Program(Program):
     """This is the program blob which the PVM will execute."""
 
-    _skip_cache: list[int]
-    _basic_blocks_set: set[int]
-
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
+        # Initialize instance attributes
+        self._skip_cache: list[int] = []
+        self._basic_blocks_set: set[int] = set()
+        
         self._precompute_skip_values()
         basic_blocks = [0]
         for n in range(len(self.instruction_set)):
@@ -28,7 +29,7 @@ class INT_Program(Program):
         self.basic_blocks = basic_blocks
         self._basic_blocks_set = set(self.basic_blocks)
 
-    def _precompute_skip_values(self):
+    def _precompute_skip_values(self) -> None:
         """Pre-compute skip values for all positions to eliminate runtime overhead."""
         # Use list instead of dict for faster indexed access
         bitmask_len = len(self.offset_bitmask)
@@ -42,7 +43,7 @@ class INT_Program(Program):
                     break
             self._skip_cache[i] = min(24, skip_value)
 
-    def skip(self, pc) -> int:
+    def skip(self, pc: int) -> int:
         """
         Skip the instructions until the next opcode is found.
         Args:

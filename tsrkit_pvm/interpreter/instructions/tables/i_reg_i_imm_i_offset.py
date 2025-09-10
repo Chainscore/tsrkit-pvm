@@ -1,4 +1,7 @@
-from typing import Any, Callable, Dict
+from typing import Any, TYPE_CHECKING, Callable, Dict
+
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 
 from ...memory import Memory
 from ....common.status import CONTINUE
@@ -6,9 +9,13 @@ from ....common.utils import chi, compare, z, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
-
 class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
-    def get_props(self):
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+    def get_props(self) -> list[int]:
         # Slice zeta once for better performance with large arrays
         zeta_slice = self.program.zeta[self.counter + 1:self.counter + 8]
         
@@ -31,7 +38,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
         else:
             vy = int(self.counter)
         
-        return (ra, lx, ly, vx, vy)
+        return [ra, lx, ly, vx, vy]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -101,7 +108,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             ),
         }
 
-    def load_imm_jump(self, registers: list, memory: Memory, ra: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
+    def load_imm_jump(self, registers: list[int], memory: Memory, ra: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
         registers[ra] = vx
         status, counter = self.program.branch(self.counter, vy, True)
         if status == CONTINUE and counter != self.counter:
@@ -109,8 +116,8 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
-    def branch_imm(op: str, signed=False) -> Callable[[Any, list, Memory, int, int, int, int, int], OpReturn]:
-        def branch_u_imm_impl(self, registers: list, memory: Memory, ra: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
+    def branch_imm(op: str, signed: bool = False) -> Callable[["InstructionsWArgs1Reg1Imm1Offset", list[int], Memory, int, int, int, int, int], OpReturn]:
+        def branch_u_imm_impl(self: "InstructionsWArgs1Reg1Imm1Offset", registers: list[int], memory: Memory, ra: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
             status, counter = self.program.branch(
                 self.counter,
                 vy,

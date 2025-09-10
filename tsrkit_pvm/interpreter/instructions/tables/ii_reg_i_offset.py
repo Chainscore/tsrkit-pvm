@@ -1,4 +1,7 @@
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 
 from ...memory import Memory
 from ....common.status import CONTINUE
@@ -8,8 +11,12 @@ from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs2Reg1Offset(InstructionTable):
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
 
-    def get_props(self):
+    def get_props(self) -> List[int]:
         # Slice zeta once for better performance with large arrays
         zeta_slice = self.program.zeta[self.counter + 1:self.counter + 7]
         
@@ -25,7 +32,7 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
             vx = int(self.counter) + z(int.from_bytes(offset_slice, "little"), lx)
         else:
             vx = int(self.counter)
-        return (ra, rb, lx, vx)
+        return [ra, rb, lx, vx]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -57,8 +64,8 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
         }
 
     @staticmethod
-    def branch(op: str, signed=False) -> Callable[[Any, list, Memory], OpReturn]:
-        def branch_impl(self, registers: list, memory: Memory, ra, rb, lx, vx) -> OpReturn:
+    def branch(op: str, signed: bool = False) -> Callable[["InstructionsWArgs2Reg1Offset", list[int], Memory, int, int, int, int], OpReturn]:
+        def branch_impl(self: "InstructionsWArgs2Reg1Offset", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
 
             a = z(registers[ra], 8) if signed else registers[ra]
             b = z(registers[rb], 8) if signed else registers[rb]

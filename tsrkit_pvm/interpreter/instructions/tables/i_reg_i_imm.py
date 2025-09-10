@@ -1,5 +1,8 @@
 from math import floor
-from typing import Any, Callable, Dict
+from typing import Any, TYPE_CHECKING, Callable, Dict
+
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 
 from ...memory import Memory
 from ....common.status import CONTINUE
@@ -7,14 +10,18 @@ from ....common.utils import chi, clamp_12, clamp_4
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
-
 class InstructionsWArgs1Reg1Imm(InstructionTable):
-    def get_props(self):
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+    def get_props(self) -> list[int]:
         lx = clamp_4(max(0, self.skip_index - 1))
         zeta_arr = self.program.zeta[self.counter + 1: self.counter + 1 + 1 + lx]
         ra = clamp_12(zeta_arr[0] % 16)
         vx = chi(int.from_bytes(zeta_arr[1:9], "little"), lx)
-        return (ra, lx, vx)
+        return [ra, lx, vx]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -40,13 +47,13 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
             ),
         }
 
-    def jump_ind(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
-        status, counter = self.program.djump(
+    def jump_ind(self, registers: list[int], memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
+        status, counter = self.program.djump( 
             self.counter, floor(int(registers[ra]) + vx) % 2**32
         )
         return status, counter, registers, memory
 
-    def load_imm(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
+    def load_imm(self, registers: list[int], memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
         """
         OPC20: Load a 64-bit immediate value into a register.
         """
@@ -54,8 +61,8 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
-    def load_u(bitsize: int) -> Callable[[Any, list, Memory, int, int, int], OpReturn]:
-        def load_u_impl(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
+    def load_u(bitsize: int) -> Callable[..., OpReturn]:
+        def load_u_impl(self: "InstructionsWArgs1Reg1Imm", registers: list[int], memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
             registers[ra] = int.from_bytes(
                 memory.read(vx, bitsize // 8), "little"
             )
@@ -64,8 +71,8 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
         return load_u_impl
 
     @staticmethod
-    def store_u(bitsize: int) -> Callable[[Any, list, Memory, int, int, int], OpReturn]:
-        def store_u_impl(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
+    def store_u(bitsize: int) -> Callable[..., OpReturn]:
+        def store_u_impl(self: "InstructionsWArgs1Reg1Imm", registers: list[int], memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
             memory.write(
                 vx,
                 int(registers[ra] % (2**bitsize)).to_bytes(bitsize // 8, "little"),
@@ -75,8 +82,8 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
         return store_u_impl
 
     @staticmethod
-    def load_i(bitsize: int) -> Callable[[Any, list, Memory, int, int, int], OpReturn]:
-        def load_i_impl(self, registers: list, memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
+    def load_i(bitsize: int) -> Callable[..., OpReturn]:
+        def load_i_impl(self: "InstructionsWArgs1Reg1Imm", registers: list[int], memory: Memory, ra: int, lx: int, vx: int) -> OpReturn:
             registers[ra] = chi(
                 int.from_bytes(memory.read(vx, bitsize // 8), "little"),
                 bitsize // 8,

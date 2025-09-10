@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Dict, List, Self, Sequence, TYPE_CHECKING
+from typing import Dict, List, Sequence, TYPE_CHECKING, Optional, Union, Any
+from typing_extensions import Self
 from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.common.utils import get_pages, total_page_size, total_zone_size
 from tsrkit_pvm.common.constants import (
@@ -35,7 +36,7 @@ class INT_Memory:
         allowed_read_pages: List[int] | None = None,
         allowed_write_pages: List[int] | None = None,
         heap: int = 0,
-        logger=None,
+        logger: Optional[Any] = None,
     ):
         allowed_read_pages = allowed_read_pages or []
         allowed_write_pages = allowed_write_pages or []
@@ -56,7 +57,7 @@ class INT_Memory:
             # Bulk-load initial bytes more efficiently
             sorted_addrs = sorted(data.items())
             current_page = -1
-            page_data = None
+            page_data: Optional[Union[bytearray, bytes]] = None
             
             for addr, val in sorted_addrs:
                 if not (0 <= val <= 255):
@@ -67,7 +68,13 @@ class INT_Memory:
                     current_page = page_idx
                     page_data = self._page_for(addr, create=True)
                 
-                page_data[addr & _PAGE_MASK] = val
+                if isinstance(page_data, bytearray):
+                    page_data[addr & _PAGE_MASK] = val
+                elif page_data is not None:
+                    # Convert to mutable page if it's immutable bytes
+                    ba = bytearray(page_data)
+                    ba[addr & _PAGE_MASK] = val
+                    self._pages[page_idx] = ba
 
         self.heap_break: int = heap
 
@@ -80,7 +87,7 @@ class INT_Memory:
         """Fast page index calculation using bit shift instead of division."""
         return addr >> _PAGE_SHIFT
 
-    def _page_for(self, addr: int, *, create: bool = False) -> bytearray:
+    def _page_for(self, addr: int, *, create: bool = False) -> Union[bytearray, bytes]:
         """
         Get the underlying page buffer for an address with caching.
         Creates a fresh zero-filled page if `create` is True.
@@ -154,7 +161,7 @@ class INT_Memory:
             # Fast single-page read
             page_off = address & _PAGE_MASK
             src_page = self._page_cache.get(pg) or self._pages.get(pg) or _ZERO_PAGE
-            if src_page is not _ZERO_PAGE and len(self._page_cache) < 16 and pg not in self._page_cache:
+            if src_page is not _ZERO_PAGE and isinstance(src_page, bytearray) and len(self._page_cache) < 16 and pg not in self._page_cache:
                 self._page_cache[pg] = src_page
             return bytes(src_page[page_off : page_off + length])
 
@@ -175,14 +182,16 @@ class INT_Memory:
                 raise PvmError(PAGE_FAULT(address))
             
             # Fast page lookup with caching
-            src_page = self._page_cache.get(pg)
-            if src_page is None:
-                src_page = self._pages.get(pg) or _ZERO_PAGE
-                if src_page is not _ZERO_PAGE and len(self._page_cache) < 16:
-                    self._page_cache[pg] = src_page
+            cached_page = self._page_cache.get(pg)
+            if cached_page is not None:
+                page_data: Union[bytearray, bytes] = cached_page
+            else:
+                page_data = self._pages.get(pg) or _ZERO_PAGE
+                if page_data is not _ZERO_PAGE and isinstance(page_data, bytearray) and len(self._page_cache) < 16:
+                    self._page_cache[pg] = page_data
             
             # Fast memory copy
-            out_mv[cursor : cursor + chunk] = src_page[page_off : page_off + chunk]
+            out_mv[cursor : cursor + chunk] = page_data[page_off : page_off + chunk]
 
             address += chunk
             cursor += chunk
@@ -221,7 +230,11 @@ class INT_Memory:
             return
 
         # Multi-page path (less common)
-        in_mv = memoryview(data_bytes)
+        if isinstance(data_bytes, bytes):
+            in_mv = memoryview(data_bytes)
+        else:
+            # Convert sequence of ints to bytes
+            in_mv = memoryview(bytes(data_bytes))
         cursor = 0
         
         while address < end:
@@ -267,23 +280,12 @@ class INT_Memory:
             return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
         return True
 
-    def dump_memory(self, start: int, end: int):  # debug helper
-        """Debug helper - optimized version."""
-        result = []
-        for addr in range(start, end):
-            pg = addr >> _PAGE_SHIFT
-            if pg in self._pages:
-                result.append(self._pages[pg][addr & _PAGE_MASK])
-            else:
-                result.append(0)
-        return result
-
     # repr / equality keep old behaviour for debugging or tests  
-    def __repr__(self):
+    def __repr__(self) -> str:
         # Simplified repr to avoid expensive calculations during logging
         return f"Memory(pages={len(self._pages)}, heap={self.heap_break})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, self.__class__):
             return NotImplemented
             
@@ -341,7 +343,7 @@ class INT_Memory:
 
         return cls(memory, read_pages, write_pages, heap=heap)
 
-    def zero_memory_range(self, start_page: int, num_pages: int):
+    def zero_memory_range(self, start_page: int, num_pages: int) -> None:
         """Optimized memory zeroing."""
         if num_pages <= 0:
             return
@@ -350,9 +352,14 @@ class INT_Memory:
             # Create or get existing page
             page_data = self._page_for(page_idx * PAGE_SIZE, create=True)
             # Fast zero fill
-            page_data[:] = b'\x00' * PAGE_SIZE
+            if isinstance(page_data, bytearray):
+                page_data[:] = b'\x00' * PAGE_SIZE
+            else:
+                # Replace with a new zeroed bytearray
+                zeroed_page = bytearray(PAGE_SIZE)
+                self._pages[page_idx] = zeroed_page
 
-    def alter_accessibility(self, start: int, len_: int, access: Accessibility):
+    def alter_accessibility(self, start: int, len_: int, access: Accessibility) -> None:
         """Optimized accessibility alteration."""
         pages = get_pages(start, len_)
         

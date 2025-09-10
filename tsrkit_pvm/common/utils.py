@@ -3,7 +3,7 @@
 from .constants import PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
 from math import ceil
 import math
-from typing import List, Union
+from typing import List, Union, Any
 
 _PVM_MEMORY_PAGE_SHIFT = 12  # log2(PVM_MEMORY_PAGE_SIZE) = log2(4096) = 12
 _PVM_INIT_ZONE_SHIFT = 16   # log2(PVM_INIT_ZONE_SIZE) = log2(65536) = 16
@@ -90,7 +90,7 @@ def z_inv(x: int, n: int) -> int:
     return (modulus + x) & (modulus - 1)  # equivalent to % 2**(8*n)
 
 
-def b(value: int, byte_size: int, is_reversed=False) -> List[int]:
+def b(value: int, byte_size: int, is_reversed: bool = False) -> List[int]:
     """Convert integer to list of bits."""
     # Handle edge case where byte_size is 0
     if byte_size <= 0:
@@ -103,7 +103,7 @@ def b(value: int, byte_size: int, is_reversed=False) -> List[int]:
     return result
 
 
-def b_inv(value: List[int], is_reversed=False) -> int:
+def b_inv(value: List[int], is_reversed: bool = False) -> int:
     """Convert list of bits to integer."""
     # avoid repeated list operations and use enumerate
     if is_reversed:
@@ -131,7 +131,7 @@ _COMPARISON_OPS = {
     'xor': lambda a, b: a ^ b,
 }
 
-def compare(a: Union[int, bool], b: Union[int, bool], op: str) -> bool:
+def compare(a: Union[int, bool], b: Union[int, bool], op: str) -> Any:
     """Compare two values using the specified operation."""
     # Use lookup table for common operations (much faster than getattr)
     if op in _COMPARISON_OPS:
@@ -141,7 +141,7 @@ def compare(a: Union[int, bool], b: Union[int, bool], op: str) -> bool:
     return getattr(a, f"__{op}__")(b)
 
 
-def compare_bits_vectorized(bits_a: List[int], bits_b: List[int], op: str) -> List[int]:
+def compare_bits_vectorized(bits_a: List[Union[int, bool]], bits_b: List[int], op: str) -> List[int]:
     """Vectorized bit comparison for 64-bit operations - much faster than loop."""
     if op == 'and':
         return [a & b for a, b in zip(bits_a, bits_b)]

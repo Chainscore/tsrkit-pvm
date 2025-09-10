@@ -7,7 +7,7 @@ eliminating the need for table object creation and multiple dictionary lookups.
 
 from dataclasses import dataclass
 from http.client import CONTINUE
-from typing import Callable, List, Optional, Tuple, Any
+from typing import Callable, List, Optional, Tuple, Any, Dict, Type, Union
 
 from tsrkit_pvm.core.instruction_table import InstructionTable
 
@@ -28,8 +28,8 @@ class CompiledInstruction:
     offset: int # Offset from start of block
     opcode: int # Opcode of the instruction
     handler: InstructionHandler # Handler for this instruction
-    args: tuple # Pre-decoded instruction arguments
-    table: InstructionTable # Table instance for this instruction
+    args: List[int]  # Pre-decoded instruction arguments
+    table: type[InstructionTable] # Table instance for this instruction
 
 @dataclass
 class BlockInfo:
@@ -39,7 +39,7 @@ class BlockInfo:
     instructions: List[CompiledInstruction]  # Pre-compiled instructions
     instruction_count: int  # Number of instructions in block
     
-    def execute(self, program, start_pc: int, registers: List[int], memory) -> Tuple[Tuple[Any, int, List[int], Any], int]:
+    def execute(self, program: Any, start_pc: int, registers: List[int], memory: Any) -> Tuple[Tuple[Any, int, List[int], Any], int]:
         """Execute this block starting from start_pc with given registers and memory."""
         current_pc = start_pc
         current_registers = registers
@@ -75,13 +75,13 @@ class InstMapper:
     into a single dispatch table for efficient performance.
     """
 
-    _dispatch_table: List[InstructionHandler | None] = [None] * 256
+    _dispatch_table: List[Union[InstructionHandler, None]] = [None] * 256
     _gas_costs: bytes = b""
     _terminating_mask: int = 0
     
-    _basic_blocks: dict[int, BlockInfo]
+    _basic_blocks: Dict[int, BlockInfo]
 
-    def __init__(self, all_tables: list[InstructionTable]):
+    def __init__(self, all_tables: List[type[InstructionTable]]):
         gas_tmp = [0] * 256
         term_mask = 0
         self._dispatch_table = [None] * 256
@@ -108,16 +108,27 @@ class InstMapper:
         self._terminating_mask = term_mask
 
     def process_instruction(
-        self, program, program_counter: int, registers: List[int], memory
-    ) -> tuple[tuple, int]:
+        self, program: Any, program_counter: int, registers: List[int], memory: Any
+    ) -> Tuple[Tuple[Any, int, List[int], Any], int]:
         """
         Execute an instruction directly using the optimized dispatch table.
 
         This version completely eliminates table instance creation by using
         cached instances that are reused and updated in-place.
         """
+        
+        # ---- Block based execution ---- #
         block = self.get_block(program, program_counter)
         return block.execute(program, program_counter, registers, memory)
+        
+        # ---- Unoptimized ---- #
+        # handler = self._dispatch_table[program.zeta[program_counter]]
+        # if handler is None:
+        #     raise ValueError("Recompiler: Invalid opcode")
+        # table_instance = handler.table_class(counter=program_counter, program=program, skip_index=program.skip(program_counter))
+        # props = table_instance.get_props()
+        # result = handler.fn(table_instance, registers, memory, *props)
+        # return result, handler.gas_cost
 
     def get_gas_cost(self, opcode: int) -> int:
         """Get gas cost for an opcode with direct lookup - no dictionary access."""
@@ -127,7 +138,7 @@ class InstMapper:
         """Check if an opcode is terminating with direct lookup."""
         return bool((self._terminating_mask >> opcode) & 1)
 
-    def get_block(self, program, start_pc: int) -> BlockInfo:
+    def get_block(self, program: Any, start_pc: int) -> BlockInfo:
         """Get a compiled block from cache or compile it if not cached."""
         if start_pc in self._basic_blocks:
             return self._basic_blocks[start_pc]
@@ -137,7 +148,7 @@ class InstMapper:
         self._basic_blocks[start_pc] = block
         return block
 
-    def _compile_block(self, program, start_pc: int) -> BlockInfo:
+    def _compile_block(self, program: Any, start_pc: int) -> BlockInfo:
         """Compile a basic block starting at the given PC."""
         # print("Compiling block at PC:", start_pc)
         compiled_instructions = []
@@ -198,8 +209,8 @@ class InstMapper:
             instruction_count=len(compiled_instructions)
         )
 
-    def execute_block(self, block: BlockInfo, program, initial_pc: int, 
-                     registers: List[int], memory) -> Tuple[Tuple[Any, int, List[int], Any], int]:
+    def execute_block(self, block: BlockInfo, program: Any, initial_pc: int, 
+                     registers: List[int], memory: Any) -> Tuple[Tuple[Any, int, List[int], Any], int]:
         """Execute a compiled block in a tight loop."""
         current_pc = initial_pc
         current_registers = registers

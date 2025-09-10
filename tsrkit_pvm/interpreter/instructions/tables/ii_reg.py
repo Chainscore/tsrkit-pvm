@@ -1,4 +1,7 @@
-from typing import Any, Callable, Dict
+from typing import Any, TYPE_CHECKING, Callable, Dict
+
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 
 from ...memory import Memory
 from ....common.status import CONTINUE
@@ -7,9 +10,13 @@ from ....common.utils import b, b_inv, chi, compare, compare_bits_vectorized, z,
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
-
 class InstructionsWArgs2Reg(InstructionTable):
-    def get_props(self):
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+    def get_props(self) -> list[int]:
         # Slice zeta once for better performance with large arrays
         zeta_slice = self.program.zeta[self.counter + 1:self.counter + 2]
         
@@ -17,7 +24,7 @@ class InstructionsWArgs2Reg(InstructionTable):
         byte_val = zeta_slice[0]  # equivalent to self.program.zeta[self.counter + 1]
         rd = clamp_12(byte_val & 0x0F)  # Lower 4 bits (equivalent to % 16)
         ra = clamp_12(byte_val >> 4)    # Upper 4 bits (equivalent to // 16)
-        return (rd, ra)
+        return [rd, ra]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -80,11 +87,11 @@ class InstructionsWArgs2Reg(InstructionTable):
             ),
         }
 
-    def move_reg(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+    def move_reg(self, registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
         registers[rd] = registers[ra]
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def sbrk(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+    def sbrk(self, registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
         req = registers[ra]  # bytes requested
         memory.alter_accessibility(memory.heap_break, req, Accessibility.WRITE)
         memory.heap_break = memory.heap_break + req
@@ -94,8 +101,8 @@ class InstructionsWArgs2Reg(InstructionTable):
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
-    def count_set_bits(bitsize: int) -> Callable[[Any, list, Memory, int, int], OpReturn]:
-        def count_set_bits_impl(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+    def count_set_bits(bitsize: int) -> Callable[..., OpReturn]:
+        def count_set_bits_impl(self: "InstructionsWArgs2Reg", registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
             registers[rd] = sum(
                 b(int(registers[ra]) % 2**bitsize, bitsize // 8)[:bitsize]
             )
@@ -104,8 +111,8 @@ class InstructionsWArgs2Reg(InstructionTable):
         return count_set_bits_impl
 
     @staticmethod
-    def leading_zero_bits(bitsize: int) -> Callable[[Any, list, Memory, int, int], OpReturn]:
-        def leading_zero_bits_impl(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+    def leading_zero_bits(bitsize: int) -> Callable[..., OpReturn]:
+        def leading_zero_bits_impl(self: "InstructionsWArgs2Reg", registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
             try:
                 leading_zeroes = b(
                     int(registers[ra]) % 2**bitsize, bitsize // 8
@@ -118,8 +125,8 @@ class InstructionsWArgs2Reg(InstructionTable):
         return leading_zero_bits_impl
 
     @staticmethod
-    def trailing_zero_bits(bitsize: int) -> Callable[[Any, list, Memory, int, int], OpReturn]:
-        def trailing_zero_impl(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+    def trailing_zero_bits(bitsize: int) -> Callable[..., OpReturn]:
+        def trailing_zero_impl(self: "InstructionsWArgs2Reg", registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
             try:
                 trailing_zeroes = b(
                     registers[ra] % 2**bitsize, bitsize // 8
@@ -132,8 +139,8 @@ class InstructionsWArgs2Reg(InstructionTable):
         return trailing_zero_impl
 
     @staticmethod
-    def sign_extend(bitsize: int) -> Callable[[Any, list, Memory, int, int], OpReturn]:
-        def sign_extend_impl(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+    def sign_extend(bitsize: int) -> Callable[..., OpReturn]:
+        def sign_extend_impl(self: "InstructionsWArgs2Reg", registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
             registers[rd] = z_inv(
                 z(registers[ra] % 2**bitsize, bitsize // 8), 8
             )
@@ -141,11 +148,11 @@ class InstructionsWArgs2Reg(InstructionTable):
 
         return sign_extend_impl
 
-    def zero_extend_16(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+    def zero_extend_16(self, registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
         registers[rd] = int(registers[ra]) % 2**16
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def reverse_bytes(self, registers: list, memory: Memory, rd: int, ra: int) -> OpReturn:
+    def reverse_bytes(self, registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
         registers[rd] = int.from_bytes(
             registers[ra].to_bytes(8, "little")[::-1], "little"
         )

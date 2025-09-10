@@ -1,10 +1,10 @@
-from dataclasses import field
 from typing import List, Union, Tuple
-from tsrkit_types import Bits, Uint, structure
+from dataclasses import dataclass
+from tsrkit_types import Bits, Uint
 from tsrkit_pvm.common.extended import ExtendedList
 
 
-@structure
+@dataclass
 class Program:
     """
     Abstract base class for Program implementations.
@@ -21,7 +21,7 @@ class Program:
     instruction_set: bytes
     offset_bitmask: List
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Pre-compute and cache frequently accessed values
         self._extended_bitmask = self.offset_bitmask + [True] * 1000 # ExtendedList(self.offset_bitmask, default=True)
         self.zeta = self.instruction_set + bytes([0] * 1000) # ExtendedList(self.instruction_set, default=0)
@@ -44,7 +44,7 @@ class Program:
             total_size += Uint[self.z * 8](jump).encode_size()
         total_size += len(self.instruction_set)
         total_size += Bits[len(self.instruction_set)](self.offset_bitmask).encode_size()
-        return total_size
+        return int(total_size)
 
     def encode_into(self, buffer: bytearray, offset: int = 0) -> int:
         """Encode the program bytecode into a buffer.
@@ -54,7 +54,7 @@ class Program:
             offset: Offset of the buffer to start encoding from
         """
         total_size = self.encode_size()
-        self._check_buffer_size(buffer, total_size, offset)
+        # self._check_buffer_size(buffer, total_size, offset)  # TODO: Implement if needed
         current_offset = offset
         size = Uint[8](len(self.jump_table)).encode_into(buffer, current_offset)
         current_offset += size
@@ -74,7 +74,7 @@ class Program:
             buffer, current_offset
         )
         current_offset += size
-        return current_offset - offset
+        return int(current_offset - offset)
 
     @classmethod
     def decode_from(
@@ -135,10 +135,12 @@ class Program:
         value, _ = Program.decode_from(data)
         return value
 
-    def __repr__(self):
-        return f"Program(z={self.z}, jump_table={self.jump_table}, instruction_set={self.instruction_set}, offset_bitmask={self.offset_bitmask})"
+    def __repr__(self) -> str:
+        return f"Program(z={self.z}, jump_table={self.jump_table}, instruction_set={self.instruction_set!r}, offset_bitmask={self.offset_bitmask})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Program):
+            return NotImplemented
         return (
             self.z == other.z
             and self.jump_table == other.jump_table

@@ -1,4 +1,7 @@
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 
 from ...memory import Memory
 from ....common.status import CONTINUE
@@ -8,7 +11,12 @@ from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs1Reg2Imm(InstructionTable):
-    def get_props(self):
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+    def get_props(self) -> list[int]:
         # Cache the byte value and use bit operations for faster parsing
         byte_val = self.program.zeta[self.counter + 1]
         ra = clamp_12(byte_val & 0x0F)           # Lower 4 bits (equivalent to % 16)
@@ -22,8 +30,8 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
         start = self.counter + 2 + lx
         end = start + ly
         vy = chi(int.from_bytes(self.program.zeta[start:end], "little"), ly)
-        
-        return (ra, lx, ly, vx, vy)
+
+        return [ra, lx, ly, vx, vy]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -55,8 +63,8 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
         }
 
     @staticmethod
-    def store_imm_ind_u(bitsize: int) -> Callable[[Any, list, Memory, int, int, int, int, int], OpReturn]:
-        def store_u_impl(self, registers: list, memory: Memory, ra: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
+    def store_imm_ind_u(bitsize: int) -> Callable[["InstructionsWArgs1Reg2Imm", list[int], Memory, int, int, int, int, int], OpReturn]:
+        def store_u_impl(self: InstructionsWArgs1Reg2Imm, registers: list[int], memory: Memory, ra: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
             memory.write(
                 registers[ra] + vx,
                 int(vy % (2**bitsize)).to_bytes(bitsize // 8, "little"),

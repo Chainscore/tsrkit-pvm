@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Self, Tuple, Type
+from typing import Tuple, Type, Union
 
 from tsrkit_types.integers import Uint
 from tsrkit_types.itf.codable import Codable
@@ -28,7 +28,7 @@ class Code(Codable):
     s: int
 
     @classmethod
-    def decode_from(cls, pc: bytes) -> None | Self:
+    def decode_from(cls, pc: bytes) -> Union[None, "Code"]:
         offset = 0
         o_len, decoded = Uint[24].decode_from(pc, offset)
         offset += decoded
@@ -51,7 +51,7 @@ class Code(Codable):
         offset += c_len
         return cls(read=o, r_write=w, z=z, s=s, code=c)
 
-    def encode_size(self):
+    def encode_size(self) -> int:
         return 3 + 3 + 2 + 3 + len(self.read) + len(self.r_write) + 4 + len(self.code)
 
     def encode_into(self, buffer: bytearray, offset: int = 0) -> int:
@@ -79,7 +79,7 @@ class Code(Codable):
         return offset - start
 
 
-def regs_from_pc(args) -> list:
+def regs_from_pc(args: bytes) -> list:
     result = [0] * 13
     result[0] = 2**32 - 2**16
     result[1] = 2**32 - 2 * PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE
@@ -89,14 +89,16 @@ def regs_from_pc(args) -> list:
 
 
 def y_function(
-    bytecode: bytes, args: bytes, mode="recompiler"
-) -> Tuple[bytes, list, Memory]:
+    bytecode: bytes, args: bytes, mode: str = "recompiler"
+) -> Union[Tuple[bytes, list, Memory], None]:
     """Extract program components from bytecode.
 
     Returns:
         Tuple of (program_code, registers, memory_data)
     """
     code = Code.decode_from(bytecode)
+    if not code:
+        return None
 
     program_ = program_base.Program.decode_from(code.code)[0]
 

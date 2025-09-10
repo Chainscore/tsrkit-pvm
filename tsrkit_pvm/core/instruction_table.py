@@ -1,6 +1,9 @@
-from typing import TYPE_CHECKING, Dict, Protocol, Tuple
-from tsrkit_pvm.core.program_base import Program
+from abc import abstractmethod
+from typing import TYPE_CHECKING, Dict, List, Protocol, Tuple, Any
 from .opcode import OpCode
+
+if TYPE_CHECKING:
+    from tsrkit_pvm.interpreter.program import INT_Program
 
 
 class InstructionTable(Protocol):
@@ -10,23 +13,15 @@ class InstructionTable(Protocol):
     """
 
     counter: int
-    program: "Program"
+    program: "INT_Program" 
+    skip_index: int
 
-    # Constructor
-    def __init__(self, counter: int, program: "Program", skip_index: int):
-        self.counter = counter
-        self.program = program
-        self.skip_index = skip_index
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        ...
 
     @classmethod
-    def table(cls) -> Dict[int, OpCode]: ...
+    def table(cls) -> Dict[int, OpCode]: 
+        ...
 
-    # Execute the instruction
-    def execute(self, opcode: int, *args):
-        # Read the opcode from instruction table
-        op = self.table()[opcode]
-        # Raise an error if the opcode is not found
-        if op is None:
-            raise ValueError(f"Invalid opcode: {self.program.zeta[self.counter]}")
-        # Execute the instruction
-        return op.fn(self, *args)
+    def get_props(self) -> List[int]:
+        ...
