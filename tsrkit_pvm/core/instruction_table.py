@@ -13,14 +13,10 @@ class InstructionTable(Protocol):
     program: "Program"
 
     # Constructor
-    def __init__(self, counter: int, program: "Program"):
+    def __init__(self, counter: int, program: "Program", skip_index: int):
         self.counter = counter
         self.program = program
-        # Inline skip calculation for maximum performance
-        if hasattr(program, '_skip_cache') and counter < len(program._skip_cache):
-            self.skip_index = program._skip_cache[counter]
-        else:
-            self.skip_index = 0
+        self.skip_index = skip_index
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]: ...

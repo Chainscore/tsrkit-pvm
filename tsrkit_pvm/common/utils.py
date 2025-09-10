@@ -96,7 +96,6 @@ def b(value: int, byte_size: int, is_reversed=False) -> List[int]:
     if byte_size <= 0:
         return []
     
-    # Optimized: use bit operations and list comprehension with pre-calculated size
     bit_count = byte_size << 3  # 8 * byte_size
     result = [(value >> i) & 1 for i in range(bit_count)]
     if is_reversed:

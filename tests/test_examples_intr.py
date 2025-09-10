@@ -343,7 +343,7 @@ def test_benched_cgoi_interpreter():
     program = INT_Program.decode_from(bytecode)[0]
     regs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    gas = 100000
+    gas = 100
     start_time = time.time_ns()
     ret = PVM.execute(
         program,
