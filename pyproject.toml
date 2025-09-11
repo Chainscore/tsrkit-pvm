@@ -46,7 +46,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.13"
+python = ">=3.12,<3.13"
 tsrkit_types = { path = "../tsrkit-types", develop = true }
 tsrkit_asm = { path = "../tsrkit-asm", develop = true }
 
