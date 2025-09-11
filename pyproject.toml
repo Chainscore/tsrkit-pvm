@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "mypyc"]
+requires = ["setuptools>=61.0", "wheel", "mypy"]
 build-backend = "setuptools.build_meta"
 
 [project]
