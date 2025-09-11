@@ -1,20 +1,11 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel", "mypy"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "tsrkit-pvm"
 version = "0.1.0"
 description = "Polkadot Virtual Machine (PVM) implementation with interpreter and recompiler as specified in GP"
 readme = "README.md"
-requires-python = ">=3.11"
 license = "MIT AND (Apache-2.0 OR BSD-2-Clause)"
-authors = [
-    {name = "Chainscore Labs", email = "hello@chainscore.finance"},
-]
-maintainers = [
-    {name = "Chainscore Labs", email = "hello@chainscore.finance"},
-]
+authors = ["Chainscore Labs <hello@chainscore.finance>"]
+maintainers = ["Chainscore Labs <hello@chainscore.finance>"]
 keywords = [
     "virtual-machine",
     "pvm",
@@ -41,53 +32,53 @@ classifiers = [
     "Topic :: System :: Emulators",
     "Topic :: Software Development :: Interpreters",
 ]
-dependencies = [
-    "tsrkit-types",
-    "tsrkit-asm",
+homepage = "https://github.com/chainscore/tsrkit-pvm"
+repository = "https://github.com/chainscore/tsrkit-pvm"
+documentation = "https://github.com/chainscore/tsrkit-pvm"
+
+packages = [
+    { include = "tsrkit_pvm" }
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
-]
-test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-benchmark>=4.0.0",
-]
-docs = [
-    "sphinx>=6.0.0",
-    "sphinx-rtd-theme>=1.2.0",
-    "myst-parser>=1.0.0",
+include = [
+    { path = "tsrkit_pvm/py.typed" },
+    { path = "tsrkit_pvm/recompiler/segwrap/libsegwrap.so" }
 ]
 
-[project.urls]
-Homepage = "https://github.com/chainscore/tsrkit-pvm"
-Repository = "https://github.com/chainscore/tsrkit-pvm"
-Issues = "https://github.com/chainscore/tsrkit-pvm/issues"
-Changelog = "https://github.com/chainscore/tsrkit-pvm/blob/main/CHANGELOG.md"
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+tsrkit_types = { path = "../tsrkit-types", develop = true }
+tsrkit_asm = { path = "../tsrkit-asm", develop = true }
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["tsrkit_pvm*"]
-exclude = ["tests*"]
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0.0"
+pytest-cov = ">=4.0.0"
+black = ">=23.0.0"
+isort = ">=5.12.0"
+flake8 = ">=6.0.0"
+mypy = ">=1.0.0"
+pre-commit = ">=3.0.0"
 
-[tool.setuptools.package-data]
-"tsrkit_pvm" = ["py.typed", "recompiler/segwrap/libsegwrap.so"]
+[tool.poetry.group.test.dependencies]
+pytest = ">=7.0.0"
+pytest-cov = ">=4.0.0"
+pytest-benchmark = ">=4.0.0"
+
+[tool.poetry.group.docs.dependencies]
+sphinx = ">=6.0.0"
+sphinx-rtd-theme = ">=1.2.0"
+myst-parser = ">=1.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 88
-target-version = ['py311']
+target-version = ["py311"]
 include = '\.pyi?$'
 extend-exclude = '''
 /(
-  # directories
   \.eggs
   | \.git
   | \.hg
@@ -121,9 +112,7 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = [
-    "tsrkit_types.*",
-]
+module = ["tsrkit_types.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -156,4 +145,4 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
-] 
+]
