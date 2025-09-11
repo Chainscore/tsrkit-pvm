@@ -42,8 +42,8 @@ classifiers = [
     "Topic :: Software Development :: Interpreters",
 ]
 dependencies = [
-    "tsrkit-types>=0.1.0",
-    "tsrkit-asm>=0.1.0",
+    "tsrkit-types",
+    "tsrkit-asm",
 ]
 
 [project.optional-dependencies]
