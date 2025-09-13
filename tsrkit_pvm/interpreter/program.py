@@ -1,5 +1,5 @@
 from math import floor
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 from tsrkit_pvm.core.program_base import Program
 from ..common.constants import PVM_ADDR_ALIGNMENT
 from ..common.status import CONTINUE, HALT, PANIC, ExecutionStatus, PvmError
@@ -8,12 +8,13 @@ from .instructions.inst_map import inst_map
 
 class INT_Program(Program):
     """This is the program blob which the PVM will execute."""
-
+    
     def __post_init__(self) -> None:
         super().__post_init__()
         # Initialize instance attributes
         self._skip_cache: list[int] = []
         self._basic_blocks_set: set[int] = set()
+        self._exec_blocks: Dict[int, Any] = {}
         
         self._precompute_skip_values()
         basic_blocks = [0]

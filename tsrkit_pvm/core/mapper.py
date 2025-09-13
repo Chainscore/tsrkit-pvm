@@ -10,11 +10,13 @@ from http.client import CONTINUE
 from typing import Callable, List, Optional, Tuple, Any, Dict, Type, Union
 
 from tsrkit_pvm.core.instruction_table import InstructionTable
+from tsrkit_pvm.common.status import ExecutionStatus, PvmError, PANIC
+from tsrkit_pvm.core.opcode import OpCode
 
 
 @dataclass
 class InstructionHandler:
-    """Optimized instruction handler data."""
+    """Instruction handler data."""
 
     name: str
     fn: Callable
@@ -25,8 +27,6 @@ class InstructionHandler:
 @dataclass
 class CompiledInstruction:
     """Pre-compiled instruction with decoded operands."""
-    offset: int # Offset from start of block
-    opcode: int # Opcode of the instruction
     handler: InstructionHandler # Handler for this instruction
     args: List[int]  # Pre-decoded instruction arguments
     table: type[InstructionTable] # Table instance for this instruction
@@ -34,10 +34,8 @@ class CompiledInstruction:
 @dataclass
 class BlockInfo:
     """Compiled basic block with pre-decoded instructions."""
-    end_pc: int            # End PC; Can calculate size from end_pc - start_pc
     total_gas: int         # Total gas cost for entire block
     instructions: List[CompiledInstruction]  # Pre-compiled instructions
-    instruction_count: int  # Number of instructions in block
     
     def execute(self, program: Any, start_pc: int, registers: List[int], memory: Any) -> Tuple[Tuple[Any, int, List[int], Any], int]:
         """Execute this block starting from start_pc with given registers and memory."""
@@ -79,13 +77,12 @@ class InstMapper:
     _gas_costs: bytes = b""
     _terminating_mask: int = 0
     
-    _basic_blocks: Dict[int, BlockInfo]
+    _exec_blocks: Dict[int, BlockInfo] = {}
 
     def __init__(self, all_tables: List[type[InstructionTable]]):
         gas_tmp = [0] * 256
         term_mask = 0
         self._dispatch_table = [None] * 256
-        self._basic_blocks = {}  # Initialize block cache
         
         for table_class in all_tables:
             instruction_table = table_class.table()
@@ -121,7 +118,7 @@ class InstMapper:
         block = self.get_block(program, program_counter)
         return block.execute(program, program_counter, registers, memory)
         
-        # ---- Unoptimized ---- #
+        # ---- Unoptimized, but better if caching is program isolayted for some reason ---- #
         # handler = self._dispatch_table[program.zeta[program_counter]]
         # if handler is None:
         #     raise ValueError("Recompiler: Invalid opcode")
@@ -140,12 +137,13 @@ class InstMapper:
 
     def get_block(self, program: Any, start_pc: int) -> BlockInfo:
         """Get a compiled block from cache or compile it if not cached."""
-        if start_pc in self._basic_blocks:
-            return self._basic_blocks[start_pc]
+        if start_pc in self._exec_blocks:
+            cached_block: BlockInfo = self._exec_blocks[start_pc]
+            return cached_block
         
         # Compile the block and cache it
         block = self._compile_block(program, start_pc)
-        self._basic_blocks[start_pc] = block
+        self._exec_blocks[start_pc] = block
         return block
 
     def _compile_block(self, program: Any, start_pc: int) -> BlockInfo:
@@ -154,19 +152,8 @@ class InstMapper:
         compiled_instructions = []
         current_pc = start_pc
         total_gas = 0
-        
-        # Find the next basic block start to determine our end
-        next_block_start = None
-        for bb_start in sorted(program.basic_blocks):
-            if bb_start > start_pc:
-                next_block_start = bb_start
-                break
-        
+
         while current_pc < len(program.zeta):
-            # Stop if we've reached the next basic block boundary
-            if next_block_start and current_pc >= next_block_start:
-                break
-                
             opcode = program.zeta[current_pc]
             handler = self._dispatch_table[opcode]
             
@@ -180,8 +167,8 @@ class InstMapper:
             
             # Create compiled instruction
             compiled_inst = CompiledInstruction(
-                opcode=opcode,
-                offset=current_pc - start_pc,
+                # opcode=opcode,
+                # offset=current_pc - start_pc,
                 handler=handler,
                 args=args,
                 table=table_instance,
@@ -193,20 +180,14 @@ class InstMapper:
             # Stop at terminating instructions
             if handler.is_terminating:
                 # For terminating instructions, the end_pc should be current_pc + 1
-                end_pc = current_pc + 1
                 break
                 
             # Move to next instruction
             current_pc += 1 + skip_count
-        else:
-            # If we didn't break, set end_pc to current_pc
-            end_pc = current_pc
         
         return BlockInfo(
-            end_pc=end_pc,
             total_gas=total_gas,
             instructions=compiled_instructions,
-            instruction_count=len(compiled_instructions)
         )
 
     def execute_block(self, block: BlockInfo, program: Any, initial_pc: int, 

@@ -24,7 +24,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-*darwin.so
+/tsrkit_pvm/interpreter/**/*.so
+/tsrkit_pvm/core/**/*.so
+/tsrkit_pvm/common/**/*.so
+/tsrkit_pvm/cpvm/**/*.c
+/tsrkit_pvm/cpvm/**/*.so
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

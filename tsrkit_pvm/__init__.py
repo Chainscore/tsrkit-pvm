@@ -37,9 +37,26 @@ from .interpreter.memory import INT_Memory
 from .interpreter.program import INT_Program
 from .interpreter.pvm import Interpreter
 
-# from .recompiler.memory import REC_Memory
-# from .recompiler.program import REC_Program
-# from .recompiler.pvm import Recompiler
+# Try to import recompiler if available
+try:
+    from .recompiler.memory import REC_Memory
+    from .recompiler.program import REC_Program
+    from .recompiler.pvm import Recompiler
+    _HAS_RECOMPILER = True
+except (ImportError, OSError):
+    REC_Memory = None
+    REC_Program = None
+    Recompiler = None
+    _HAS_RECOMPILER = False
+
+# Try to import Cython PVM if available
+try:
+    from .cpvm.cy_pvm import CyInterpreter
+    _HAS_CYTHON = True
+    print("🚀 Using Cython-optimized PVM")
+except ImportError:
+    CyInterpreter = None
+    _HAS_CYTHON = False
 
 __all__ = [
     # Core
@@ -52,9 +69,10 @@ __all__ = [
     "INT_Memory",
     "INT_Program",
     "Interpreter",
-    # "REC_Memory",
-    # "REC_Program",
-    # "Recompiler",
+    "REC_Memory",
+    "REC_Program",
+    "Recompiler",
+    "CyInterpreter",
     # Common constants
     "PVM_ADDR_ALIGNMENT",
     "PVM_INIT_DATA_SIZE",
