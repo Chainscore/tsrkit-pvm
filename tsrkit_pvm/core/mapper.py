@@ -17,12 +17,8 @@ from tsrkit_pvm.core.opcode import OpCode
 @dataclass
 class InstructionHandler:
     """Instruction handler data."""
-
-    name: str
-    fn: Callable
-    gas_cost: int
-    is_terminating: bool
-    table_class: type  # For creating table instances when needed
+    op_data: OpCode
+    table_class: type
 
 @dataclass
 class CompiledInstruction:
@@ -46,7 +42,7 @@ class BlockInfo:
         
         for i, compiled_inst in enumerate(self.instructions):
             # Execute the instruction with pre-decoded arguments
-            result = compiled_inst.handler.fn(
+            result = compiled_inst.handler.op_data.fn(
                 compiled_inst.table, current_registers, current_memory, *compiled_inst.args
             )
             
@@ -54,7 +50,7 @@ class BlockInfo:
             status, next_pc, current_registers, current_memory = result
             
             # If instruction terminates execution, return immediately
-            if compiled_inst.handler.is_terminating:
+            if compiled_inst.handler.op_data.is_terminating:
                 return (status, next_pc, current_registers, current_memory), self.total_gas
             
             if status != CONTINUE:
@@ -77,7 +73,7 @@ class InstMapper:
     _gas_costs: bytes = b""
     _terminating_mask: int = 0
     
-    _exec_blocks: Dict[int, BlockInfo] = {}
+    _exec_blocks: Dict[int, BlockInfo]
 
     def __init__(self, all_tables: List[type[InstructionTable]]):
         gas_tmp = [0] * 256
@@ -89,10 +85,7 @@ class InstMapper:
 
             for opcode, op_code in instruction_table.items():
                 handler = InstructionHandler(
-                    name=op_code.name,
-                    fn=op_code.fn,
-                    gas_cost=op_code.gas,
-                    is_terminating=op_code.is_terminating,
+                    op_data=op_code,
                     table_class=table_class,
                 )
                 self._dispatch_table[opcode] = handler
@@ -103,6 +96,7 @@ class InstMapper:
 
         self._gas_costs = bytes(gas_tmp)
         self._terminating_mask = term_mask
+        self._exec_blocks = {}
 
     def process_instruction(
         self, program: Any, program_counter: int, registers: List[int], memory: Any
@@ -129,21 +123,25 @@ class InstMapper:
 
     def get_gas_cost(self, opcode: int) -> int:
         """Get gas cost for an opcode with direct lookup - no dictionary access."""
-        return self._gas_costs[opcode]
+        opc = self._dispatch_table[opcode]
+        if opc is None:
+            raise PvmError(PANIC, f"Invalid opcode: {opcode}")
+        return opc.op_data.gas
 
     def is_terminating(self, opcode: int) -> bool:
         """Check if an opcode is terminating with direct lookup."""
-        return bool((self._terminating_mask >> opcode) & 1)
+        opc = self._dispatch_table[opcode]
+        if opc is None:
+            return True
+        return opc.op_data.is_terminating
 
     def get_block(self, program: Any, start_pc: int) -> BlockInfo:
         """Get a compiled block from cache or compile it if not cached."""
-        if start_pc in self._exec_blocks:
-            cached_block: BlockInfo = self._exec_blocks[start_pc]
-            return cached_block
-        
-        # Compile the block and cache it
-        block = self._compile_block(program, start_pc)
-        self._exec_blocks[start_pc] = block
+        try:
+            block = self._exec_blocks[start_pc]
+        except KeyError:
+            block = self._compile_block(program, start_pc)
+            self._exec_blocks[start_pc] = block
         return block
 
     def _compile_block(self, program: Any, start_pc: int) -> BlockInfo:
@@ -153,7 +151,7 @@ class InstMapper:
         current_pc = start_pc
         total_gas = 0
 
-        while current_pc < len(program.zeta):
+        while True:
             opcode = program.zeta[current_pc]
             handler = self._dispatch_table[opcode]
             
@@ -167,18 +165,16 @@ class InstMapper:
             
             # Create compiled instruction
             compiled_inst = CompiledInstruction(
-                # opcode=opcode,
-                # offset=current_pc - start_pc,
                 handler=handler,
                 args=args,
                 table=table_instance,
             )
             
             compiled_instructions.append(compiled_inst)
-            total_gas += handler.gas_cost
+            total_gas += handler.op_data.gas
             
             # Stop at terminating instructions
-            if handler.is_terminating:
+            if handler.op_data.is_terminating:
                 # For terminating instructions, the end_pc should be current_pc + 1
                 break
                 
@@ -189,37 +185,3 @@ class InstMapper:
             total_gas=total_gas,
             instructions=compiled_instructions,
         )
-
-    def execute_block(self, block: BlockInfo, program: Any, initial_pc: int, 
-                     registers: List[int], memory: Any) -> Tuple[Tuple[Any, int, List[int], Any], int]:
-        """Execute a compiled block in a tight loop."""
-        current_pc = initial_pc
-        current_registers = registers
-        current_memory = memory
-        status = None
-        
-        # Process all instructions in the block
-        for i, compiled_inst in enumerate(block.instructions):
-            # Create table instance for this instruction with the current PC
-            table_instance = compiled_inst.handler.table_class(
-                counter=current_pc, program=program
-            )
-            
-            # Execute the instruction with pre-decoded arguments
-            result = compiled_inst.handler.fn(
-                table_instance, current_registers, current_memory, *compiled_inst.args
-            )
-            
-            # Unpack result (status, pc, registers, memory)
-            status, next_pc, current_registers, current_memory = result
-            
-            # If instruction terminates execution, return immediately
-            if compiled_inst.handler.is_terminating:
-                return (status, next_pc, current_registers, current_memory), block.total_gas
-            
-            # For non-terminating instructions, advance PC normally
-            # The instruction handler should have set the correct next PC
-            current_pc = next_pc
-                
-        # Block completed normally (shouldn't happen as blocks end with terminating instructions)
-        return (status, current_pc, current_registers, current_memory), block.total_gas

@@ -13,7 +13,8 @@ from tsrkit_pvm.recompiler.program import REC_Program
 from tsrkit_pvm.recompiler.memory import REC_Memory
 from tsrkit_pvm.interpreter.program import INT_Program
 from tsrkit_pvm.interpreter.memory import INT_Memory
-from ..cpvm.cy_memory import CyMemory
+from tsrkit_pvm import _HAS_RECOMPILER
+# from ..cpvm.cy_memory import CyMemory
 
 _PVM_MODE = os.environ.get("PVM_MODE", "interpreter")
 
@@ -104,7 +105,7 @@ def y_function(
         return None
 
     
-    if _PVM_MODE == "recompiler":
+    if _PVM_MODE == "recompiler" and _HAS_RECOMPILER:
         program_ = REC_Program.decode_from(code.code)[0]
         memory = REC_Memory.from_pc(
             code.read,
@@ -114,19 +115,21 @@ def y_function(
             code.s,
             VMContext.calculate_size(len(program_.jump_table)),
         )
-    elif _PVM_MODE == "cython":
-        program_ = INT_Program.decode_from(code.code)[0]
-        memory = CyMemory.from_pc(
-            code.read,
-            code.r_write,
-            args,
-            code.z,
-            code.s,
-        )
-    else:
+    # elif _PVM_MODE == "cython":
+    #     program_ = INT_Program.decode_from(code.code)[0]
+    #     memory = CyMemory.from_pc(
+    #         code.read,
+    #         code.r_write,
+    #         args,
+    #         code.z,
+    #         code.s,
+    #     )
+    elif _PVM_MODE == "interpreter":
         # For interpreter, cython, or any other mode, use interpreter memory/program
         program_ = INT_Program.decode_from(code.code)[0]
         memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
+    else:
+        raise ValueError(f"PVM_MODE {_PVM_MODE} not supported")
 
     return (
         program_,

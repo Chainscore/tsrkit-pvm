@@ -160,8 +160,8 @@ class INT_Memory:
             
             # Fast single-page read
             page_off = address & _PAGE_MASK
-            src_page = self._page_cache.get(pg) or self._pages.get(pg) or _ZERO_PAGE
-            if src_page is not _ZERO_PAGE and isinstance(src_page, bytearray) and len(self._page_cache) < 16 and pg not in self._page_cache:
+            src_page = self._page_cache.get(pg) or self._pages.get(pg) or bytearray(PAGE_SIZE)
+            if src_page is not _ZERO_PAGE and pg not in self._page_cache:
                 self._page_cache[pg] = src_page
             return bytes(src_page[page_off : page_off + length])
 
@@ -186,8 +186,8 @@ class INT_Memory:
             if cached_page is not None:
                 page_data: Union[bytearray, bytes] = cached_page
             else:
-                page_data = self._pages.get(pg) or _ZERO_PAGE
-                if page_data is not _ZERO_PAGE and isinstance(page_data, bytearray) and len(self._page_cache) < 16:
+                page_data = self._pages.get(pg) or bytearray(PAGE_SIZE)
+                if page_data is not _ZERO_PAGE and len(self._page_cache) < 16:
                     self._page_cache[pg] = page_data
             
             # Fast memory copy

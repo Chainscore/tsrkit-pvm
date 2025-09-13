@@ -63,7 +63,7 @@ if __name__ == "__main__":
             # "tsrkit_pvm/common/status.py",
             # "tsrkit_pvm/common/constants.py",
             # "tsrkit_pvm/core/code.py",
-            "tsrkit_pvm/core/mapper.py",
+            # "tsrkit_pvm/core/mapper.py",
             # "tsrkit_pvm/interpreter/pvm.py",
             # "tsrkit_pvm/interpreter/program.py",
             # "tsrkit_pvm/interpreter/memory.py",

@@ -53,7 +53,10 @@ class INT_Program(Program):
             Distance to the next opcode.
         """
         # Direct list access is faster than dict.get()
-        return self._skip_cache[pc] if pc < len(self._skip_cache) else 0
+        try: 
+            return self._skip_cache[pc]
+        except IndexError:
+            return 0
 
     def branch(
         self, counter: int, branch: int, condition: bool

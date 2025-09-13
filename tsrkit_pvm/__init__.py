@@ -73,6 +73,8 @@ __all__ = [
     "REC_Program",
     "Recompiler",
     "CyInterpreter",
+    "_HAS_RECOMPILER",
+    "_HAS_CYTHON",
     # Common constants
     "PVM_ADDR_ALIGNMENT",
     "PVM_INIT_DATA_SIZE",

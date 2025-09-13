@@ -1,5 +1,6 @@
 """Common utilities shared across PVM implementations."""
 
+import operator
 from .constants import PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
 from math import ceil
 import math
@@ -90,18 +91,31 @@ def z_inv(x: int, n: int) -> int:
     return (modulus + x) & (modulus - 1)  # equivalent to % 2**(8*n)
 
 
+BYTE_TO_BITS = [tuple(((b >> i) & 1) for i in range(8)) for b in range(256)]
+BYTES_TO_BYTE = {bytes(bits): b for b, bits in enumerate(BYTE_TO_BITS)}
+
 def b(value: int, byte_size: int, is_reversed: bool = False) -> List[int]:
     """Convert integer to list of bits."""
-    # Handle edge case where byte_size is 0
     if byte_size <= 0:
         return []
-    
-    bit_count = byte_size << 3  # 8 * byte_size
-    result = [(value >> i) & 1 for i in range(bit_count)]
-    if is_reversed:
-        result.reverse()
-    return result
 
+    bit_count = byte_size << 3
+    out = [0] * bit_count  # preallocate list of correct size
+
+    if not is_reversed:
+        for byte_index in range(byte_size):
+            byte = (value >> (byte_index * 8)) & 0xFF
+            bits = BYTE_TO_BITS[byte]
+            base = byte_index * 8
+            out[base:base+8] = bits
+    else:
+        for byte_index in range(byte_size):
+            byte = (value >> (byte_index * 8)) & 0xFF
+            bits = BYTE_TO_BITS[byte][::-1]
+            base = bit_count - (byte_index+1)*8
+            out[base:base+8] = bits
+
+    return out
 
 def b_inv(value: List[int], is_reversed: bool = False) -> int:
     """Convert list of bits to integer."""
@@ -120,15 +134,15 @@ def b_inv(value: List[int], is_reversed: bool = False) -> int:
 
 # Pre-computed comparison operations lookup table for performance
 _COMPARISON_OPS = {
-    'eq': lambda a, b: a == b,
-    'ne': lambda a, b: a != b, 
-    'lt': lambda a, b: a < b,
-    'le': lambda a, b: a <= b,
-    'gt': lambda a, b: a > b,
-    'ge': lambda a, b: a >= b,
-    'and': lambda a, b: a & b,
-    'or': lambda a, b: a | b,
-    'xor': lambda a, b: a ^ b,
+    'eq' : operator.eq,
+    'ne' : operator.ne,
+    'lt' : operator.lt,
+    'le' : operator.le,
+    'gt' : operator.gt,
+    'ge' : operator.ge,
+    'and': operator.and_,
+    'or' : operator.or_,
+    'xor': operator.xor,
 }
 
 def compare(a: Union[int, bool], b: Union[int, bool], op: str) -> Any:
@@ -139,7 +153,6 @@ def compare(a: Union[int, bool], b: Union[int, bool], op: str) -> Any:
     
     # Fallback to dynamic lookup for less common operations
     return getattr(a, f"__{op}__")(b)
-
 
 def compare_bits_vectorized(bits_a: List[Union[int, bool]], bits_b: List[int], op: str) -> List[int]:
     """Vectorized bit comparison for 64-bit operations - much faster than loop."""
