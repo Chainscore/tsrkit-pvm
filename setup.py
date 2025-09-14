@@ -55,54 +55,48 @@ if __name__ == "__main__":
         # Use existing MyPyC compilation
         from mypyc.build import mypycify
         from pathlib import Path
+        import glob
         
         print("MyPyC compilation requested...")
         
-        target_files = [
-            # "tsrkit_pvm/common/utils.py",
-            # "tsrkit_pvm/common/status.py",
-            # "tsrkit_pvm/common/constants.py",
-            # "tsrkit_pvm/core/code.py",
-            # "tsrkit_pvm/core/mapper.py",
-            # "tsrkit_pvm/interpreter/pvm.py",
-            # "tsrkit_pvm/interpreter/program.py",
-            # "tsrkit_pvm/interpreter/memory.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/wo_args.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/i_imm.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/i_offset.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/i_reg_i_ewimm.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/i_reg_i_imm.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/i_reg_ii_imm.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/i_reg_i_imm_i_offset.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/ii_imm.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/ii_reg.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/ii_reg_i_imm.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/ii_reg_i_offset.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/ii_reg_ii_imm.py",
-            # "tsrkit_pvm/interpreter/instructions/tables/iii_reg.py",
+        # Collect targets
+        core_files = [
+            "tsrkit_pvm/common/utils.py",
+            "tsrkit_pvm/common/status.py",
+            "tsrkit_pvm/common/constants.py",
+            "tsrkit_pvm/core/code.py",
+            "tsrkit_pvm/core/opcode.py",
         ]
-        
-        # Try MyPyC compilation
-        ext_modules = []
-        compiled_count = 0
-        failed_count = 0
-        
-        for py_file in target_files:
-            try:
-                print(f"Compiling {py_file}...")
-                mypycified = mypycify([py_file], opt_level="3")
-                if mypycified:
-                    ext_modules.extend(mypycified)
-                    compiled_count += 1
-                    print(f"✓ Successfully compiled {py_file}")
-                else:
+        recompiler_files = [
+            *glob.glob("tsrkit_pvm/recompiler/**/*.py", recursive=True),
+            *glob.glob("tsrkit_pvm/interpreter/**/*.py", recursive=True),
+        ]
+        recompiler_files = [f for f in recompiler_files if not f.endswith("__init__.py")]
+        target_files = core_files + recompiler_files
+
+        try:
+            # Compile each file individually to avoid a top-level hashed __mypyc support module
+            ext_modules = []
+            compiled_count = 0
+            failed_count = 0
+            for py_file in target_files:
+                try:
+                    print(f"Compiling {py_file}...")
+                    mods = mypycify([py_file], opt_level="3")
+                    if mods:
+                        ext_modules.extend(mods)
+                        compiled_count += 1
+                        print(f"✓ Successfully compiled {py_file}")
+                    else:
+                        failed_count += 1
+                        print(f"✗ Failed to compile {py_file}")
+                except Exception as ce:
                     failed_count += 1
-                    print(f"✗ Failed to compile {py_file}")
-            except Exception as e:
-                failed_count += 1
-                print(f"✗ Error compiling {py_file}: {e}")
-        
-        print(f"\nMyPyC compilation summary: {compiled_count} succeeded, {failed_count} failed")
+                    print(f"✗ Error compiling {py_file}: {ce}")
+            print(f"\nMyPyC compilation summary: {compiled_count} succeeded, {failed_count} failed")
+        except Exception as e:
+            print(f"✗ Failed to configure MyPyC: {e}")
+            ext_modules = []
     
     setup(
         name="tsrkit_pvm",

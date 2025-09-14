@@ -25,10 +25,12 @@ share/python-wheels/
 MANIFEST
 
 /tsrkit_pvm/interpreter/**/*.so
+/tsrkit_pvm/recompiler/**/*.so
 /tsrkit_pvm/core/**/*.so
 /tsrkit_pvm/common/**/*.so
 /tsrkit_pvm/cpvm/**/*.c
 /tsrkit_pvm/cpvm/**/*.so
+*.so
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

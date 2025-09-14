@@ -8,12 +8,10 @@ from tsrkit_pvm.recompiler.vm_context import VMContext
 
 from ..common.constants import PVM_INIT_DATA_SIZE, PVM_INIT_ZONE_SIZE
 
-# Import both classes to avoid MyPyC issues with conditional imports
-from tsrkit_pvm.recompiler.program import REC_Program
-from tsrkit_pvm.recompiler.memory import REC_Memory
+from ..recompiler.program import REC_Program
+from ..recompiler.memory import REC_Memory
 from tsrkit_pvm.interpreter.program import INT_Program
 from tsrkit_pvm.interpreter.memory import INT_Memory
-from tsrkit_pvm import _HAS_RECOMPILER
 # from ..cpvm.cy_memory import CyMemory
 
 _PVM_MODE = os.environ.get("PVM_MODE", "interpreter")
@@ -105,7 +103,7 @@ def y_function(
         return None
 
     
-    if _PVM_MODE == "recompiler" and _HAS_RECOMPILER:
+    if _PVM_MODE == "recompiler":
         program_ = REC_Program.decode_from(code.code)[0]
         memory = REC_Memory.from_pc(
             code.read,

@@ -31,6 +31,7 @@ struct pg_data {
 
 static struct pg_data program_status;
 static uint64_t host_call_offset = 1000;
+static int syscall_handler_initialized = 0;  // Track initialization state
 
 static void syscall_handler(int sig, siginfo_t *si, void *ctx_) {
   fflush(stdout);
@@ -125,6 +126,11 @@ int get_program_status(struct pg_data *out) {
 
 // --- Handlers --- //
 int init_syscall_handler(void) {
+    // Check if already initialized
+    if (syscall_handler_initialized) {
+        return 0;  // Already set up, no need to do it again
+    }
+    
     fflush(stdout);
     
     // Set up signal handler first
@@ -172,6 +178,7 @@ int init_syscall_handler(void) {
         return -3;
     }
     
+    syscall_handler_initialized = 1;  // Mark as initialized
     return 0;
 }
 
@@ -200,9 +207,16 @@ int init_segill_handler(void) {
 
 // --- Main Initializer --- // 
 int initialize(void) {
-  init_segv_handler();
-  init_segill_handler();
-  init_syscall_handler();
+  int segv_result = init_segv_handler();
+  if (segv_result != 0) return segv_result;
+  
+  int sill_result = init_segill_handler();  
+  if (sill_result != 0) return sill_result;
+  
+  int syscall_result = init_syscall_handler();
+  if (syscall_result != 0) return syscall_result;
+  
+  return 0;
 }
 
 // --- Cleanup Helper --- //
@@ -210,4 +224,5 @@ void cleanup(void) {
   signal(SIGSEGV, SIG_DFL);
   signal(SIGILL, SIG_DFL);
   signal(SIGSYS, SIG_DFL);
+  syscall_handler_initialized = 0;  // Reset initialization state
 }

@@ -1,9 +1,7 @@
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Dict, List, Protocol, Tuple, Any
 from .opcode import OpCode
-
-if TYPE_CHECKING:
-    from tsrkit_pvm.interpreter.program import INT_Program
+from .program_base import Program
 
 
 class InstructionTable(Protocol):
@@ -13,15 +11,15 @@ class InstructionTable(Protocol):
     """
 
     counter: int
-    program: "INT_Program" 
+    program: Program
     skip_index: int
 
-    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+    def __init__(self, counter: int, program: Program, skip_index: int) -> None:
         ...
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]: 
         ...
 
-    def get_props(self) -> List[int]:
+    def get_props(self) -> Any:
         ...

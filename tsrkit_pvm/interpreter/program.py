@@ -16,7 +16,18 @@ class INT_Program(Program):
         self._basic_blocks_set: set[int] = set()
         self._exec_blocks: Dict[int, Any] = {}
         
-        self._precompute_skip_values()
+        # Pre-compute skip values for all positions to eliminate runtime overhead.
+        bitmask_len = len(self.offset_bitmask)
+        self._skip_cache = [0] * bitmask_len
+        
+        for i in range(bitmask_len):
+            skip_value = bitmask_len
+            for j in range(i + 1, bitmask_len + 1):
+                if self._extended_bitmask[j]:
+                    skip_value = j - i - 1
+                    break
+            self._skip_cache[i] = min(24, skip_value)
+            
         basic_blocks = [0]
         for n in range(len(self.instruction_set)):
             if (
@@ -29,20 +40,8 @@ class INT_Program(Program):
         
         self.basic_blocks = basic_blocks
         self._basic_blocks_set = set(self.basic_blocks)
-
-    def _precompute_skip_values(self) -> None:
-        """Pre-compute skip values for all positions to eliminate runtime overhead."""
-        # Use list instead of dict for faster indexed access
-        bitmask_len = len(self.offset_bitmask)
-        self._skip_cache = [0] * bitmask_len
+        self.jump_table_len = len(self.jump_table)
         
-        for i in range(bitmask_len):
-            skip_value = bitmask_len
-            for j in range(i + 1, bitmask_len + 1):
-                if self._extended_bitmask[j]:
-                    skip_value = j - i - 1
-                    break
-            self._skip_cache[i] = min(24, skip_value)
 
     def skip(self, pc: int) -> int:
         """
@@ -73,7 +72,7 @@ class INT_Program(Program):
         index = floor(a // PVM_ADDR_ALIGNMENT) - 1
         if (
             a == 0
-            or index > len(self.jump_table)
+            or index >= self.jump_table_len
             or a % PVM_ADDR_ALIGNMENT != 0
             or self.jump_table[index] not in self._basic_blocks_set
         ):

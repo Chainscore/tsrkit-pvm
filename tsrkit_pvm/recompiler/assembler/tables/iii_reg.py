@@ -1,11 +1,22 @@
 from typing import Any, Callable, Dict, TYPE_CHECKING
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode
+from ....core.program_base import Program
+
+if TYPE_CHECKING:
+    from ...program import REC_Program
+
 from ...vm_context import r_map, TEMP_REG
 from tsrkit_asm import RegSize, RegMem, Operands, Reg, Condition, Size, ImmKind, MemOp
 
 
 class InstructionsWArgs3Reg(InstructionTable):
+    def __init__(self, counter: int, program: Program, skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+
     def get_props(self):
         ra = min(12, self.program.zeta[self.counter + 1] % 16)
         rb = min(12, self.program.zeta[self.counter + 1] // 16)

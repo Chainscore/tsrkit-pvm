@@ -1,12 +1,21 @@
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 
 from tsrkit_pvm.common.utils import z
 
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode
+from ....core.program_base import Program
+
+if TYPE_CHECKING:
+    from ...program import REC_Program
 
 
 class WArgsOneOffset(InstructionTable):
+    def __init__(self, counter: int, program: Program, skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
     def get_props(self):
         lx = min(4, self.skip_index)
         start = self.counter + 1

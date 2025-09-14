@@ -63,8 +63,9 @@ class Program:
         current_offset += size
         size = Uint(len(self.instruction_set)).encode_into(buffer, current_offset)
         current_offset += size
+        JumpInt = Uint[self.z * 8]
         for jump in self.jump_table:
-            size = Uint[self.z * 8](jump).encode_into(buffer, current_offset)
+            size = JumpInt(jump).encode_into(buffer, current_offset)
             current_offset += size
 
         buffer[current_offset : current_offset + len(self.instruction_set)] = (

@@ -24,6 +24,7 @@ class REC_Memory:
     heap_start = 0
     _r_pages: set[int]  # Track readable pages
     _w_pages: set[int]  # Track writable pages
+    _closed = False  # Track if memory has been closed
 
     def __init__(self, vm_size: int, heap_start=0):
         """
@@ -40,6 +41,20 @@ class REC_Memory:
         self.heap_start = heap_start
         self._r_pages = set()
         self._w_pages = set()
+        self._closed = False
+
+    def close(self):
+        """Close the memory mapping and clean up resources"""
+        if not self._closed and hasattr(self, 'buf'):
+            try:
+                self.buf.close()
+                self._closed = True
+            except:
+                pass  # Ignore errors during cleanup
+
+    def __del__(self):
+        """Ensure cleanup on garbage collection"""
+        self.close()
 
     @classmethod
     def from_initial(cls, initial_page_map: list, initial_data: list, vm_size: int):
@@ -195,7 +210,6 @@ class REC_Memory:
         mem._r_pages.update(read_pages)
         mem._w_pages.update(write_pages)
 
-        print("r", mem._r_pages, "w", mem._w_pages)
         return mem
 
     def is_accessible(self, address: int, length: int, access: Accessibility = Accessibility.READ) -> bool:
@@ -245,7 +259,3 @@ class REC_Memory:
             raise IndexError(
                 f"Memory write out of bounds: address={address}, length={length}"
             ) from e
-
-
-# Alias for compatibility
-GuestMemory = REC_Memory

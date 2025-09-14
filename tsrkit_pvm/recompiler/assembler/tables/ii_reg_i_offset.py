@@ -1,13 +1,24 @@
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, TYPE_CHECKING
 
 from tsrkit_pvm.common.utils import z
 from tsrkit_asm import Operands, Condition, RegMem, Size
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode
+from ....core.program_base import Program
+
+if TYPE_CHECKING:
+    from ...program import REC_Program
+
 from ...vm_context import r_map
 
 
 class InstructionsWArgs2Reg1Offset(InstructionTable):
+    def __init__(self, counter: int, program: Program, skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+
     def get_props(self):
         ra = min(12, int(self.program.zeta[self.counter + 1]) % 16)
         rb = min(12, int(self.program.zeta[self.counter + 1]) // 16)

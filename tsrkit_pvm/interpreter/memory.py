@@ -158,11 +158,19 @@ class INT_Memory:
                     self.logger.debug(f"Not allowed to read {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
             
-            # Fast single-page read
+            # Single-page read with reduced dict lookups
             page_off = address & _PAGE_MASK
-            src_page = self._page_cache.get(pg) or self._pages.get(pg) or bytearray(PAGE_SIZE)
-            if src_page is not _ZERO_PAGE and pg not in self._page_cache:
-                self._page_cache[pg] = src_page
+            
+            # Try cache first, then pages, with single lookup pattern
+            src_page = self._page_cache.get(pg)
+            if src_page is None:
+                src_page = self._pages.get(pg)
+                if src_page is None:
+                    src_page = bytearray(PAGE_SIZE)
+                else:
+                    # Cache the page for future access
+                    self._page_cache[pg] = src_page
+            
             return bytes(src_page[page_off : page_off + length])
 
         # Multi-page path (less common)
@@ -215,14 +223,18 @@ class INT_Memory:
                     self.logger.debug(f"Not allowed to write {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
             
-            # Fast single-page write
+            # Optimized single-page write with reduced dict lookups
             page_off = address & _PAGE_MASK
+            
+            # Try cache first, then pages, with single lookup pattern
             dst_page = self._page_cache.get(pg)
             if dst_page is None:
                 dst_page = self._pages.get(pg)
                 if dst_page is None:
                     dst_page = bytearray(PAGE_SIZE)
                     self._pages[pg] = dst_page
+                # Always cache pages we write to
+                self._page_cache[pg] = dst_page
                 if len(self._page_cache) < 16:
                     self._page_cache[pg] = dst_page
             
