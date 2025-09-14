@@ -68,7 +68,13 @@ if __name__ == "__main__":
             "tsrkit_pvm/core/opcode.py",
         ]
         recompiler_files = [
-            *glob.glob("tsrkit_pvm/recompiler/**/*.py", recursive=True),
+            *glob.glob("tsrkit_pvm/recompiler/assembler/tables/*.py", recursive=True),
+            "tsrkit_pvm/recompiler/assembler/inst_map.py",
+            "tsrkit_pvm/recompiler/assembler/utils.py",
+            "tsrkit_pvm/recompiler/memory.py",
+            "tsrkit_pvm/recompiler/program.py",
+            "tsrkit_pvm/recompiler/vm_context.py",
+            "tsrkit_pvm/interpreter/pvm.py",
             *glob.glob("tsrkit_pvm/interpreter/**/*.py", recursive=True),
         ]
         recompiler_files = [f for f in recompiler_files if not f.endswith("__init__.py")]
