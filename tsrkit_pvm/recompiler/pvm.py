@@ -37,8 +37,6 @@ from ..common.status import PANIC, HALT, PAGE_FAULT, HOST, OUT_OF_GAS, Execution
 # NOTE: Python's signal mod can only handle signals at high lvl
 # Its handlers run on main thread only
 # C's sigaction provides a better low level handler
-
-# Use importlib.resources for robust path resolution that works with mypyc
 try:
     from importlib.resources import files
     segwrap_package = files('tsrkit_pvm.recompiler.segwrap')
@@ -55,7 +53,6 @@ try:
         print("Warning: segwrap library loaded but missing expected symbols")
         
 except (ImportError, OSError, Exception) as e:
-    print(f"Warning: Could not load segwrap library: {e}")
     segwrap = None
     _segwrap_available = False
 

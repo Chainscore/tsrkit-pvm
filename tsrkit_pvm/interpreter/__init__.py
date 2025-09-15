@@ -21,7 +21,6 @@ PVM_MODE = os.environ.get("PVM_MODE", "mypyc").lower()
 if PVM_MODE == "cython":
     try:
         from .cy_pvm import Interpreter as PVM
-        print("🚀 Using Cython-optimized PVM")
     except ImportError as e:
         print(f"⚠️  Cython PVM not available ({e}), falling back to standard interpreter")
         from .pvm import Interpreter as PVM

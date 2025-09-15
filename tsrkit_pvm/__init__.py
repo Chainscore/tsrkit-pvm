@@ -53,7 +53,6 @@ except (ImportError, OSError):
 try:
     from .cpvm.cy_pvm import CyInterpreter
     _HAS_CYTHON = True
-    print("🚀 Using Cython-optimized PVM")
 except ImportError:
     CyInterpreter = None
     _HAS_CYTHON = False
