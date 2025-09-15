@@ -74,7 +74,7 @@ if __name__ == "__main__":
             "tsrkit_pvm/recompiler/memory.py",
             "tsrkit_pvm/recompiler/program.py",
             "tsrkit_pvm/recompiler/vm_context.py",
-            "tsrkit_pvm/interpreter/pvm.py",
+            "tsrkit_pvm/recompiler/pvm.py",
             *glob.glob("tsrkit_pvm/interpreter/**/*.py", recursive=True),
         ]
         recompiler_files = [f for f in recompiler_files if not f.endswith("__init__.py")]

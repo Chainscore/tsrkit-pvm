@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Sequence, TYPE_CHECKING, Optional, Union, Any
 from typing_extensions import Self
+from bitarray import bitarray
 from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.common.utils import get_pages, total_page_size, total_zone_size
 from tsrkit_pvm.common.constants import (
@@ -22,6 +23,8 @@ _ADDR_MASK = ADDR_MOD - 1  # For fast address normalization
 # Pre-allocated zero page for reads from unallocated memory
 _ZERO_PAGE = bytes(PAGE_SIZE)
 
+MAX_PAGES = 1 << 20  # 1M pages for 4GB address space
+
 
 class INT_Memory:
     """
@@ -41,9 +44,19 @@ class INT_Memory:
         allowed_read_pages = allowed_read_pages or []
         allowed_write_pages = allowed_write_pages or []
         
-        # Use optimized set implementation for better performance than bitsets for sparse access
-        self._r_pages: set[int] = set(allowed_read_pages)
-        self._w_pages: set[int] = set(allowed_write_pages)
+        # Use bitarray for efficient permission tracking
+        self._r_pages: bitarray = bitarray(MAX_PAGES)
+        self._r_pages.setall(0)
+        self._w_pages: bitarray = bitarray(MAX_PAGES)
+        self._w_pages.setall(0)
+        
+        # Set initial permissions
+        for pg in allowed_read_pages:
+            if pg < MAX_PAGES:
+                self._r_pages[pg] = 1
+        for pg in allowed_write_pages:
+            if pg < MAX_PAGES:
+                self._w_pages[pg] = 1
         
         self.logger = logger
 
@@ -120,19 +133,21 @@ class INT_Memory:
         return ba
 
     def _assert_access(self, addr: int, *, write: bool = False) -> None:
-        """Optimized access check."""
+        """Optimized access check with bitarray."""
         if addr < LOW_BOUND:
             raise Exception(f"Memory panic: address {addr} < {LOW_BOUND}")
         
         pg = addr >> _PAGE_SHIFT
+        if pg >= MAX_PAGES:
+            raise PvmError(PAGE_FAULT(addr))
         
         if write:
-            if pg not in self._w_pages:
+            if not self._w_pages[pg]:
                 if self.logger:
                     self.logger.debug(f"Not allowed to write {addr}(Page={pg})")
                 raise PvmError(PAGE_FAULT(addr))
         else:
-            if pg not in self._r_pages and pg not in self._w_pages:
+            if not (self._r_pages[pg] or self._w_pages[pg]):
                 if self.logger:
                     self.logger.debug(f"Not allowed to read {addr}(Page={pg})")
                 raise PvmError(PAGE_FAULT(addr))
@@ -153,7 +168,7 @@ class INT_Memory:
         if (address >> _PAGE_SHIFT) == ((end - 1) >> _PAGE_SHIFT):
             pg = address >> _PAGE_SHIFT
             # Inline permission check for speed
-            if pg not in self._r_pages and pg not in self._w_pages:
+            if pg >= MAX_PAGES or not (self._r_pages[pg] or self._w_pages[pg]):
                 if self.logger:
                     self.logger.debug(f"Not allowed to read {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
@@ -184,7 +199,7 @@ class INT_Memory:
             chunk = min(PAGE_SIZE - page_off, end - address)
 
             # Inline permission check for speed
-            if pg not in self._r_pages and pg not in self._w_pages:
+            if pg >= MAX_PAGES or not (self._r_pages[pg] or self._w_pages[pg]):
                 if self.logger:
                     self.logger.debug(f"Not allowed to read {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
@@ -218,7 +233,7 @@ class INT_Memory:
         if (address >> _PAGE_SHIFT) == ((end - 1) >> _PAGE_SHIFT):
             pg = address >> _PAGE_SHIFT
             # Inline permission check for speed
-            if pg not in self._w_pages:
+            if pg >= MAX_PAGES or not self._w_pages[pg]:
                 if self.logger:
                     self.logger.debug(f"Not allowed to write {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
@@ -255,7 +270,7 @@ class INT_Memory:
             chunk = min(PAGE_SIZE - page_off, end - address)
 
             # Inline permission check for speed
-            if pg not in self._w_pages:
+            if pg >= MAX_PAGES or not self._w_pages[pg]:
                 if self.logger:
                     self.logger.debug(f"Not allowed to write {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
@@ -281,15 +296,15 @@ class INT_Memory:
         return get_pages(address, length)
 
     def is_accessible(self, address: int, length: int, access: Accessibility = Accessibility.READ) -> bool:
-        """Optimized accessibility check."""
+        """Optimized accessibility check with bitarray."""
         if length <= 0:
             return True
             
         pages = self.get_pages(address, length)
         if access == Accessibility.WRITE:
-            return all(pg in self._w_pages for pg in pages)
+            return all(self._w_pages[pg] for pg in pages if pg < MAX_PAGES)
         elif access == Accessibility.READ:
-            return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
+            return all((self._r_pages[pg] or self._w_pages[pg]) for pg in pages if pg < MAX_PAGES)
         return True
 
     # repr / equality keep old behaviour for debugging or tests  
@@ -301,7 +316,9 @@ class INT_Memory:
         if not isinstance(other, self.__class__):
             return NotImplemented
             
-        # Compare permission sets
+        # Compare permission bits (sample or full check for large)
+        if len(self._r_pages) != len(other._r_pages) or len(self._w_pages) != len(other._w_pages):
+            return False
         if self._r_pages != other._r_pages or self._w_pages != other._w_pages:
             return False
             
@@ -376,19 +393,33 @@ class INT_Memory:
         pages = get_pages(start, len_)
         
         for pg in pages:
-            if access == Accessibility.WRITE:
-                self._w_pages.add(pg)
-                self._r_pages.discard(pg)
-            elif access == Accessibility.READ:
-                self._r_pages.add(pg)
-                self._w_pages.discard(pg)
+            if pg >= MAX_PAGES:
+                continue
+            
+            current_write = self._w_pages[pg]
+            current_read = self._r_pages[pg]
+            
+            target_write = access == Accessibility.WRITE
+            target_read = access == Accessibility.READ
+            
+            # Skip if already correct
+            if current_write == target_write and current_read == target_read:
+                continue
+            
+            if target_write:
+                self._w_pages[pg] = 1
+                self._r_pages[pg] = 0
+            elif target_read:
+                self._r_pages[pg] = 1
+                self._w_pages[pg] = 0
             else:
-                self._r_pages.discard(pg)
-                self._w_pages.discard(pg)
+                self._r_pages[pg] = 0
+                self._w_pages[pg] = 0
         
         # Invalidate cache for affected pages
         for pg in pages:
-            self._page_cache.pop(pg, None)
+            if pg < MAX_PAGES:
+                self._page_cache.pop(pg, None)
 
 _ZERO_PAGE = bytes(PAGE_SIZE)
 

@@ -43,7 +43,7 @@ classifiers = [
 ]
 dependencies = [
     "tsrkit-types>=0.1.0",
-    "tsrkit-asm>=0.1.0",
+    "bitarray (>=3.7.1,<4.0.0)",
 ]
 
 [project.optional-dependencies]

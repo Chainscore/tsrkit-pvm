@@ -1,7 +1,4 @@
 from typing import Tuple, ClassVar, Optional
-
-from tsrkit_types import U64, TypedArray
-
 from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.core.ipvm import PVM
 from tsrkit_pvm.recompiler.assembler.inst_map import inst_map
@@ -20,7 +17,6 @@ from tsrkit_asm import (
     RegMem,
     Reg,
 )
-import time
 import ctypes
 import mmap
 import os
@@ -82,7 +78,6 @@ class Recompiler(PVM):
         # Ensure type is bytes for mypy
         assert program.msn_code is not None, "assemble() must set msn_code"
 
-        start_time_ns = time.time_ns()
         code_buf, code_pointer = cls.allocate_executable_memory(program.msn_code)
         
         # Track all allocated buffers for cleanup
@@ -105,13 +100,6 @@ class Recompiler(PVM):
         allocated_buffers.append(caller_buf)
         # Install safe signal handler (only once per process)
         cls.init_sig_handlers()
-
-        # Execute the compiled code with segfault protection
-        if logger:
-            logger.debug(
-                f"Assmbling completed! \n\t Time \t {(time.time_ns() - start_time_ns) / (10**6)} ms \n\t Caller \t {addr} \n\t Program \t {code_pointer} \n\t Memory offset \t {memory.offset}"
-            )
-        asm_time_ns = time.time_ns()
 
         # Activate syscall handler for PVM syscalls during execution
         try:
@@ -159,20 +147,12 @@ class Recompiler(PVM):
 
         final_pc = program.msn_to_pvm_index(pg_data.rip - code_pointer)
 
-        if logger:
-            logger.debug(
-                f"Execution completed \n\t Time: {(time.time_ns() - asm_time_ns) / (10**6)} ms \n\t Status: {status._value_} \n\t Registers: {updated_regs} \n\t Gas: {gas} \n\t PC: {final_pc}"
-            )
-
         gas = int(VMContext.from_pointer(vm_pointer, len(program.jump_table)).gas)  # gas is already an int
 
         # Adjust overflow
         if status._value_.name == "out-of-gas":
             gas -= 2**32
             final_pc = program.msn_to_pvm_index(pg_data.si_data - code_pointer)
-
-        # if status._value_.name == "page-fault":
-        #     status._value_.register -= memory.offset
 
         # Clean up allocated memory buffers
         for buf in allocated_buffers:
@@ -181,9 +161,6 @@ class Recompiler(PVM):
             except:
                 pass  # Ignore cleanup errors
         
-        # Clean up guest memory if needed
-        # Note: Don't close memory here as it might be used by caller
-
         return status, final_pc, gas, updated_regs, memory
 
     @classmethod
@@ -254,13 +231,13 @@ class Recompiler(PVM):
             raise e
 
     @classmethod
-    def init_sig_handlers(cls):
+    def init_sig_handlers(cls, logger = None):
         """Install the C signal handlers (only once per process)"""
         if cls._signal_handlers_initialized:
             return  # Already initialized
         
         if not _segwrap_available or segwrap is None:
-            print("Warning: segwrap library not available, signal handlers disabled")
+            if logger: logger.warning("Warning: segwrap library not available, signal handlers disabled")
             cls._signal_handlers_initialized = True
             return
             
@@ -269,13 +246,10 @@ class Recompiler(PVM):
             # If we get error -3, it's likely a seccomp restriction (containers, etc.)
             # For now, we'll allow this to continue but log a warning
             if result == -3:
-                import warnings
-                warnings.warn(
-                    "Failed to install seccomp filter (error -3). "
-                    "PVM syscall handling may not work properly in restricted environments. "
-                    "This is expected in containers or sandboxed environments.",
-                    RuntimeWarning
-                )
+                if logger: 
+                    logger.warning(
+                        "Failed to install seccomp filter (error -3). PVM syscall handling may not work properly in restricted environments. This is expected in containers or sandboxed environments.",
+                    )
                 # Mark as initialized even if seccomp failed, to avoid repeated attempts
                 cls._signal_handlers_initialized = True
                 return  # Continue without seccomp
@@ -356,6 +330,3 @@ class Recompiler(PVM):
         if _segwrap_available and segwrap is not None:
             segwrap.cleanup()
         cls._signal_handlers_initialized = False  # Allow re-initialization
-
-
-# Export Recompiler as PVM for backward compatibility
