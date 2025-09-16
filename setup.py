@@ -3,10 +3,10 @@ from setuptools import setup, find_packages
 
 if __name__ == "__main__":
     # Check if Cython mode is requested
-    PVM_MODE = os.environ.get("PVM_MODE", "mypyc").lower()
-    print(f"Building with PVM_MODE={PVM_MODE}")
-    
-    if PVM_MODE == "cython":
+    PVM_BUILD_MODE = os.environ.get("PVM_BUILD_MODE", "mypyc").lower()
+    print(f"Building with PVM_BUILD_MODE={PVM_BUILD_MODE}")
+
+    if PVM_BUILD_MODE == "cython":
         # Use Cython compilation
         try:
             from Cython.Build import cythonize
@@ -49,9 +49,9 @@ if __name__ == "__main__":
             print(f"✓ Successfully compiled {len(cython_files)} Cython files")
         except ImportError:
             print("❌ Cython not available, falling back to MyPyC")
-            PVM_MODE = "mypyc"
-    
-    if PVM_MODE != "cython":
+            PVM_BUILD_MODE = "mypyc"
+
+    if PVM_BUILD_MODE != "cython":
         # Use existing MyPyC compilation
         from mypyc.build import mypycify
         from pathlib import Path
