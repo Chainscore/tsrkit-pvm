@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "mypy"]
+requires = ["setuptools>=61.0", "wheel", "mypy", "mypyc"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Polkadot Virtual Machine (PVM) implementation with interpreter and recompiler as specified in GP"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT AND (Apache-2.0 OR BSD-2-Clause)"
+license = "MIT¯¯"
 authors = [
     {name = "Chainscore Labs", email = "hello@chainscore.finance"},
 ]
