@@ -91,12 +91,10 @@ cdef class CyInstructionsWArgs2Reg1Offset:
 
     cpdef tuple branch_lt_u(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
         """OPC172: Branch if ra < rb (unsigned) to offset vx."""
-        cdef uint64_t a = registers[ra]
-        cdef uint64_t b = registers[rb]
         cdef object status_result
         cdef object status
         cdef uint32_t target_counter
-        if a < b:
+        if registers[ra] < registers[rb]:
             status_result = self.program.branch(self.counter, vx, True)
             status = status_result[0]
             target_counter = status_result[1]
@@ -108,12 +106,10 @@ cdef class CyInstructionsWArgs2Reg1Offset:
 
     cpdef tuple branch_lt_s(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
         """OPC173: Branch if ra < rb (signed) to offset vx."""
-        cdef int64_t a = <int64_t>registers[ra]
-        cdef int64_t b = <int64_t>registers[rb]
         cdef object status_result
         cdef object status
         cdef uint32_t target_counter
-        if a < b:
+        if registers[ra] < registers[rb]:
             status_result = self.program.branch(self.counter, vx, True)
             status = status_result[0]
             target_counter = status_result[1]

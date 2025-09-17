@@ -3,8 +3,10 @@ from setuptools import setup, find_packages
 
 if __name__ == "__main__":
     # Check if Cython mode is requested
-    PVM_BUILD_MODE = os.environ.get("PVM_BUILD_MODE", "mypyc").lower()
+    PVM_BUILD_MODE = os.environ.get("PVM_BUILD_MODE", "plain").lower()
     print(f"Building with PVM_BUILD_MODE={PVM_BUILD_MODE}")
+    
+    ext_modules = []  # Default to no compiled extensions
 
     if PVM_BUILD_MODE == "cython":
         # Use Cython compilation
@@ -47,11 +49,11 @@ if __name__ == "__main__":
                 language_level=3,
             )
             print(f"✓ Successfully compiled {len(cython_files)} Cython files")
-        except ImportError:
-            print("❌ Cython not available, falling back to MyPyC")
+        except ImportError as e:
+            print(f"❌ Cython not available: {e}, falling back to MyPyC")
             PVM_BUILD_MODE = "mypyc"
 
-    if PVM_BUILD_MODE != "cython":
+    if PVM_BUILD_MODE == "mypyc":
         # Use existing MyPyC compilation
         from mypyc.build import mypycify
         from pathlib import Path
@@ -61,21 +63,21 @@ if __name__ == "__main__":
         
         # Collect targets
         core_files = [
-            "tsrkit_pvm/common/utils.py",
-            "tsrkit_pvm/common/status.py",
-            "tsrkit_pvm/common/constants.py",
-            "tsrkit_pvm/core/code.py",
-            "tsrkit_pvm/core/opcode.py",
+            # "tsrkit_pvm/common/utils.py",
+            # "tsrkit_pvm/common/status.py",
+            # "tsrkit_pvm/common/constants.py",
+            # "tsrkit_pvm/core/code.py",
+            # "tsrkit_pvm/core/opcode.py",
         ]
         recompiler_files = [
-            *glob.glob("tsrkit_pvm/recompiler/assembler/tables/*.py", recursive=True),
-            "tsrkit_pvm/recompiler/assembler/inst_map.py",
-            "tsrkit_pvm/recompiler/assembler/utils.py",
-            "tsrkit_pvm/recompiler/memory.py",
-            "tsrkit_pvm/recompiler/program.py",
-            "tsrkit_pvm/recompiler/vm_context.py",
-            "tsrkit_pvm/recompiler/pvm.py",
-            *glob.glob("tsrkit_pvm/interpreter/**/*.py", recursive=True),
+            # *glob.glob("tsrkit_pvm/recompiler/assembler/tables/*.py", recursive=True),
+            # "tsrkit_pvm/recompiler/assembler/inst_map.py",
+            # "tsrkit_pvm/recompiler/assembler/utils.py",
+            # "tsrkit_pvm/recompiler/memory.py",
+            # "tsrkit_pvm/recompiler/program.py",
+            # "tsrkit_pvm/recompiler/vm_context.py",
+            # "tsrkit_pvm/recompiler/pvm.py",
+            *glob.glob("tsrkit_pvm/interpreter/**/*.py", recursive=True)
         ]
         recompiler_files = [f for f in recompiler_files if not f.endswith("__init__.py")]
         target_files = core_files + recompiler_files

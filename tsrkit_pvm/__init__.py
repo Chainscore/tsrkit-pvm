@@ -41,7 +41,9 @@ from .interpreter.pvm import Interpreter
 try:
     from .recompiler.memory import REC_Memory
     from .recompiler.program import REC_Program
-    from .recompiler.pvm import Recompiler
+    from .recompiler.pvm import Recompiler, _segwrap_available
+    if not _segwrap_available:
+        raise ImportError("segwrap not available")
     _HAS_RECOMPILER = True
 except (ImportError, OSError):
     REC_Memory = None

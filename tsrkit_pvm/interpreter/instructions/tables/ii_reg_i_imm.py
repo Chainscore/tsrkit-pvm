@@ -280,7 +280,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
     @staticmethod
     def add_imm(bitsize: int) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
         def add_imm_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
-            value = (int(registers[rb]) + vx) % 2 ** (bitsize)
+            value = (registers[rb] + vx) % 2 ** (bitsize)
             if bitsize < 64:
                 value = chi(value, bitsize // 8)
             registers[ra] = value

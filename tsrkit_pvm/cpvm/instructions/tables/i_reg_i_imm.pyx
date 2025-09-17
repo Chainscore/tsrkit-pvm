@@ -73,12 +73,7 @@ cdef class CyInstructionsWArgs1Reg1Imm:
         cdef object status_result = self.program.djump(self.counter, target_address)
         cdef object status = status_result[0]
         cdef uint32_t target_counter = status_result[1]
-        
-        if status == CONTINUE and target_counter != self.counter:
-            return status, target_counter, registers, memory
-        
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return status, target_counter, registers, memory
 
     cpdef tuple load_imm(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC51: Load immediate value into register."""

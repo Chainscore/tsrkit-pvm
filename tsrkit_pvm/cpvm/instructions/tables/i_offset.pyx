@@ -40,7 +40,7 @@ cdef class CyWArgsOneOffset:
         cdef bytes offset_bytes = self.program.zeta[start:end]
         cdef uint32_t raw_offset = int.from_bytes(offset_bytes, "little")
         cdef uint64_t vx = int(self.counter) + z(raw_offset, lx)
-        return [lx, vx]
+        return [vx]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -49,14 +49,13 @@ cdef class CyWArgsOneOffset:
             40: OpCode(name="jump", fn=cls.jump, gas=1, is_terminating=True),
         }
 
-    cpdef tuple jump(self, list registers, object memory, uint32_t lx, uint64_t vx):
+    cpdef tuple jump(self, list registers, object memory, uint64_t vx):
         """
         OPC40: Unconditional jump to specified offset.
         
         Args:
             registers: Register array 
             memory: Memory object
-            lx: Length of offset (unused in computation)
             vx: Target jump address
         
         Returns:

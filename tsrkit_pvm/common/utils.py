@@ -2,8 +2,6 @@
 
 import operator
 from .constants import PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
-from math import ceil
-import math
 from typing import List, Union, Any
 
 _PVM_MEMORY_PAGE_SHIFT = 12  # log2(PVM_MEMORY_PAGE_SIZE) = log2(4096) = 12
@@ -60,7 +58,6 @@ def chi(value: int, n: int) -> int:
     
     # Optimized: pre-calculate bit shifts and avoid repeated power calculations
     bit_pos = (n << 3) - 1  # 8 * n - 1
-    threshold = 1 << bit_pos  # 2 ** (8 * n - 1)
     multiplier = (1 << 64) - (1 << (n << 3))  # 2**64 - 2 ** (8 * n)
     return value + ((value >> bit_pos) * multiplier)
 

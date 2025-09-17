@@ -82,8 +82,16 @@ cdef class CyInstMapper:
         """
         Execute an instruction using the optimized dispatch table.
         """
-        cdef object block = self.get_block(program, program_counter)
-        return block.execute(program, program_counter, registers, memory)
+        # cdef object block = self.get_block(program, program_counter)
+        # return block.execute(program, program_counter, registers, memory)
+
+        handler = self._dispatch_table[program.zeta[program_counter]]
+        if handler is None:
+            raise ValueError("Recompiler: Invalid opcode")
+        table_instance = handler.table_class(counter=program_counter, program=program, skip_index=program.skip(program_counter))
+        props = table_instance.get_props()
+        result = handler.fn(table_instance, registers, memory, *props)
+        return result, handler.gas_cost
     
     cpdef int32_t get_gas_cost(self, int32_t opcode):
         """Get gas cost with direct C array lookup."""
@@ -194,6 +202,8 @@ class CyBlockInfo:
         # Tight execution loop
         for i in range(len(self.instructions)):
             compiled_inst = self.instructions[i]
+
+            print(">> Executing Opcode:", compiled_inst.opcode, "at PC:", current_pc)
 
             # Execute instruction
             result = compiled_inst.handler.fn(

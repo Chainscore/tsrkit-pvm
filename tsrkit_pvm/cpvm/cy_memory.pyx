@@ -196,14 +196,14 @@ cdef class CyMemory:
             length: Number of bytes to read
             
         Returns:
-            list: The read data as a list of integers (for compatibility)
+            bytes: The read data as bytes (consistent with INT_Memory)
         """
         cdef uint64_t end
         cdef uint32_t start_page, end_page, page_off
         cdef object src_page
         
         if length == 0:
-            return []
+            return b""
         
         # Fast address normalization
         address = address & _ADDR_MASK
@@ -225,19 +225,20 @@ cdef class CyMemory:
             src_page = self._page_for_read(address)
             
             if isinstance(src_page, bytearray):
-                return list(src_page[page_off:page_off + length])
+                return bytes(src_page[page_off:page_off + length])
             else:
                 # Zero page case
-                return [0] * length
+                return b'\x00' * length
         
         # Multi-page path
         return self._read_multipage(address, length, end)
     
-    cdef list _read_multipage(self, uint64_t address, uint32_t length, uint64_t end):
-        """Handle multi-page reads."""
-        cdef list out = []
+    cdef bytes _read_multipage(self, uint64_t address, uint32_t length, uint64_t end):
+        """Handle multi-page reads and return bytes."""
+        cdef bytearray out = bytearray(length)
         cdef uint32_t pg, page_off, chunk
         cdef object page_data
+        cdef uint32_t cursor = 0
         
         while address < end:
             pg = self._page_index(address)
@@ -255,14 +256,15 @@ cdef class CyMemory:
             
             # Copy data
             if isinstance(page_data, bytearray):
-                out.extend(list(page_data[page_off:page_off + chunk]))
+                out[cursor:cursor + chunk] = page_data[page_off:page_off + chunk]
             else:
                 # Zero page - add zeros
-                out.extend([0] * chunk)
+                out[cursor:cursor + chunk] = b'\x00' * chunk
             
             address += chunk
+            cursor += chunk
             
-        return out
+        return bytes(out)
     
     @cython.boundscheck(False)
     @cython.wraparound(False)

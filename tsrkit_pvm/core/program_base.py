@@ -103,7 +103,7 @@ class Program:
         z, size = int.from_bytes(buffer[current_offset : current_offset + 1], "little"), 1
         bytes_read += size
         current_offset += size
-
+        
         c_len, size = Uint.decode_from(buffer, current_offset)
         bytes_read += size
         current_offset += size
@@ -115,7 +115,7 @@ class Program:
             current_offset += z
             j.append(int(val))
 
-        c = buffer[current_offset : current_offset + c_len]
+        c = bytes(buffer[current_offset : current_offset + c_len])
         current_offset += c_len
 
         # Optimized bit decoding with minimal operations

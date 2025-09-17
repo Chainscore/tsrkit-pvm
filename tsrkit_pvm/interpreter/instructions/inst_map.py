@@ -19,12 +19,10 @@ from .tables.ii_reg_ii_imm import InstructionsWArgs2Reg2Imm
 from .tables.iii_reg import InstructionsWArgs3Reg
 from .tables.wo_args import InstructionsWoArgs
 
-from dataclasses import dataclass
-from http.client import CONTINUE
 from typing import Callable, List, Optional, Tuple, Any, Dict, Type, Union
 
 from tsrkit_pvm.core.instruction_table import InstructionTable
-from tsrkit_pvm.common.status import ExecutionStatus, PvmError, PANIC
+from tsrkit_pvm.common.status import CONTINUE, ExecutionStatus, PvmError, PANIC
 from tsrkit_pvm.core.opcode import OpCode
 
 all_tables = [
@@ -43,27 +41,32 @@ all_tables = [
     InstructionsWArgs3Reg,
 ]
 
-@dataclass
 class InstructionHandler:
     """Instruction handler data."""
-    op_data: OpCode
-    table_class: type
+    __slots__ = ('op_data', 'table_class')
+    
+    def __init__(self, op_data: OpCode, table_class: type):
+        self.op_data = op_data
+        self.table_class = table_class
 
-@dataclass
 class CompiledInstruction:
     """Pre-compiled instruction with decoded operands and cached function pointers."""
-    handler: InstructionHandler # Handler for this instruction
-    args: List[int]  # Pre-decoded instruction arguments
-    table: type[InstructionTable] # Table instance for this instruction
-    # Performance cache - pre-resolved function and termination flag
-    fn: Callable  # Cached function pointer to avoid repeated attribute access
-    is_terminating: bool  # Cached termination flag to avoid repeated attribute access
+    __slots__ = ('handler', 'args', 'table', 'fn', 'is_terminating')
+    
+    def __init__(self, handler: InstructionHandler, args: List[int], table: type[InstructionTable], fn: Callable, is_terminating: bool):
+        self.handler = handler
+        self.args = args
+        self.table = table
+        self.fn = fn
+        self.is_terminating = is_terminating
 
-@dataclass
 class BlockInfo:
     """Compiled basic block with pre-decoded instructions."""
-    total_gas: int         # Total gas cost for entire block
-    instructions: List[CompiledInstruction]  # Pre-compiled instructions
+    __slots__ = ('total_gas', 'instructions')
+    
+    def __init__(self, total_gas: int, instructions: List[CompiledInstruction]):
+        self.total_gas = total_gas
+        self.instructions = instructions
     
     def execute(self, program: Any, start_pc: int, registers: List[int], memory: Any) -> Tuple[Tuple[Any, int, List[int], Any], int]:
         """Execute this block starting from start_pc with given registers and memory.
@@ -87,7 +90,7 @@ class BlockInfo:
             # Use pre-cached termination flag
             if compiled_inst.is_terminating:
                 return (status, next_pc, registers, memory), total_gas
-            
+                
             if status != CONTINUE:
                 return (status, next_pc, registers, memory), i + 1
             
@@ -117,7 +120,6 @@ class InstMapper:
                     table_class=table_class,
                 )
                 self._dispatch_table[opcode] = handler
-
         self._exec_blocks = {}
 
     def process_instruction(
@@ -140,8 +142,8 @@ class InstMapper:
         #     raise ValueError("Recompiler: Invalid opcode")
         # table_instance = handler.table_class(counter=program_counter, program=program, skip_index=program.skip(program_counter))
         # props = table_instance.get_props()
-        # result = handler.fn(table_instance, registers, memory, *props)
-        # return result, handler.gas_cost
+        # result = handler.op_data.fn(table_instance, registers, memory, *props)
+        # return result, handler.op_data.gas
 
     def get_gas_cost(self, opcode: int) -> int:
         """Get gas cost for an opcode with direct lookup - no dictionary access."""

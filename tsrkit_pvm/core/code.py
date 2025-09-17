@@ -12,7 +12,7 @@ from ..recompiler.program import REC_Program
 from ..recompiler.memory import REC_Memory
 from tsrkit_pvm.interpreter.program import INT_Program
 from tsrkit_pvm.interpreter.memory import INT_Memory
-# from ..cpvm.cy_memory import CyMemory
+from ..cpvm.cy_memory import CyMemory
 
 _PVM_MODE = os.environ.get("PVM_MODE", "interpreter")
 
@@ -32,13 +32,13 @@ class Code(Codable):
     @classmethod
     def decode_from(cls, pc: bytes) -> Union[None, "Code"]:
         offset = 0
-        o_len, decoded = Uint[24].decode_from(pc, offset)
+        o_len, decoded = int.from_bytes(pc[offset : offset + 3], "little"), 3
         offset += decoded
-        w_len, decoded = Uint[24].decode_from(pc, offset)
+        w_len, decoded = int.from_bytes(pc[offset : offset + 3], "little"), 3
         offset += decoded
-        z, decoded = Uint[16].decode_from(pc, offset)
+        z, decoded = int.from_bytes(pc[offset : offset + 2], "little"), 2
         offset += decoded
-        s, decoded = Uint[24].decode_from(pc, offset)
+        s, decoded = int.from_bytes(pc[offset : offset + 3], "little"), 3
         offset += decoded
         # `o` (read-only data)
         o = pc[offset : offset + o_len]
@@ -47,7 +47,7 @@ class Code(Codable):
         w = pc[offset : offset + w_len]
         offset += w_len
         # Code blobs
-        c_len, decoded = Uint[32].decode_from(pc, offset)
+        c_len, decoded = int.from_bytes(pc[offset : offset + 4], "little"), 4
         offset += decoded
         c = pc[offset : offset + c_len]
         offset += c_len
@@ -113,17 +113,11 @@ def y_function(
             code.s,
             VMContext.calculate_size(len(program_.jump_table)),
         )
-    # elif _PVM_MODE == "cython":
-    #     program_ = INT_Program.decode_from(code.code)[0]
-    #     memory = CyMemory.from_pc(
-    #         code.read,
-    #         code.r_write,
-    #         args,
-    #         code.z,
-    #         code.s,
-    #     )
+    elif _PVM_MODE == "cython":
+        # TODO: use cython program/memory once implemented
+        program_ = INT_Program.decode_from(code.code)[0]
+        memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
     elif _PVM_MODE == "interpreter":
-        # For interpreter, cython, or any other mode, use interpreter memory/program
         program_ = INT_Program.decode_from(code.code)[0]
         memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
     else:

@@ -29,9 +29,10 @@ MAX_PAGES = 1 << 20  # 1M pages for 4GB address space
 class INT_Memory:
     """
     Sparse, page-mapped memory model with read/write page protection.
-    Uses hybrid approach with optimized sets and bit manipulation.
+    Optimized with hot page caching for sequential access patterns.
     """
-    __slots__ = ('_pages', '_r_pages', '_w_pages', 'heap_break', 'logger', '_page_cache')
+    __slots__ = ('_pages', '_r_pages', '_w_pages', 'heap_break', 'logger',
+                 '_hot_page_num', '_hot_page_data', '_hot_page_writable')
 
     def __init__(
         self,
@@ -63,33 +64,35 @@ class INT_Memory:
         # Sparse page map with pre-allocation strategy
         self._pages: Dict[int, bytearray] = {}
         
-        # Simple cache for frequently accessed pages  
-        self._page_cache: Dict[int, bytearray] = {}
+        # Hot page optimization - avoid dictionary lookups for sequential access
+        self._hot_page_num: int = -1
+        self._hot_page_data: Optional[bytearray] = None
+        self._hot_page_writable: bool = False
         
         if data:
-            # Bulk-load initial bytes more efficiently
-            sorted_addrs = sorted(data.items())
-            current_page = -1
-            page_data: Optional[Union[bytearray, bytes]] = None
-            
-            for addr, val in sorted_addrs:
-                if not (0 <= val <= 255):
-                    raise ValueError(f"Memory: invalid value {val} @ {addr}")
-                
-                page_idx = addr >> _PAGE_SHIFT
-                if page_idx != current_page:
-                    current_page = page_idx
-                    page_data = self._page_for(addr, create=True)
-                
-                if isinstance(page_data, bytearray):
-                    page_data[addr & _PAGE_MASK] = val
-                elif page_data is not None:
-                    # Convert to mutable page if it's immutable bytes
-                    ba = bytearray(page_data)
-                    ba[addr & _PAGE_MASK] = val
-                    self._pages[page_idx] = ba
+            # Simple bulk loading
+            self._bulk_load_sparse(sorted(data.items()))
 
         self.heap_break: int = heap
+
+    def _bulk_load_sparse(self, sorted_addrs):
+        """Traditional sparse loading for non-contiguous data."""
+        current_page = -1
+        page_data: Optional[bytearray] = None
+        
+        for addr, val in sorted_addrs:
+            if not (0 <= val <= 255):
+                raise ValueError(f"Memory: invalid value {val} @ {addr}")
+                
+            page_idx = addr >> _PAGE_SHIFT
+            if page_idx != current_page:
+                current_page = page_idx
+                page_data = self._pages.get(page_idx)
+                if page_data is None:
+                    page_data = bytearray(PAGE_SIZE)
+                    self._pages[page_idx] = page_data
+            
+            page_data[addr & _PAGE_MASK] = val
 
     # --------------------------------------------------------------------- #
     # Core helpers - Optimized with bit manipulation
@@ -102,22 +105,14 @@ class INT_Memory:
 
     def _page_for(self, addr: int, *, create: bool = False) -> Union[bytearray, bytes]:
         """
-        Get the underlying page buffer for an address with caching.
+        Get the underlying page buffer for an address.
         Creates a fresh zero-filled page if `create` is True.
         """
         pg = addr >> _PAGE_SHIFT
         
-        # Check cache first for hot pages
-        cached_page = self._page_cache.get(pg)
-        if cached_page is not None:
-            return cached_page
-        
         # Check main storage
         page_data = self._pages.get(pg)
         if page_data is not None:
-            # Cache this page for future access
-            if len(self._page_cache) < 16:  # Limit cache size
-                self._page_cache[pg] = page_data
             return page_data
         
         if not create:
@@ -127,9 +122,6 @@ class INT_Memory:
         # Create new page
         ba = bytearray(PAGE_SIZE)
         self._pages[pg] = ba
-        # Cache new page
-        if len(self._page_cache) < 16:
-            self._page_cache[pg] = ba
         return ba
 
     def _assert_access(self, addr: int, *, write: bool = False) -> None:
@@ -160,136 +152,129 @@ class INT_Memory:
         if length <= 0:
             return b""
         
-        # Fast address normalization using bitwise AND
         address = address & _ADDR_MASK
-        end = address + length
-
-        # Fast path for single-page reads (most common case)
-        if (address >> _PAGE_SHIFT) == ((end - 1) >> _PAGE_SHIFT):
-            pg = address >> _PAGE_SHIFT
-            # Inline permission check for speed
+        
+        # Ultra-fast path: single page, hot cache hit
+        pg = address >> _PAGE_SHIFT
+        if pg == self._hot_page_num and self._hot_page_data is not None:
+            page_off = address & _PAGE_MASK
+            if page_off + length <= PAGE_SIZE:
+                return bytes(self._hot_page_data[page_off:page_off + length])
+        
+        # Single page path (most common)
+        if (address >> _PAGE_SHIFT) == ((address + length - 1) >> _PAGE_SHIFT):
             if pg >= MAX_PAGES or not (self._r_pages[pg] or self._w_pages[pg]):
-                if self.logger:
-                    self.logger.debug(f"Not allowed to read {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
             
-            # Single-page read with reduced dict lookups
             page_off = address & _PAGE_MASK
+            page_data = self._pages.get(pg)
             
-            # Try cache first, then pages, with single lookup pattern
-            src_page = self._page_cache.get(pg)
-            if src_page is None:
-                src_page = self._pages.get(pg)
-                if src_page is None:
-                    src_page = bytearray(PAGE_SIZE)
-                else:
-                    # Cache the page for future access
-                    self._page_cache[pg] = src_page
+            if page_data is None:
+                # Zero data - avoid allocation
+                return b'\x00' * length
             
-            return bytes(src_page[page_off : page_off + length])
-
-        # Multi-page path (less common)
-        out = bytearray(length)
-        out_mv = memoryview(out)
+            # Update hot cache
+            self._hot_page_num = pg
+            self._hot_page_data = page_data
+            self._hot_page_writable = self._w_pages[pg]
+            
+            return bytes(page_data[page_off:page_off + length])
+        
+        # Multi-page fallback (rare)
+        return self._read_multipage(address, length)
+    
+    def _read_multipage(self, address: int, length: int) -> bytes:
+        """Separate multi-page read to keep main path fast."""
+        result = bytearray(length)
+        end = address + length
         cursor = 0
         
         while address < end:
             pg = address >> _PAGE_SHIFT
-            page_off = address & _PAGE_MASK
-            chunk = min(PAGE_SIZE - page_off, end - address)
-
-            # Inline permission check for speed
             if pg >= MAX_PAGES or not (self._r_pages[pg] or self._w_pages[pg]):
-                if self.logger:
-                    self.logger.debug(f"Not allowed to read {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
             
-            # Fast page lookup with caching
-            cached_page = self._page_cache.get(pg)
-            if cached_page is not None:
-                page_data: Union[bytearray, bytes] = cached_page
-            else:
-                page_data = self._pages.get(pg) or bytearray(PAGE_SIZE)
-                if page_data is not _ZERO_PAGE and len(self._page_cache) < 16:
-                    self._page_cache[pg] = page_data
+            page_off = address & _PAGE_MASK
+            chunk = min(PAGE_SIZE - page_off, end - address)
             
-            # Fast memory copy
-            out_mv[cursor : cursor + chunk] = page_data[page_off : page_off + chunk]
-
-            address += chunk
+            page_data = self._pages.get(pg)
+            if page_data is None:
+                # Leave result as zeros (already initialized)
+                pass
+            else:
+                result[cursor:cursor + chunk] = page_data[page_off:page_off + chunk]
+            
             cursor += chunk
-        return bytes(out)
+            address += chunk
+        
+        return bytes(result)
 
     def write(self, address: int, data_bytes: bytes | Sequence[int]) -> None:
         if not data_bytes:
             return
             
-        # Fast address normalization
         address = address & _ADDR_MASK
         length = len(data_bytes)
-        end = address + length
-
-        # Fast path for single-page writes (most common case)
-        if (address >> _PAGE_SHIFT) == ((end - 1) >> _PAGE_SHIFT):
-            pg = address >> _PAGE_SHIFT
-            # Inline permission check for speed
+        
+        # Ultra-fast path: single page, hot cache hit
+        pg = address >> _PAGE_SHIFT
+        page_off = address & _PAGE_MASK
+        
+        if (pg == self._hot_page_num and self._hot_page_writable and 
+            self._hot_page_data is not None and page_off + length <= PAGE_SIZE):
+            self._hot_page_data[page_off:page_off + length] = data_bytes
+            return
+        
+        # Single page path (most common)
+        if (address >> _PAGE_SHIFT) == ((address + length - 1) >> _PAGE_SHIFT):
             if pg >= MAX_PAGES or not self._w_pages[pg]:
-                if self.logger:
-                    self.logger.debug(f"Not allowed to write {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
             
-            # Optimized single-page write with reduced dict lookups
-            page_off = address & _PAGE_MASK
+            # Get or create page
+            page_data = self._pages.get(pg)
+            if page_data is None:
+                page_data = bytearray(PAGE_SIZE)
+                self._pages[pg] = page_data
             
-            # Try cache first, then pages, with single lookup pattern
-            dst_page = self._page_cache.get(pg)
-            if dst_page is None:
-                dst_page = self._pages.get(pg)
-                if dst_page is None:
-                    dst_page = bytearray(PAGE_SIZE)
-                    self._pages[pg] = dst_page
-                # Always cache pages we write to
-                self._page_cache[pg] = dst_page
-                if len(self._page_cache) < 16:
-                    self._page_cache[pg] = dst_page
+            # Update hot cache
+            self._hot_page_num = pg
+            self._hot_page_data = page_data
+            self._hot_page_writable = True
             
-            dst_page[page_off : page_off + length] = data_bytes
+            page_data[page_off:page_off + length] = data_bytes
             return
-
-        # Multi-page path (less common)
+        
+        # Multi-page fallback (rare)
+        self._write_multipage(address, data_bytes)
+    
+    def _write_multipage(self, address: int, data_bytes):
+        """Separate multi-page write to keep main path fast."""
         if isinstance(data_bytes, bytes):
-            in_mv = memoryview(data_bytes)
+            data_mv = memoryview(data_bytes)
         else:
-            # Convert sequence of ints to bytes
-            in_mv = memoryview(bytes(data_bytes))
+            data_mv = memoryview(bytes(data_bytes))
+        
+        length = len(data_bytes)
+        end = address + length
         cursor = 0
         
         while address < end:
             pg = address >> _PAGE_SHIFT
-            page_off = address & _PAGE_MASK
-            chunk = min(PAGE_SIZE - page_off, end - address)
-
-            # Inline permission check for speed
             if pg >= MAX_PAGES or not self._w_pages[pg]:
-                if self.logger:
-                    self.logger.debug(f"Not allowed to write {address}(Page={pg})")
                 raise PvmError(PAGE_FAULT(address))
             
-            # Fast page lookup/creation with caching
-            dst_page = self._page_cache.get(pg)
-            if dst_page is None:
-                dst_page = self._pages.get(pg)
-                if dst_page is None:
-                    dst_page = bytearray(PAGE_SIZE)
-                    self._pages[pg] = dst_page
-                if len(self._page_cache) < 16:
-                    self._page_cache[pg] = dst_page
+            page_off = address & _PAGE_MASK
+            chunk = min(PAGE_SIZE - page_off, end - address)
             
-            # Fast memory copy
-            dst_page[page_off : page_off + chunk] = in_mv[cursor : cursor + chunk]
-
-            address += chunk
+            page_data = self._pages.get(pg)
+            if page_data is None:
+                page_data = bytearray(PAGE_SIZE)
+                self._pages[pg] = page_data
+            
+            page_data[page_off:page_off + chunk] = data_mv[cursor:cursor + chunk]
+            
             cursor += chunk
+            address += chunk
 
     def get_pages(self, address: int, length: int) -> list[int]:
         """Get list of page numbers spanning a memory range."""
@@ -416,10 +401,13 @@ class INT_Memory:
                 self._r_pages[pg] = 0
                 self._w_pages[pg] = 0
         
-        # Invalidate cache for affected pages
+        # Invalidate hot page cache for affected pages
         for pg in pages:
-            if pg < MAX_PAGES:
-                self._page_cache.pop(pg, None)
+            if pg < MAX_PAGES and pg == self._hot_page_num:
+                self._hot_page_num = -1
+                self._hot_page_data = None
+                self._hot_page_writable = False
+                break
 
 _ZERO_PAGE = bytes(PAGE_SIZE)
 
