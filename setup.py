@@ -63,20 +63,20 @@ if __name__ == "__main__":
         
         # Collect targets
         core_files = [
-            # "tsrkit_pvm/common/utils.py",
-            # "tsrkit_pvm/common/status.py",
-            # "tsrkit_pvm/common/constants.py",
-            # "tsrkit_pvm/core/code.py",
-            # "tsrkit_pvm/core/opcode.py",
+            "tsrkit_pvm/common/utils.py",
+            "tsrkit_pvm/common/status.py",
+            "tsrkit_pvm/common/constants.py",
+            "tsrkit_pvm/core/code.py",
+            "tsrkit_pvm/core/opcode.py",
         ]
         recompiler_files = [
-            # *glob.glob("tsrkit_pvm/recompiler/assembler/tables/*.py", recursive=True),
-            # "tsrkit_pvm/recompiler/assembler/inst_map.py",
-            # "tsrkit_pvm/recompiler/assembler/utils.py",
-            # "tsrkit_pvm/recompiler/memory.py",
-            # "tsrkit_pvm/recompiler/program.py",
-            # "tsrkit_pvm/recompiler/vm_context.py",
-            # "tsrkit_pvm/recompiler/pvm.py",
+            *glob.glob("tsrkit_pvm/recompiler/assembler/tables/*.py", recursive=True),
+            "tsrkit_pvm/recompiler/assembler/inst_map.py",
+            "tsrkit_pvm/recompiler/assembler/utils.py",
+            "tsrkit_pvm/recompiler/memory.py",
+            "tsrkit_pvm/recompiler/program.py",
+            "tsrkit_pvm/recompiler/vm_context.py",
+            "tsrkit_pvm/recompiler/pvm.py",
             *glob.glob("tsrkit_pvm/interpreter/**/*.py", recursive=True)
         ]
         recompiler_files = [f for f in recompiler_files if not f.endswith("__init__.py")]
