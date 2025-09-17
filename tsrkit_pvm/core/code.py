@@ -12,7 +12,7 @@ from ..recompiler.program import REC_Program
 from ..recompiler.memory import REC_Memory
 from tsrkit_pvm.interpreter.program import INT_Program
 from tsrkit_pvm.interpreter.memory import INT_Memory
-from ..cpvm.cy_memory import CyMemory
+# from ..cpvm.cy_memory import CyMemory
 
 _PVM_MODE = os.environ.get("PVM_MODE", "interpreter")
 

@@ -75,7 +75,7 @@ class INT_Memory:
 
         self.heap_break: int = heap
 
-    def _bulk_load_sparse(self, sorted_addrs):
+    def _bulk_load_sparse(self, sorted_addrs: List[tuple[int, int]]) -> None:
         """Traditional sparse loading for non-contiguous data."""
         current_page = -1
         page_data: Optional[bytearray] = None
@@ -92,10 +92,11 @@ class INT_Memory:
                     page_data = bytearray(PAGE_SIZE)
                     self._pages[page_idx] = page_data
             
+            assert page_data is not None 
             page_data[addr & _PAGE_MASK] = val
 
     # --------------------------------------------------------------------- #
-    # Core helpers - Optimized with bit manipulation
+    # Core helpers
     # --------------------------------------------------------------------- #
 
     @staticmethod
@@ -145,7 +146,7 @@ class INT_Memory:
                 raise PvmError(PAGE_FAULT(addr))
 
     # --------------------------------------------------------------------- #
-    # Public operations - Optimized for performance
+    # Public operations
     # --------------------------------------------------------------------- #
 
     def read(self, address: int, length: int) -> bytes:
@@ -176,7 +177,7 @@ class INT_Memory:
             # Update hot cache
             self._hot_page_num = pg
             self._hot_page_data = page_data
-            self._hot_page_writable = self._w_pages[pg]
+            self._hot_page_writable = bool(self._w_pages[pg])
             
             return bytes(page_data[page_off:page_off + length])
         
