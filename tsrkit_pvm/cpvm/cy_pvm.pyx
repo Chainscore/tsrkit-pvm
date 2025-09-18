@@ -12,13 +12,10 @@ cimport cython
 from libc.stdint cimport int32_t, int64_t, uint32_t, uint64_t
 from typing import Any, List, Tuple, Union
 
-from tsrkit_pvm.interpreter.memory import INT_Memory
-from tsrkit_pvm.interpreter.program import INT_Program
-from tsrkit_pvm.common.status import OUT_OF_GAS, PAGE_FAULT, PANIC, ExecutionStatus, PvmError, CONTINUE
-from .instructions.tables import ALL_CY_TABLES
-from .mapper import CyInstMapper
+from .cy_program import CyProgram
 from .cy_memory import CyMemory
-import array
+from tsrkit_pvm.common.status import OUT_OF_GAS, PAGE_FAULT, PANIC, ExecutionStatus, PvmError, CONTINUE
+from .mapper import inst_map
 
 cdef class CyInterpreter:
     """
@@ -28,60 +25,25 @@ cdef class CyInterpreter:
     but with Cython optimizations for the critical execution loop.
     """
     
-    # Class-level mapper for instruction dispatch
-    cdef object _inst_mapper
-    
-    def __cinit__(self):
-        """Initialize the instruction mapper."""
-        self._inst_mapper = CyInstMapper(ALL_CY_TABLES)
-    
-    @staticmethod
+    @classmethod
     def execute(
-        program: INT_Program,
+        cls,
+        program: CyProgram,
         program_counter: int,
         gas: int,
         registers: List[int],
-        memory,
+        memory: CyMemory,
         logger: Union[Any, None] = None,
-    ) -> Tuple[ExecutionStatus, int, int, list, INT_Memory]:
-        """
-        Execute the program blob as per Psi specification.
-        
-        This method maintains identical semantics to the original but with
-        optimized inner loop performance using Cython.
-        """
-        # Create instance to use the mapper
-        interpreter = CyInterpreter()
-        # reg_arr = array.array("Q", registers)
-        # cdef uint64_t[:] reg_array = reg_arr  # Typed memoryview for registers
-        # cdef uint32_t program_counter_c = <uint32_t>(program_counter)
-        # cdef int32_t gas_c = <int32_t>(gas)
-        return interpreter._execute_optimized(program, program_counter, gas, registers, memory, logger)
-    
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cdef tuple _execute_optimized(
-        self,
-        object program, 
-        int program_counter,
-        int gas,
-        list registers, 
-        object memory,  
-        object logger,
     ):
-        """
-        Optimized execution loop with Cython performance improvements.
-        
-        Key optimizations:
-        - Typed local variables for gas accounting and program counter
-        - Reduced Python object overhead in tight loop
-        - Optimized status checking
-        """
         # Use C integers for performance-critical variables
         cdef int64_t remaining_gas = gas
         cdef int32_t pc = program_counter
         cdef int32_t gas_cost
         cdef bint should_break = False
+
+        cdef uint64_t reg_arr[13]
+        for i in range(13):
+            reg_arr[i] = registers[i]
         
         # Keep status as Python object for compatibility
         status = None
@@ -101,9 +63,9 @@ cdef class CyInterpreter:
         while not should_break:
             try:
                 # Execute instruction using optimized mapper
-                result, gas_cost = self._inst_mapper.process_instruction(program, pc, registers, memory)
-                status, pc, registers, memory = result
-                
+                result, gas_cost = inst_map.process_instruction(program, pc, reg_arr, memory)
+                status, pc, _, memory = result
+
                 remaining_gas -= gas_cost
 
                 if remaining_gas < 0:
@@ -169,10 +131,10 @@ cdef class CyInterpreter:
                 "PVM result",
                 final_pc=pc,
                 gas_remaining=remaining_gas,
-                registers=registers,
+                registers=reg_arr,
                 memory=memory,
             )
 
         # Convert C integers back to Python for return
-        return status, int(pc), int(remaining_gas), registers, memory
+        return status, int(pc), int(remaining_gas), reg_arr, memory
 

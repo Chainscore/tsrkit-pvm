@@ -24,7 +24,12 @@ Usage:
 from .cy_pvm import CyInterpreter
 from .mapper import CyInstMapper, CyCompiledInstruction, CyBlockInfo
 from .instructions import ALL_CY_TABLES, ALL_TABLES
-from .cy_memory import CyMemory, CyINT_Memory
+from .cy_memory import CyMemory
+from .cy_status import (
+    PvmError, 
+    HALT, PANIC, OUT_OF_GAS, CONTINUE, PAGE_FAULT, HOST
+)
+from .cy_program import CyProgram
 
 __all__ = [
     # Main interpreter
@@ -41,5 +46,16 @@ __all__ = [
     
     # Memory system
     'CyMemory',
-    'CyINT_Memory',
+    
+    # Status and error handling
+    'PvmError',
+    'HALT',
+    'PANIC', 
+    'OUT_OF_GAS',
+    'CONTINUE',
+    'PAGE_FAULT',
+    'HOST',
+    
+    # Program classes
+    'CyProgram',
 ]

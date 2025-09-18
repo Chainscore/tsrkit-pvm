@@ -11,6 +11,8 @@ from libc.stdint cimport uint32_t, uint64_t
 from tsrkit_pvm.common.status import CONTINUE
 from tsrkit_pvm.common.utils import clamp_4, z
 from tsrkit_pvm.core.opcode import OpCode
+from ...cy_memory cimport CyMemory
+
 
 cdef class CyWArgsOneOffset:
     """
@@ -49,7 +51,7 @@ cdef class CyWArgsOneOffset:
             40: OpCode(name="jump", fn=cls.jump, gas=1, is_terminating=True),
         }
 
-    cpdef tuple jump(self, list registers, object memory, uint64_t vx):
+    cdef tuple jump(self, uint64_t *registers, CyMemory memory, uint64_t vx):
         """
         OPC40: Unconditional jump to specified offset.
         
@@ -59,7 +61,7 @@ cdef class CyWArgsOneOffset:
             vx: Target jump address
         
         Returns:
-            Tuple of (status, next_pc, registers, memory)
+            Tuple of (status, counter)
         """
         # Use the program's branch method for proper jump validation
         cdef object status_result = self.program.branch(self.counter, vx, True)
@@ -67,10 +69,10 @@ cdef class CyWArgsOneOffset:
         cdef uint32_t target_counter = status_result[1]
         
         if status == CONTINUE and target_counter != self.counter:
-            return status, target_counter, registers, memory
+            return status, target_counter
         
         # Default fallthrough
         cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
 

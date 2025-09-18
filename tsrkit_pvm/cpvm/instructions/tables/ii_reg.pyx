@@ -13,10 +13,11 @@ from typing import Dict
 from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t, uint16_t, uint32_t
 
 from tsrkit_pvm.common.status import CONTINUE
-from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.common.utils import b, b_inv, chi, compare, compare_bits_vectorized, z, z_inv, clamp_12
 from tsrkit_pvm.core.instruction_table import InstructionTable
 from tsrkit_pvm.core.opcode import OpCode, OpReturn
+from ...cy_memory import WRITE
+from ...cy_memory cimport CyMemory
 
 cdef class CyInstructionsWArgs2Reg:
     """
@@ -104,16 +105,15 @@ cdef class CyInstructionsWArgs2Reg:
             ),
         }
 
-    cpdef tuple move_reg(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  move_reg(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC100: Move value from register ra to register rd."""
         registers[rd] = registers[ra]
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple sbrk(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  sbrk(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC101: Expand heap by ra bytes and store old break in rd."""
         cdef int64_t req = registers[ra]  # bytes requested
-        memory.alter_accessibility(memory.heap_break, req, Accessibility.WRITE)
+        memory.alter_accessibility(memory.heap_break, req, WRITE)
         
         # Store old heap break in destination register
         registers[rd] = memory.heap_break
@@ -121,85 +121,75 @@ cdef class CyInstructionsWArgs2Reg:
         # Update heap break
         memory.heap_break = memory.heap_break + req
         
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
     # Bit counting instructions with C-level optimizations
-    cpdef tuple count_set_bits_64(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  count_set_bits_64(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC102: Count set bits in 64-bit value."""
         cdef uint64_t val = registers[ra] % (2**64)
         cdef uint32_t count = self._count_set_bits_c(val)
         registers[rd] = count
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple count_set_bits_32(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  count_set_bits_32(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC103: Count set bits in 32-bit value."""
         cdef uint32_t val = registers[ra] % (2**32)
         cdef uint32_t count = self._count_set_bits_c(val)
         registers[rd] = count
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
     # Leading zero counting with C optimizations
-    cpdef tuple leading_zero_bits_64(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  leading_zero_bits_64(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC104: Count leading zero bits in 64-bit value."""
         cdef uint64_t val = registers[ra] % (2**64)
         cdef uint32_t count = self._leading_zeros_c(val, 64)
         registers[rd] = count
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple leading_zero_bits_32(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  leading_zero_bits_32(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC105: Count leading zero bits in 32-bit value."""
         cdef uint32_t val = registers[ra] % (2**32)
         cdef uint32_t count = self._leading_zeros_c(val, 32)
         registers[rd] = count
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
     # Trailing zero counting with C optimizations  
-    cpdef tuple trailing_zero_bits_64(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  trailing_zero_bits_64(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC106: Count trailing zero bits in 64-bit value."""
         cdef uint64_t val = registers[ra] % (2**64)
         cdef uint32_t count = self._trailing_zeros_c(val, 64)
         registers[rd] = count
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple trailing_zero_bits_32(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  trailing_zero_bits_32(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC107: Count trailing zero bits in 32-bit value."""
         cdef uint32_t val = registers[ra] % (2**32)
         cdef uint32_t count = self._trailing_zeros_c(val, 32)
         registers[rd] = count
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
     # Sign extension instructions
-    cpdef tuple sign_extend_8(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  sign_extend_8(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC108: Sign extend 8-bit value to 64-bit."""
         registers[rd] = z_inv(
             z(registers[ra] % 2**8, 8 // 8), 8
         )
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple sign_extend_16(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  sign_extend_16(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC109: Sign extend 16-bit value to 64-bit."""
         registers[rd] = z_inv(
             z(registers[ra] % 2**16, 16 // 8), 8
         )
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple zero_extend_16(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  zero_extend_16(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC110: Zero extend 16-bit value to 64-bit."""
         cdef uint64_t val = registers[ra] % (2**16)
         registers[rd] = val
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple reverse_bytes(self, list registers, object memory, uint32_t rd, uint32_t ra):
+    cdef tuple  reverse_bytes(self, uint64_t *registers, CyMemory memory, uint32_t rd, uint32_t ra):
         """OPC111: Reverse byte order of 64-bit value."""
         # cdef uint64_t val = registers[ra]
         # cdef uint64_t reversed = (
@@ -216,10 +206,11 @@ cdef class CyInstructionsWArgs2Reg:
         registers[rd] = int.from_bytes(
             registers[ra].to_bytes(8, "little")[::-1], "little"
         )
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    # Optimized C helper functions
+    # ----------------------------#
+    # ---- C helper functions ----#
+    # ----------------------------#
     cdef uint32_t _count_set_bits_c(self, uint64_t val):
         """Fast bit counting using Brian Kernighan's algorithm."""
         cdef uint32_t count = 0

@@ -12,6 +12,8 @@ from libc.stdint cimport uint32_t, uint64_t
 from tsrkit_pvm.common.status import CONTINUE
 from tsrkit_pvm.common.utils import chi, clamp_12, clamp_4, clamp_4_max0
 from tsrkit_pvm.core.opcode import OpCode
+from ...cy_memory cimport CyMemory
+
 
 cdef class CyInstructionsWArgs1Reg2Imm:
     """
@@ -71,30 +73,26 @@ cdef class CyInstructionsWArgs1Reg2Imm:
         }
 
     # Store immediate indirect instructions
-    cpdef tuple store_imm_ind_u8(self, list registers, object memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple  store_imm_ind_u8(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC70: Store immediate vy as u8 at address (ra + vx)."""
         value = int(vy % (2**8))
-        memory.write(registers[ra] + vx, value.to_bytes(1, "little"))
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(1, "little"))
+        return CONTINUE, -1
 
-    cpdef tuple store_imm_ind_u16(self, list registers, object memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple  store_imm_ind_u16(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC71: Store immediate vy as u16 at address (ra + vx)."""
         value = int(vy % (2**16))
-        memory.write(registers[ra] + vx, value.to_bytes(2, "little"))
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(2, "little"))
+        return CONTINUE, -1
 
-    cpdef tuple store_imm_ind_u32(self, list registers, object memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple  store_imm_ind_u32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC72: Store immediate vy as u32 at address (ra + vx)."""
         value = int(vy % (2**32))
-        memory.write(registers[ra] + vx, value.to_bytes(4, "little"))
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(4, "little"))
+        return CONTINUE, -1
 
-    cpdef tuple store_imm_ind_u64(self, list registers, object memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple  store_imm_ind_u64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC73: Store immediate vy as u64 at address (ra + vx)."""
         value = int(vy % (2**64))
-        memory.write(registers[ra] + vx, value.to_bytes(8, "little"))
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(8, "little"))
+        return CONTINUE, -1

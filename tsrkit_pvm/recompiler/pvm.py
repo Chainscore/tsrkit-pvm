@@ -35,7 +35,7 @@ from ..common.status import PANIC, HALT, PAGE_FAULT, HOST, OUT_OF_GAS, Execution
 # C's sigaction provides a better low level handler
 try:
     from importlib.resources import files
-    segwrap_package = files('tsrkit_pvm.recompiler.segwrap')
+    segwrap_package = files('libs')
     _segwrap_path = str(segwrap_package / 'libsegwrap.so')
     
     # Load the segwrap library with error handling

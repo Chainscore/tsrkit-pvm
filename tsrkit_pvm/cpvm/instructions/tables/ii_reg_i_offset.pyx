@@ -13,6 +13,8 @@ from libc.stdint cimport uint32_t, int64_t, uint64_t
 from tsrkit_pvm.core.opcode import OpCode
 from tsrkit_pvm.common.status import CONTINUE, PANIC
 from tsrkit_pvm.common.utils import clamp_12, clamp_4_max0, z
+from ...cy_memory cimport CyMemory
+
 
 cdef class CyInstructionsWArgs2Reg1Offset:
     """Cython optimized instruction class for 2 register + 1 offset instructions."""
@@ -59,7 +61,7 @@ cdef class CyInstructionsWArgs2Reg1Offset:
             175: OpCode(name="branch_ge_s", fn=cls.branch_ge_s, gas=1, is_terminating=True),
         }
 
-    cpdef tuple branch_eq(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
+    cdef tuple  branch_eq(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
         """OPC170: Branch if ra == rb to offset vx."""
         cdef object status_result
         cdef object status
@@ -69,12 +71,11 @@ cdef class CyInstructionsWArgs2Reg1Offset:
             status = status_result[0]
             target_counter = status_result[1]
             if status == CONTINUE and target_counter != self.counter:
-                return status, target_counter, registers, memory
+                return status, target_counter
         
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple branch_ne(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
+    cdef tuple  branch_ne(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
         """OPC171: Branch if ra != rb to offset vx."""
         cdef object status_result
         cdef object status
@@ -84,12 +85,11 @@ cdef class CyInstructionsWArgs2Reg1Offset:
             status = status_result[0]
             target_counter = status_result[1]
             if status == CONTINUE and target_counter != self.counter:
-                return status, target_counter, registers, memory
+                return status, target_counter
         
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple branch_lt_u(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
+    cdef tuple  branch_lt_u(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
         """OPC172: Branch if ra < rb (unsigned) to offset vx."""
         cdef object status_result
         cdef object status
@@ -99,12 +99,11 @@ cdef class CyInstructionsWArgs2Reg1Offset:
             status = status_result[0]
             target_counter = status_result[1]
             if status == CONTINUE and target_counter != self.counter:
-                return status, target_counter, registers, memory
+                return status, target_counter
         
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple branch_lt_s(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
+    cdef tuple  branch_lt_s(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
         """OPC173: Branch if ra < rb (signed) to offset vx."""
         cdef object status_result
         cdef object status
@@ -114,12 +113,11 @@ cdef class CyInstructionsWArgs2Reg1Offset:
             status = status_result[0]
             target_counter = status_result[1]
             if status == CONTINUE and target_counter != self.counter:
-                return status, target_counter, registers, memory
+                return status, target_counter
         
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple branch_ge_u(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
+    cdef tuple  branch_ge_u(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
         """OPC174: Branch if ra >= rb (unsigned) to offset vx."""
         cdef uint64_t a = registers[ra]
         cdef uint64_t b = registers[rb]
@@ -131,12 +129,11 @@ cdef class CyInstructionsWArgs2Reg1Offset:
             status = status_result[0]
             target_counter = status_result[1]
             if status == CONTINUE and target_counter != self.counter:
-                return status, target_counter, registers, memory
+                return status, target_counter
         
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple branch_ge_s(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
+    cdef tuple  branch_ge_s(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
         """OPC175: Branch if ra >= rb (signed) to offset vx."""
         cdef int64_t a = <int64_t>registers[ra]
         cdef int64_t b = <int64_t>registers[rb]
@@ -148,7 +145,6 @@ cdef class CyInstructionsWArgs2Reg1Offset:
             status = status_result[0]
             target_counter = status_result[1]
             if status == CONTINUE and target_counter != self.counter:
-                return status, target_counter, registers, memory
+                return status, target_counter
         
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1

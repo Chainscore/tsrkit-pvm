@@ -15,17 +15,7 @@ import os
 from .memory import INT_Memory as Memory
 from .program import INT_Program as Program
 
-# Dynamic PVM implementation selection based on PVM_MODE
-PVM_MODE = os.environ.get("PVM_MODE", "mypyc").lower()
-
-if PVM_MODE == "cython":
-    try:
-        from .cy_pvm import Interpreter as PVM
-    except ImportError as e:
-        print(f"⚠️  Cython PVM not available ({e}), falling back to standard interpreter")
-        from .pvm import Interpreter as PVM
-else:
-    from .pvm import Interpreter as PVM
+from .pvm import Interpreter as PVM
 from ..common.status import (
     CONTINUE,
     HALT,

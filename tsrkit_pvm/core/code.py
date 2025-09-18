@@ -12,7 +12,8 @@ from ..recompiler.program import REC_Program
 from ..recompiler.memory import REC_Memory
 from tsrkit_pvm.interpreter.program import INT_Program
 from tsrkit_pvm.interpreter.memory import INT_Memory
-# from ..cpvm.cy_memory import CyMemory
+from ..cpvm.cy_memory import CyMemory
+from ..cpvm.cy_program import CyProgram
 
 _PVM_MODE = os.environ.get("PVM_MODE", "interpreter")
 
@@ -115,8 +116,10 @@ def y_function(
         )
     elif _PVM_MODE == "cython":
         # TODO: use cython program/memory once implemented
-        program_ = INT_Program.decode_from(code.code)[0]
-        memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
+        # program_ = INT_Program.decode_from(code.code)[0]
+        program_ = CyProgram.decode_from(code.code)[0]
+        memory = CyMemory.from_pc(code.read, code.r_write, args, code.z, code.s)
+        # memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
     elif _PVM_MODE == "interpreter":
         program_ = INT_Program.decode_from(code.code)[0]
         memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)

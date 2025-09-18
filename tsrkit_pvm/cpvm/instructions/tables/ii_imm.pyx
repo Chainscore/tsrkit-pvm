@@ -14,6 +14,8 @@ from libc.stdint cimport uint32_t, uint64_t, uint8_t, uint16_t, uint32_t
 from tsrkit_pvm.common.status import CONTINUE
 from tsrkit_pvm.common.utils import chi, clamp_4, clamp_4_max0
 from tsrkit_pvm.core.opcode import OpCode
+from ...cy_memory cimport CyMemory
+
 
 cdef class CyInstructionsWArgs2Imm:
     """
@@ -64,35 +66,31 @@ cdef class CyInstructionsWArgs2Imm:
             33: OpCode(name="store_imm_u64", fn=cls.store_imm_u64, gas=1, is_terminating=False),
         }
 
-    cpdef tuple store_imm_u8(self, list registers, object memory, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple  store_imm_u8(self, uint64_t *registers, CyMemory memory, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC30: Store immediate 8-bit value."""
-        cdef uint8_t value = <uint8_t>(vy & 0xFF)
+        cdef uint8_t value = <uint8_t>(vy % 2**8)
         cdef uint64_t address = <uint64_t>vx
-        memory.write_u8(address, value)
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write(address & 0xFFFFFFFF, value.to_bytes(1, 'little'))
+        return CONTINUE, -1
 
-    cpdef tuple store_imm_u16(self, list registers, object memory, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple  store_imm_u16(self, uint64_t *registers, CyMemory memory, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC31: Store immediate 16-bit value."""
-        cdef uint16_t value = <uint16_t>(vy & 0xFFFF)
+        cdef uint16_t value = <uint16_t>(vy % 2**16)
         cdef uint64_t address = <uint64_t>vx
-        memory.write_u16(address, value)
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write(address & 0xFFFFFFFF, value.to_bytes(2, 'little'))
+        return CONTINUE, -1
 
-    cpdef tuple store_imm_u32(self, list registers, object memory, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple  store_imm_u32(self, uint64_t *registers, CyMemory memory, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC32: Store immediate 32-bit value."""
-        cdef uint32_t value = <uint32_t>(vy & 0xFFFFFFFF)
+        cdef uint32_t value = <uint32_t>(vy % 2**32)
         cdef uint64_t address = <uint64_t>vx
-        memory.write_u32(address, value)
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write(address & 0xFFFFFFFF, value.to_bytes(4, 'little'))
+        return CONTINUE, -1
 
-    cpdef tuple store_imm_u64(self, list registers, object memory, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple  store_imm_u64(self, uint64_t *registers, CyMemory memory, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC33: Store immediate 64-bit value."""
-        cdef uint64_t value = <uint64_t>vy
+        cdef uint64_t value = <uint64_t>(vy % 2**64)
         cdef uint64_t address = <uint64_t>vx
-        memory.write_u64(address, value)
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write(address & 0xFFFFFFFF, value.to_bytes(8, 'little'))
+        return CONTINUE, -1
 

@@ -30,6 +30,7 @@ MANIFEST
 /tsrkit_pvm/common/**/*.so
 /tsrkit_pvm/cpvm/**/*.c
 /tsrkit_pvm/cpvm/**/*.so
+/tsrkit_pvm/cpvm/**/*.html
 *.so
 
 # PyInstaller
@@ -152,4 +153,14 @@ Thumbs.db
 # Project specific
 *.log
 .coverage
-htmlcov/ 
+htmlcov/
+
+# Compiled extensions scattered in source tree (keep organized ones in _compiled/)
+tsrkit_pvm/**/*.so
+tsrkit_pvm/**/*.pyd
+!tsrkit_pvm/_compiled/*.so
+!tsrkit_pvm/_compiled/*.pyd
+
+# Generated C files from Cython
+tsrkit_pvm/**/*.c
+!tsrkit_pvm/recompiler/segwrap/segwrap.c 

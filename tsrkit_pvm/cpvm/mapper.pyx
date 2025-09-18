@@ -4,16 +4,46 @@
 # cython: cdivision=True
 # cython: profile=True
 
-"""
-Cython optimized instruction mapper and dispatch system.
-"""
-
-from typing import List, Any, Dict, Tuple, Optional, Union
+from typing import List, Any
 from libc.stdint cimport int64_t, int32_t, uint8_t, uint32_t, uint64_t
 from libc.string cimport memset
 from cpython.mem cimport PyMem_Malloc, PyMem_Free
+from ..common.status import CONTINUE
+from .cy_memory cimport CyMemory 
+from .cy_program cimport CyProgram
 
-# Simple C struct for gas costs and flags only (no Python objects)
+from .instructions.tables.i_imm import CyInstructionsWArgs1Imm
+from .instructions.tables.wo_args import InstructionsWoArgs
+from .instructions.tables.i_offset import CyWArgsOneOffset
+from .instructions.tables.i_reg_i_ewimm import CyInstructionsWArgs1Reg1EwImm
+from .instructions.tables.i_reg_i_imm import CyInstructionsWArgs1Reg1Imm
+from .instructions.tables.i_reg_i_imm_i_offset import InstructionsWArgs1Reg1Imm1Offset
+from .instructions.tables.i_reg_ii_imm import CyInstructionsWArgs1Reg2Imm
+from .instructions.tables.ii_imm import CyInstructionsWArgs2Imm
+from .instructions.tables.ii_reg import CyInstructionsWArgs2Reg
+from .instructions.tables.ii_reg_i_imm import CyInstructionsWArgs2Reg1Imm
+from .instructions.tables.ii_reg_i_offset import CyInstructionsWArgs2Reg1Offset
+from .instructions.tables.ii_reg_ii_imm import CyInstructionsWArgs2Reg2Imm
+from .instructions.tables.iii_reg import CyInstructionsWArgs3Reg
+from .cy_block cimport CyBlockInfo, CyCompiledInstruction
+
+
+all_tables = [
+    InstructionsWoArgs,
+    CyInstructionsWArgs1Imm,
+    CyWArgsOneOffset,
+    CyInstructionsWArgs1Reg1EwImm,
+    CyInstructionsWArgs1Reg1Imm,
+    InstructionsWArgs1Reg1Imm1Offset,
+    CyInstructionsWArgs1Reg2Imm,
+    CyInstructionsWArgs2Imm,
+    CyInstructionsWArgs2Reg,
+    CyInstructionsWArgs2Reg1Imm,
+    CyInstructionsWArgs2Reg1Offset,
+    CyInstructionsWArgs2Reg2Imm,
+    CyInstructionsWArgs3Reg,
+]
+
 cdef struct COpInfo:
     uint8_t gas_cost
     uint8_t is_terminating
@@ -40,7 +70,7 @@ cdef class CyInstMapper:
     cdef COpInfo* _op_info_table
     cdef uint64_t _terminating_mask
     cdef dict _basic_blocks
-    cdef list _dispatch_table  # 256-entry list of CyInstructionHandler
+    cdef public list _dispatch_table  # 256-entry list of CyInstructionHandler
     cdef list _all_tables
 
     def __init__(self, all_tables: List[type]):
@@ -77,21 +107,13 @@ cdef class CyInstMapper:
                     if op_code.is_terminating:
                         self._terminating_mask |= (1UL << opcode)
     
-    cpdef tuple process_instruction(self, object program, int32_t program_counter, 
-                                   list registers, object memory):
+    cdef tuple process_instruction(self, CyProgram program, int32_t program_counter, 
+                                   uint64_t *registers, CyMemory memory):
         """
         Execute an instruction using the optimized dispatch table.
         """
-        # cdef object block = self.get_block(program, program_counter)
-        # return block.execute(program, program_counter, registers, memory)
-
-        handler = self._dispatch_table[program.zeta[program_counter]]
-        if handler is None:
-            raise ValueError("Recompiler: Invalid opcode")
-        table_instance = handler.table_class(counter=program_counter, program=program, skip_index=program.skip(program_counter))
-        props = table_instance.get_props()
-        result = handler.fn(table_instance, registers, memory, *props)
-        return result, handler.gas_cost
+        cdef CyBlockInfo block = self.get_block(program, program_counter)
+        return block.execute(program, program_counter, registers, memory)
     
     cpdef int32_t get_gas_cost(self, int32_t opcode):
         """Get gas cost with direct C array lookup."""
@@ -105,7 +127,7 @@ cdef class CyInstMapper:
             return bool((self._terminating_mask >> opcode) & 1)
         return False
     
-    cpdef object get_block(self, object program, int32_t start_pc):
+    cpdef CyBlockInfo get_block(self, object program, int32_t start_pc):
         """Get compiled block from cache or compile new one."""
         if start_pc in self._basic_blocks:
             return self._basic_blocks[start_pc]
@@ -115,40 +137,28 @@ cdef class CyInstMapper:
         self._basic_blocks[start_pc] = block
         return block
     
-    cdef object _compile_block(self, object program, int32_t start_pc):
-        """Compile a basic block with C-level optimizations."""
+    cdef CyBlockInfo _compile_block(self, CyProgram program, int32_t start_pc):
+        """Compile a basic block starting at the given PC with aggressive pre-caching."""
         cdef int32_t current_pc = start_pc
-        cdef int32_t opcode
+        cdef uint8_t opcode
         cdef CyInstructionHandler handler
-        cdef int32_t total_gas = 0
-        cdef int32_t next_block_start = -1
-        
-        # Find next basic block boundary
-        if hasattr(program, 'basic_blocks'):
-            for bb_start in sorted(program.basic_blocks):
-                if bb_start > start_pc:
-                    next_block_start = bb_start
-                    break
+        cdef uint32_t total_gas = 0
         
         compiled_instructions = []
         
-        while current_pc < len(program.zeta):
-            if next_block_start >= 0 and current_pc >= next_block_start:
-                break
+        while True:
             opcode = program.zeta[current_pc]
-            # print(">> Compiling Opcode:", opcode, "at PC:", current_pc)
-            if opcode < 0 or opcode >= 256:
-                raise ValueError(f"Invalid opcode: {opcode} at PC {current_pc}")
             handler = self._dispatch_table[opcode]
-            if handler is None or handler.fn is None:
-                raise ValueError(f"No handler for opcode: {opcode} at PC {current_pc}")
+            
+            if handler is None:
+                raise ValueError(f"Invalid opcode: {opcode} at PC {current_pc}")
+            
+            # Create temporary table instance to get instruction arguments
             skip_count = program.skip(current_pc)
-            table_instance = handler.table_class(
-                counter=current_pc,
-                program=program,
-                skip_index=skip_count
-            )
+            table_instance = handler.table_class(counter=current_pc, program=program, skip_index=skip_count)
             args = table_instance.get_props()
+            
+            # Create compiled instruction with pre-cached function and flags
             compiled_inst = CyCompiledInstruction(
                 opcode=opcode,
                 offset=current_pc - start_pc,
@@ -156,72 +166,23 @@ cdef class CyInstMapper:
                 args=args,
                 table=table_instance,
             )
+            
             compiled_instructions.append(compiled_inst)
             total_gas += handler.gas_cost
+            
+            # Stop at terminating instructions
             if handler.is_terminating:
-                end_pc = current_pc + 1
                 break
+                
+            # Move to next instruction
             current_pc += 1 + skip_count
-        else:
-            end_pc = current_pc
+        
         return CyBlockInfo(
-            end_pc=end_pc,
+            end_pc=current_pc,
             total_gas=total_gas,
             instructions=compiled_instructions,
             instruction_count=len(compiled_instructions)
         )
 
-class CyCompiledInstruction:
-    """Python wrapper for CCompiledInstruction."""
-    def __init__(self, opcode: int, offset: int, handler, args: List[int], table):
-        self.opcode = opcode
-        self.offset = offset
-        self.handler = handler
-        self.args = args
-        self.table = table
-
-class CyBlockInfo:
-    """Python wrapper for CBlockInfo with optimized execution."""
-    def __init__(self, end_pc: int, total_gas: int, instructions: List, instruction_count: int):
-        self.end_pc = end_pc
-        self.total_gas = total_gas
-        self.instructions = instructions
-        self.instruction_count = instruction_count
-    
-    def execute(self, program: Any, start_pc: int, registers: List[int], 
-                memory: Any) -> Tuple[Tuple[Any, int, List[int], Any], int]:
-        """Execute block with optimized loop."""
-        cdef int32_t current_pc = start_pc
-        cdef int32_t i
-        cdef object status = None
-        cdef int32_t next_pc
-        
-        current_registers = registers
-        current_memory = memory
-        
-        # Tight execution loop
-        for i in range(len(self.instructions)):
-            compiled_inst = self.instructions[i]
-
-            print(">> Executing Opcode:", compiled_inst.opcode, "at PC:", current_pc)
-
-            # Execute instruction
-            result = compiled_inst.handler.fn(
-                compiled_inst.table, current_registers, current_memory, *compiled_inst.args
-            )
-            
-            # Unpack result
-            status, next_pc, current_registers, current_memory = result
-            
-            # Check for termination
-            if compiled_inst.handler.is_terminating:
-                return (status, next_pc, current_registers, current_memory), self.total_gas
-            
-            # Check for non-continue status
-            if status != 0:  # Assuming CONTINUE = 0
-                return (status, next_pc, current_registers, current_memory), i + 1
-            
-            current_pc = next_pc
-        
-        # Block completed normally
-        return (status, current_pc, current_registers, current_memory), self.total_gas
+# Global instance for compatibility with Python version
+inst_map = CyInstMapper(all_tables)

@@ -25,6 +25,9 @@ if __name__ == "__main__":
             }
             
             cython_files = [
+                "tsrkit_pvm/cpvm/cy_status.pyx",
+                "tsrkit_pvm/cpvm/cy_program.pyx",
+                "tsrkit_pvm/cpvm/cy_block.pyx",
                 "tsrkit_pvm/cpvm/cy_memory.pyx",
                 "tsrkit_pvm/cpvm/instructions/tables/wo_args.pyx",
                 "tsrkit_pvm/cpvm/instructions/tables/i_imm.pyx",
@@ -66,7 +69,7 @@ if __name__ == "__main__":
             "tsrkit_pvm/common/utils.py",
             "tsrkit_pvm/common/status.py",
             "tsrkit_pvm/common/constants.py",
-            "tsrkit_pvm/core/code.py",
+            # "tsrkit_pvm/core/code.py",
             "tsrkit_pvm/core/opcode.py",
         ]
         recompiler_files = [

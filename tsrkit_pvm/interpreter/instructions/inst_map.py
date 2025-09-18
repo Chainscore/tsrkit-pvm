@@ -86,7 +86,7 @@ class BlockInfo:
             status, next_pc, registers, memory = compiled_inst.fn(
                 compiled_inst.table, registers, memory, *compiled_inst.args
             )
-            
+
             # Use pre-cached termination flag
             if compiled_inst.is_terminating:
                 return (status, next_pc, registers, memory), total_gas

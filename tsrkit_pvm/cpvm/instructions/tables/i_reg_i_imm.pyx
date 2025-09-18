@@ -12,11 +12,11 @@ This table handles instructions that take one register and one immediate argumen
 from typing import Dict
 from libc.stdint cimport uint32_t, uint64_t
 
-from tsrkit_pvm.interpreter.memory import INT_Memory
 from tsrkit_pvm.common.status import CONTINUE
 from tsrkit_pvm.common.utils import chi, clamp_12, clamp_4
-from tsrkit_pvm.core.instruction_table import InstructionTable
 from tsrkit_pvm.core.opcode import OpCode
+from ...cy_memory cimport CyMemory
+
 
 cdef class CyInstructionsWArgs1Reg1Imm:
     """
@@ -66,91 +66,77 @@ cdef class CyInstructionsWArgs1Reg1Imm:
             62: OpCode(name="store_u64", fn=cls.store_u64, gas=1, is_terminating=False),
         }
 
-    cpdef tuple jump_ind(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  jump_ind(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC50: Indirect jump to address in register + offset."""
-        cdef uint32_t target_address = <uint32_t>((registers[ra] + vx) % 2**32)
-        # Use the program's djump method for proper jump validation
-        cdef object status_result = self.program.djump(self.counter, target_address)
-        cdef object status = status_result[0]
-        cdef uint32_t target_counter = status_result[1]
-        return status, target_counter, registers, memory
+        status, counter = self.program.djump( 
+            self.counter, (int(registers[ra]) + vx) % 2**32
+        )
+        return status, counter
 
-    cpdef tuple load_imm(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  load_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC51: Load immediate value into register."""
         registers[ra] = vx
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple load_u8(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  load_u8(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC52: Load unsigned 8-bit value from memory."""
-        cdef bytes data = memory.read(vx, 1)
+        cdef bytes data = memory.read(vx & 0xFFFFFFFF, 1)
         registers[ra] = int.from_bytes(data, "little")
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple load_i8(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  load_i8(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC53: Load signed 8-bit value from memory."""
-        cdef bytes data = memory.read(vx, 1)
+        cdef bytes data = memory.read(vx & 0xFFFFFFFF, 1)
         registers[ra] = chi(int.from_bytes(data, "little"), 1)
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple load_u16(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  load_u16(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC54: Load unsigned 16-bit value from memory."""
-        cdef bytes data = memory.read(vx, 2)
+        cdef bytes data = memory.read(vx & 0xFFFFFFFF, 2)
         registers[ra] = int.from_bytes(data, "little")
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple load_i16(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  load_i16(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC55: Load signed 16-bit value from memory."""
-        cdef bytes data = memory.read(vx, 2)
+        cdef bytes data = memory.read(vx & 0xFFFFFFFF, 2)
         registers[ra] = chi(int.from_bytes(data, "little"), 2)
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple load_u32(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  load_u32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC56: Load unsigned 32-bit value from memory."""
-        cdef bytes data = memory.read(vx, 4)
+        cdef bytes data = memory.read(vx & 0xFFFFFFFF, 4)
         registers[ra] = int.from_bytes(data, "little")
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple load_i32(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  load_i32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC57: Load signed 32-bit value from memory."""
-        cdef bytes data = memory.read(vx, 4)
+        cdef bytes data = memory.read(vx & 0xFFFFFFFF, 4)
         registers[ra] = chi(int.from_bytes(data, "little"), 4)
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple load_u64(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  load_u64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC58: Load unsigned 64-bit value from memory."""
-        cdef bytes data = memory.read(vx, 8)
+        cdef bytes data = memory.read(vx & 0xFFFFFFFF, 8)
         registers[ra] = int.from_bytes(data, "little")
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1
 
-    cpdef tuple store_u8(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  store_u8(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC59: Store register value as unsigned 8-bit to memory."""
-        memory.write(vx, (registers[ra] % 256).to_bytes(1, "little"))
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write(vx & 0xFFFFFFFF, (registers[ra] % 256).to_bytes(1, "little"))
+        return CONTINUE, -1
 
-    cpdef tuple store_u16(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  store_u16(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC60: Store register value as unsigned 16-bit to memory."""
-        memory.write(vx, (registers[ra] % 65536).to_bytes(2, "little"))
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write(vx & 0xFFFFFFFF, (registers[ra] % 65536).to_bytes(2, "little"))
+        return CONTINUE, -1
 
-    cpdef tuple store_u32(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  store_u32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC61: Store register value as unsigned 32-bit to memory."""
-        memory.write(vx, (registers[ra] % 4294967296).to_bytes(4, "little"))
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write(vx & 0xFFFFFFFF, (registers[ra] % 4294967296).to_bytes(4, "little"))
+        return CONTINUE, -1
 
-    cpdef tuple store_u64(self, list registers, object memory, uint32_t ra, uint32_t lx, uint64_t vx):
+    cdef tuple  store_u64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint64_t vx):
         """OPC62: Store register value as unsigned 64-bit to memory."""
-        memory.write(vx, (registers[ra] % 18446744073709551616).to_bytes(8, "little"))
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        memory.write(vx & 0xFFFFFFFF, (registers[ra] % 18446744073709551616).to_bytes(8, "little"))
+        return CONTINUE, -1
 

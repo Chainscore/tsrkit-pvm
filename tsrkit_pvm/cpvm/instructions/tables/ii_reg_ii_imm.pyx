@@ -7,12 +7,12 @@ This table handles instructions with complex argument parsing:
 """
 
 from typing import Dict
-cimport cython
 from libc.stdint cimport uint32_t, int64_t, uint64_t
-
 from tsrkit_pvm.core.opcode import OpCode
 from tsrkit_pvm.common.status import CONTINUE, PANIC
 from tsrkit_pvm.common.utils import chi, clamp_12, clamp_4, clamp_4_max0
+from ...cy_memory cimport CyMemory
+
 
 cdef class CyInstructionsWArgs2Reg2Imm:
     """Cython optimized instruction class for 2 register + 2 immediate instructions."""
@@ -73,10 +73,10 @@ cdef class CyInstructionsWArgs2Reg2Imm:
         }
 
 
-    cpdef tuple load_imm_jump_ind(self, list registers, object memory, uint32_t ra, uint32_t rb, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
+    cdef tuple load_imm_jump_ind(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
         """OPC180: Load immediate value into register and jump indirect."""
         from math import floor
         wb = registers[rb]
         registers[ra] = vx
         status, counter = self.program.djump(self.counter, floor(wb + vy) % 2**32)
-        return status, counter, registers, memory
+        return status, counter

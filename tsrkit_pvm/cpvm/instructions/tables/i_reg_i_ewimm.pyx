@@ -13,6 +13,8 @@ from libc.stdint cimport uint32_t, uint64_t
 from tsrkit_pvm.common.status import CONTINUE
 from tsrkit_pvm.common.utils import clamp_12
 from tsrkit_pvm.core.opcode import OpCode
+from ...cy_memory cimport CyMemory
+
 
 cdef class CyInstructionsWArgs1Reg1EwImm:
     """
@@ -49,8 +51,7 @@ cdef class CyInstructionsWArgs1Reg1EwImm:
             20: OpCode(name="load_imm_64", fn=cls.load_imm_64, gas=1, is_terminating=False),
         }
 
-    cpdef tuple load_imm_64(self, list registers, object memory, uint32_t ra, uint64_t vx):
+    cdef tuple load_imm_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint64_t vx):
         """OPC20: Load 64-bit immediate value into register."""
         registers[ra] = vx
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+        return CONTINUE, -1

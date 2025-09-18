@@ -28,6 +28,7 @@ from .ii_reg_i_offset import CyInstructionsWArgs2Reg1Offset
 from .ii_reg_ii_imm import CyInstructionsWArgs2Reg2Imm
 from .iii_reg import CyInstructionsWArgs3Reg
 
+
 # List of all available instruction table classes
 ALL_CY_TABLES = [
     InstructionsWoArgs,

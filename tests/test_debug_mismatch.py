@@ -93,8 +93,6 @@ def test_debug_mismatch_int_rec():
         steps += 1
 
 
-
-
 @pytest.mark.skipif("PTRN" not in os.environ, reason="Pattern not found")
 def test_debug_mismatch_int_cython():
     """Test a single pattern - can be modified for quick testing"""
@@ -132,7 +130,7 @@ def test_debug_mismatch_int_cython():
             tc.initial_memory.to_memory(tc.initial_page_map),
         )
 
-        # assert r_status == i_status, "Should have same status"
+        assert r_status == i_status, "Should have same status"
 
         print("\t i", i_registers)
         print("\t r", r_registers)

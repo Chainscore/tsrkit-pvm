@@ -5,13 +5,11 @@
 # cython: profile=True
 
 from typing import Dict
-from libc.stdint cimport uint32_t
-
-from tsrkit_pvm.common.status import CONTINUE, PANIC, PvmError
-from tsrkit_pvm.core.instruction_table import InstructionTable
+from libc.stdint cimport uint32_t, uint64_t
+from tsrkit_pvm.common.status import PvmError, CONTINUE, PANIC
 from tsrkit_pvm.core.opcode import OpCode, OpReturn
+from ...cy_memory cimport CyMemory
 
-    
 cdef class InstructionsWoArgs:
     cdef uint32_t counter
     cdef object program
@@ -32,11 +30,10 @@ cdef class InstructionsWoArgs:
             1: OpCode(name="fallthrough", fn=cls.fallthrough, gas=1, is_terminating=True),
         }
 
-    cpdef tuple trap(self, list registers, object memory):
-        raise PvmError(PANIC)
+    cdef tuple  trap(self, uint64_t *registers, CyMemory memory):
+        raise PvmError(PANIC, -1, "Trap instruction executed")
 
-    cpdef tuple fallthrough(self, list registers, object memory):
-        cdef uint32_t next_pc = self.counter + self.skip_index + 1
-        return CONTINUE, next_pc, registers, memory
+    cdef tuple  fallthrough(self, uint64_t *registers, CyMemory memory):
+        return CONTINUE, -1
 
 
