@@ -17,31 +17,31 @@ from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
 # Separate dispatch function for ecalli instruction
-cdef int ecalli_fn(uint64_t *registers, CyMemory memory, uint64_t vx, uint64_t vy, 
-                   uint8_t ra, uint8_t rb, uint8_t rc):
+cdef tuple ecalli_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
     OPC10: Ecalli - Execute call immediate.
     Performs a host call with the immediate value.
     
     Args:
+        program: Current program state
         registers: Current register state
         memory: Current memory state  
+        counter: Current program counter
         vx: Immediate value to pass to host
-        vy, ra, rb, rc: Unused for this instruction
+        vy, ra, rb, rd: Unused for this instruction
         
     Returns:
-        HOST status code
+        Tuple of (execution_status, next_pc)
     """
-    # Call HOST with the immediate value (vx)
-    return HOST(vx)
+    # Call HOST with the immediate value (vx) and return status with next_pc
+    return (HOST(vx), <uint32_t>0xFFFFFFFF)
 
 cdef class CyInstructionsWArgs1Imm(CyTable):
     """
     Cython optimized instruction table for instructions with 1 immediate argument.
     """
     
-    @staticmethod
-    cdef tuple get_props(uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
         """
         Extract immediate value from program bytes.
         Returns (vx, vy, ra, rb, rc) where vx is the immediate value, others are 0.
@@ -59,20 +59,15 @@ cdef class CyInstructionsWArgs1Imm(CyTable):
         # Apply chi transformation
         cdef uint64_t vx = chi(immediate_value, lx)
         
-        # Return in unified format: (vx, vy, ra, rb, rc)
+        # Return in unified format: (vx, vy, ra, rb, rd)
         return (vx, 0, 0, 0, 0)
-    
-    @staticmethod
-    cdef dict get_table():
+
+    cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""
-        cdef dict table = {}
-        cdef CyTableEntry entry
-        
-        # OPC10: ecalli
-        entry.fn = ecalli_fn
-        entry.gas_cost = 1
-        entry.is_terminating = False
-        table[10] = entry
-        
-        return table
+        return TABLE
+
+# Prebuilt table (opcode -> CyTableEntry)
+cdef dict TABLE = {}
+cdef CyTableEntry _e
+_e = CyTableEntry(); _e.fn = ecalli_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[10] = _e
 

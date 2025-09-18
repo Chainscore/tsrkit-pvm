@@ -12,421 +12,433 @@ This table handles instructions that take two registers and one immediate argume
 - rot_r_imm: Rotation operations with immediate
 """
 
-from typing import Dict
-from libc.stdint cimport uint32_t, int64_t, uint64_t
+from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t
 from tsrkit_pvm.common.status import CONTINUE
 from tsrkit_pvm.common.utils import b, b_inv, chi, compare, compare_bits_vectorized, z, z_inv, clamp_12, clamp_4, clamp_4_max0
-from tsrkit_pvm.core.opcode import OpCode
+from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
+from ...cy_program cimport CyProgram
 
-cdef class CyInstructionsWArgs2Reg1Imm:
-    """
-    Cython optimized instruction table for 2 register + 1 immediate argument instructions.
-    
-    This class provides high-performance implementations of instructions that
-    take two registers and one immediate argument, including:
-    - Memory operations (store/load with offset)
-    - Arithmetic operations with immediate values
-    - Logic operations (AND, XOR, OR) with immediate values
-    - Comparison and conditional operations
-    - Shift and rotation operations
-    All optimized with Cython for maximum performance.
-    """
-    
-    cdef public uint32_t counter
-    cdef public object program  # INT_Program - keeping as Python object for now
-    cdef public uint32_t skip_index
-    
-    def __init__(self, uint32_t counter, program, uint32_t skip_index):
-        self.counter = counter
-        self.program = program
-        self.skip_index = skip_index
 
-    cpdef list get_props(self):
+# Store indirect instructions
+cdef tuple  store_ind_u8(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC120: Store register ra as u8 to address (rb + vx)."""
+    value = int(registers[ra] & 0xFF)
+    cdef uint64_t reg_val = <uint64_t>(registers[rb] & 0xFFFFFFFFFFFFFFFF)
+    cdef uint64_t addr_calc = (reg_val + vx) & 0xFFFFFFFF
+    memory.write(int(addr_calc), value.to_bytes(1, "little"))
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  store_ind_u16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC121: Store register ra as u16 to address (rb + vx)."""
+    value = int(registers[ra] & 0xFFFF)
+    cdef uint64_t reg_val = <uint64_t>(registers[rb] & 0xFFFFFFFFFFFFFFFF)
+    cdef uint64_t addr_calc = (reg_val + vx) & 0xFFFFFFFF
+    memory.write(int(addr_calc), value.to_bytes(2, "little"))
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  store_ind_u32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC122: Store register ra as u32 to address (rb + vx)."""
+    value = int(registers[ra] % 2**32)
+    cdef uint64_t reg_val = <uint64_t>(registers[rb] & 0xFFFFFFFFFFFFFFFF)
+    cdef uint64_t addr_calc = (reg_val + vx) & 0xFFFFFFFF
+    memory.write(int(addr_calc), value.to_bytes(4, "little"))
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  store_ind_u64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC123: Store register ra as u64 to address (rb + vx)."""
+    value = int(registers[ra] % 2**64)
+    cdef uint64_t reg_val = <uint64_t>(registers[rb] & 0xFFFFFFFFFFFFFFFF)
+    cdef uint64_t addr_calc = (reg_val + vx) & 0xFFFFFFFF
+    memory.write(int(addr_calc), value.to_bytes(8, "little"))
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+# Load indirect instructions
+cdef tuple  load_ind_u8(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC124: Load u8 from address (rb + vx) to register ra."""
+    data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 1)
+    value = int.from_bytes(data, "little")
+    registers[ra] = value
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  load_ind_i8(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC125: Load i8 from address (rb + vx) to register ra."""
+    cdef bytes data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 1)
+    value = int.from_bytes(data, "little")
+    # Sign extend from 8-bit to 64-bit
+    value = z_inv(z(value, 1), 8)
+    registers[ra] = value
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  load_ind_u16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC126: Load u16 from address (rb + vx) to register ra."""
+    cdef uint64_t address = <uint64_t>(registers[rb] + vx)
+    data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 2)
+    value = int.from_bytes(data, "little")
+    registers[ra] = value
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  load_ind_i16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC127: Load i16 from address (rb + vx) to register ra."""
+    cdef bytes data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 2)
+    value = int.from_bytes(data, "little")
+    # Sign extend from 16-bit to 64-bit
+    value = z_inv(z(value, 2), 8)
+    registers[ra] = value
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  load_ind_u32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC128: Load u32 from address (rb + vx) to register ra."""
+    data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 4)
+    value = int.from_bytes(data, "little")
+    registers[ra] = value
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  load_ind_i32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC129: Load i32 from address (rb + vx) to register ra."""
+    cdef bytes data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 4)
+    value = int.from_bytes(data, "little")
+    # Sign extend from 32-bit to 64-bit
+    value = z_inv(z(value, 4), 8)
+    registers[ra] = value
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  load_ind_u64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC130: Load u64 from address (rb + vx) to register ra."""
+    data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 8)
+    value = int.from_bytes(data, "little")
+    registers[ra] = value
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+# Arithmetic and logic operations with immediate values
+cdef tuple  add_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC131: Add immediate value to register (32-bit)."""
+    cdef uint64_t value = (registers[rb] + vx) % 2**32
+    registers[ra] = chi(value, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  and_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC132: Bitwise AND with immediate value."""
+    cdef list wb_bits = b(registers[rb], 8)
+    cdef list vx_bits = b(vx, 8)
+    cdef list result_bits = compare_bits_vectorized(wb_bits, vx_bits, "and")
+    registers[ra] = b_inv(result_bits)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  xor_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC133: Bitwise XOR with immediate value."""
+    cdef list wb_bits = b(registers[rb], 8)
+    cdef list vx_bits = b(vx, 8)
+    cdef list result_bits = compare_bits_vectorized(wb_bits, vx_bits, "xor")
+    registers[ra] = b_inv(result_bits)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  or_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC134: Bitwise OR with immediate value."""
+    cdef list wb_bits = b(registers[rb], 8)
+    cdef list vx_bits = b(vx, 8)
+    cdef list result_bits = compare_bits_vectorized(wb_bits, vx_bits, "or")
+    registers[ra] = b_inv(result_bits)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  mul_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC135: Multiply with immediate value (32-bit)."""
+    cdef uint64_t value = (registers[rb] * vx) % 2**32
+    registers[ra] = chi(value, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  set_lt_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC136: Set if less than (unsigned) immediate."""
+    registers[ra] = 1 if registers[rb] < vx else 0
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  set_lt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC137: Set if less than (signed) immediate."""
+    cdef int64_t a = z(registers[rb], 8)
+    cdef int64_t b = z(vx, 8)
+    registers[ra] = 1 if a < b else 0
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shlo_l_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC138: Shift left immediate (32-bit)."""
+    cdef uint64_t a = registers[rb]
+    cdef uint64_t shift = vx % 32
+    cdef uint64_t result = (a * (2 ** shift)) % 2**32
+    registers[ra] = chi(result, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shlo_r_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC139: Shift right logical immediate (32-bit)."""
+    cdef uint64_t a = registers[rb] % 2**32
+    cdef uint64_t shift = vx % 32
+    cdef uint64_t result = a >> shift
+    registers[ra] = chi(result, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shar_r_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC140: Shift right arithmetic immediate (32-bit)."""
+    cdef int64_t a = z(registers[rb] % 2**32, 4)
+    cdef uint64_t shift = vx % 32
+    cdef int64_t result = a >> shift
+    registers[ra] = z_inv(result, 8)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  neg_add_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC141: Negate and add immediate (32-bit)."""
+    cdef uint64_t value = (vx + 2**32 - registers[rb]) % 2**32
+    registers[ra] = chi(value, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  set_gt_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC142: Set if greater than (unsigned) immediate."""
+    registers[ra] = 1 if registers[rb] > vx else 0
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  set_gt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC143: Set if greater than (signed) immediate."""
+    cdef int64_t a = z(registers[rb], 8)
+    cdef int64_t b = z(vx, 8)
+    registers[ra] = 1 if a > b else 0
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shlo_l_imm_alt_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC144: Shift left immediate alternate (32-bit) - operands swapped."""
+    cdef uint64_t a = vx
+    cdef uint64_t shift = registers[rb] % 32
+    cdef uint64_t result = (a * (2 ** shift)) % 2**32
+    registers[ra] = chi(result, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shlo_r_imm_alt_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC145: Shift right logical immediate alternate (32-bit) - operands swapped."""
+    cdef uint64_t a = vx % 2**32
+    cdef uint64_t shift = registers[rb] % 32
+    cdef uint64_t result = a >> shift
+    registers[ra] = chi(result, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shar_r_imm_alt_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC146: Shift right arithmetic immediate alternate (32-bit) - operands swapped."""
+    cdef int64_t a = z(vx % 2**32, 4)
+    cdef uint64_t shift = registers[rb] % 32
+    cdef int64_t result = a >> shift
+    registers[ra] = z_inv(result, 8)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  cmov_iz_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC147: Conditional move if zero immediate."""
+    if registers[rb] == 0:
+        registers[ra] = vx
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  cmov_nz_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC148: Conditional move if not zero immediate."""
+    if registers[rb] != 0:
+        registers[ra] = vx
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+# 64-bit operations
+cdef tuple  add_imm_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC149: Add immediate value to register (64-bit)."""
+    registers[ra] = (registers[rb] + vx) % 2**64
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  mul_imm_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC150: Multiply with immediate value (64-bit)."""
+    registers[ra] = registers[rb] * vx
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shlo_l_imm_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC151: Shift left immediate (64-bit)."""
+    cdef uint64_t a = registers[rb]
+    cdef uint64_t shift = vx % 64
+    cdef uint64_t result = (a << shift) % 2**64
+    registers[ra] = result
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shlo_r_imm_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC152: Shift right logical immediate (64-bit)."""
+    cdef uint64_t a = registers[rb]
+    cdef uint64_t shift = vx % 64
+    cdef uint64_t result = a >> shift
+    registers[ra] = result
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shar_r_imm_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC153: Shift right arithmetic immediate (64-bit)."""
+    cdef uint64_t a = <uint64_t>registers[rb]
+    cdef uint64_t shift = vx % 64
+    cdef int64_t result = a >> shift
+    registers[ra] = <uint64_t>result
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  neg_add_imm_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC154: Negate and add immediate (64-bit)."""
+    cdef uint64_t value = (vx + 2**64 - registers[rb]) % 2**64
+    registers[ra] = value
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shlo_l_imm_alt_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC155: Shift left immediate alternate (64-bit) - operands swapped."""
+    cdef uint64_t a = vx
+    cdef uint64_t shift = registers[rb] % 64
+    cdef uint64_t result = (a << shift) % 2**64
+    registers[ra] = result
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shlo_r_imm_alt_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC156: Shift right logical immediate alternate (64-bit) - operands swapped."""
+    cdef uint64_t a = vx
+    cdef uint64_t shift = registers[rb] % 64
+    cdef uint64_t result = a >> shift
+    registers[ra] = result
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  shar_r_imm_alt_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC157: Shift right arithmetic immediate alternate (64-bit) - operands swapped."""
+    cdef int64_t a = <int64_t>vx
+    cdef uint64_t shift = registers[rb] % 64
+    cdef int64_t result = a >> shift
+    registers[ra] = <uint64_t>result
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+# Rotation operations
+cdef tuple  rot_r_64_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC158: Rotate right 64-bit immediate."""
+    cdef uint64_t a_val = registers[rb]
+    cdef uint64_t b_val = vx % 64
+    cdef list a_bits = b(a_val, 8)
+    cdef list result_bits = [a_bits[(i + b_val) % 64] for i in range(64)]
+    registers[ra] = b_inv(result_bits)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  rot_r_64_imm_alt(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC159: Rotate right 64-bit immediate alternate - operands swapped."""
+    cdef uint64_t a_val = vx
+    cdef uint64_t b_val = registers[rb] % 64
+    cdef list a_bits = b(a_val, 8)
+    cdef list result_bits = [a_bits[(i + b_val) % 64] for i in range(64)]
+    registers[ra] = b_inv(result_bits)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  rot_r_32_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC160: Rotate right 32-bit immediate."""
+    cdef uint64_t a_val = registers[rb] % 2**32
+    cdef uint64_t b_val = vx % 32
+    cdef list a_bits = b(a_val, 4)
+    cdef list result_bits = [a_bits[(i + b_val) % 32] for i in range(32)]
+    cdef uint64_t result = b_inv(result_bits)
+    registers[ra] = chi(result, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple  rot_r_32_imm_alt(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC161: Rotate right 32-bit immediate alternate - operands swapped."""
+    cdef uint64_t a_val = vx % 2**32
+    cdef uint64_t b_val = registers[rb] % 32
+    cdef list a_bits = b(a_val, 4)
+    cdef list result_bits = [a_bits[(i + b_val) % 32] for i in range(32)]
+    cdef uint64_t result = b_inv(result_bits)
+    registers[ra] = chi(result, 4)
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+
+cdef class CyInstructionsWArgs2Reg1Imm(CyTable):
+    """
+    Cython optimized instruction table for instructions with 2 register + 1 immediate argument.
+    """
+    
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
         """
-        Extract two register and immediate arguments from the instruction stream.
-        Returns [ra, rb, lx, vx] where ra/rb are registers, lx is length, vx is immediate.
+        Extract two registers and immediate arguments from program bytes.
+        Returns (vx, vy, ra, rb, rd) where vx is immediate, ra/rb are registers, others are 0.
         """
-        cdef bytes zeta_slice = self.program.zeta[self.counter + 1:self.counter + 8]
+        cdef uint32_t skip_index = program.skip(program_counter)
+        cdef bytes zeta_slice = program.zeta[program_counter + 1:program_counter + 8]
         cdef uint32_t byte_val = zeta_slice[0]
-        cdef uint32_t ra = clamp_12(byte_val & 0x0F)  # Lower 4 bits
-        cdef uint32_t rb = clamp_12(byte_val >> 4)    # Upper 4 bits
-        cdef uint32_t lx = clamp_4_max0(self.skip_index - 1)
+        cdef uint8_t ra = clamp_12(byte_val & 0x0F)  # Lower 4 bits
+        cdef uint8_t rb = clamp_12(byte_val >> 4)    # Upper 4 bits
+        cdef uint32_t lx = clamp_4_max0(skip_index - 1)
         
-        cdef uint64_t vx = 0  # Use temporary variable to handle overflow
+        cdef uint64_t vx = 0
         cdef bytes imm_slice
         if lx > 0:
             imm_slice = zeta_slice[1:1+lx]
-            vx = <uint64_t>(chi(int.from_bytes(imm_slice, "little"), lx) % 2**64)
+            vx = chi(int.from_bytes(imm_slice, "little"), lx)
         
-        return [ra, rb, lx, vx]
+        # Return in unified format: (vx, vy, ra, rb, rd)
+        return (vx, 0, ra, rb, 0)
 
-    @classmethod
-    def table(cls) -> Dict[int, OpCode]:
+    cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""
-        return {
-            120: OpCode(name="store_ind_u8", fn=cls.store_ind_u8, gas=1, is_terminating=False),
-            121: OpCode(name="store_ind_u16", fn=cls.store_ind_u16, gas=1, is_terminating=False),
-            122: OpCode(name="store_ind_u32", fn=cls.store_ind_u32, gas=1, is_terminating=False),
-            123: OpCode(name="store_ind_u64", fn=cls.store_ind_u64, gas=1, is_terminating=False),
-            124: OpCode(name="load_ind_u8", fn=cls.load_ind_u8, gas=1, is_terminating=False),
-            125: OpCode(name="load_ind_i8", fn=cls.load_ind_i8, gas=1, is_terminating=False),
-            126: OpCode(name="load_ind_u16", fn=cls.load_ind_u16, gas=1, is_terminating=False),
-            127: OpCode(name="load_ind_i16", fn=cls.load_ind_i16, gas=1, is_terminating=False),
-            128: OpCode(name="load_ind_u32", fn=cls.load_ind_u32, gas=1, is_terminating=False),
-            129: OpCode(name="load_ind_i32", fn=cls.load_ind_i32, gas=1, is_terminating=False),
-            130: OpCode(name="load_ind_u64", fn=cls.load_ind_u64, gas=1, is_terminating=False),
-            131: OpCode(name="add_imm_32", fn=cls.add_imm_32, gas=1, is_terminating=False),
-            132: OpCode(name="and_imm", fn=cls.and_imm, gas=1, is_terminating=False),
-            133: OpCode(name="xor_imm", fn=cls.xor_imm, gas=1, is_terminating=False),
-            134: OpCode(name="or_imm", fn=cls.or_imm, gas=1, is_terminating=False),
-            135: OpCode(name="mul_imm_32", fn=cls.mul_imm_32, gas=1, is_terminating=False),
-            136: OpCode(name="set_lt_u_imm", fn=cls.set_lt_u_imm, gas=1, is_terminating=False),
-            137: OpCode(name="set_lt_s_imm", fn=cls.set_lt_s_imm, gas=1, is_terminating=False),
-            138: OpCode(name="shlo_l_imm_32", fn=cls.shlo_l_imm_32, gas=1, is_terminating=False),
-            139: OpCode(name="shlo_r_imm_32", fn=cls.shlo_r_imm_32, gas=1, is_terminating=False),
-            140: OpCode(name="shar_r_imm_32", fn=cls.shar_r_imm_32, gas=1, is_terminating=False),
-            141: OpCode(name="neg_add_imm_32", fn=cls.neg_add_imm_32, gas=1, is_terminating=False),
-            142: OpCode(name="set_gt_u_imm", fn=cls.set_gt_u_imm, gas=1, is_terminating=False),
-            143: OpCode(name="set_gt_s_imm", fn=cls.set_gt_s_imm, gas=1, is_terminating=False),
-            144: OpCode(name="shlo_l_imm_alt_32", fn=cls.shlo_l_imm_alt_32, gas=1, is_terminating=False),
-            145: OpCode(name="shlo_r_imm_alt_32", fn=cls.shlo_r_imm_alt_32, gas=1, is_terminating=False),
-            146: OpCode(name="shar_r_imm_alt_32", fn=cls.shar_r_imm_alt_32, gas=1, is_terminating=False),
-            147: OpCode(name="cmov_iz_imm", fn=cls.cmov_iz_imm, gas=1, is_terminating=False),
-            148: OpCode(name="cmov_nz_imm", fn=cls.cmov_nz_imm, gas=1, is_terminating=False),
-            149: OpCode(name="add_imm_64", fn=cls.add_imm_64, gas=1, is_terminating=False),
-            150: OpCode(name="mul_imm_64", fn=cls.mul_imm_64, gas=1, is_terminating=False),
-            151: OpCode(name="shlo_l_imm_64", fn=cls.shlo_l_imm_64, gas=1, is_terminating=False),
-            152: OpCode(name="shlo_r_imm_64", fn=cls.shlo_r_imm_64, gas=1, is_terminating=False),
-            153: OpCode(name="shar_r_imm_64", fn=cls.shar_r_imm_64, gas=1, is_terminating=False),
-            154: OpCode(name="neg_add_imm_64", fn=cls.neg_add_imm_64, gas=1, is_terminating=False),
-            155: OpCode(name="shlo_l_imm_alt_64", fn=cls.shlo_l_imm_alt_64, gas=1, is_terminating=False),
-            156: OpCode(name="shlo_r_imm_alt_64", fn=cls.shlo_r_imm_alt_64, gas=1, is_terminating=False),
-            157: OpCode(name="shar_r_imm_alt_64", fn=cls.shar_r_imm_alt_64, gas=1, is_terminating=False),
-            158: OpCode(name="rot_r_64_imm", fn=cls.rot_r_64_imm, gas=1, is_terminating=False),
-            159: OpCode(name="rot_r_64_imm_alt", fn=cls.rot_r_64_imm_alt, gas=1, is_terminating=False),
-            160: OpCode(name="rot_r_32_imm", fn=cls.rot_r_32_imm, gas=1, is_terminating=False),
-            161: OpCode(name="rot_r_32_imm_alt", fn=cls.rot_r_32_imm_alt, gas=1, is_terminating=False),
-        }
+        return TABLE
 
-    # Store indirect instructions
-    cdef tuple  store_ind_u8(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC120: Store register ra as u8 to address (rb + vx)."""
-        value = int(registers[ra] & 0xFF)
-        cdef uint64_t reg_val = <uint64_t>(registers[rb] & 0xFFFFFFFFFFFFFFFF)
-        cdef uint64_t addr_calc = (reg_val + vx) & 0xFFFFFFFF
-        memory.write(int(addr_calc), value.to_bytes(1, "little"))
-        return CONTINUE, -1
+# Prebuilt table (opcode -> CyTableEntry)
+cdef dict TABLE = {}
+cdef CyTableEntry _e
 
-    cdef tuple  store_ind_u16(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC121: Store register ra as u16 to address (rb + vx)."""
-        value = int(registers[ra] & 0xFFFF)
-        cdef uint64_t reg_val = <uint64_t>(registers[rb] & 0xFFFFFFFFFFFFFFFF)
-        cdef uint64_t addr_calc = (reg_val + vx) & 0xFFFFFFFF
-        memory.write(int(addr_calc), value.to_bytes(2, "little"))
-        return CONTINUE, -1
+# Store instructions (120-123)
+_e = CyTableEntry(); _e.fn = store_ind_u8; _e.gas_cost = 1; _e.is_terminating = False; TABLE[120] = _e
+_e = CyTableEntry(); _e.fn = store_ind_u16; _e.gas_cost = 1; _e.is_terminating = False; TABLE[121] = _e
+_e = CyTableEntry(); _e.fn = store_ind_u32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[122] = _e
+_e = CyTableEntry(); _e.fn = store_ind_u64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[123] = _e
 
-    cdef tuple  store_ind_u32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC122: Store register ra as u32 to address (rb + vx)."""
-        value = int(registers[ra] % 2**32)
-        cdef uint64_t reg_val = <uint64_t>(registers[rb] & 0xFFFFFFFFFFFFFFFF)
-        cdef uint64_t addr_calc = (reg_val + vx) & 0xFFFFFFFF
-        memory.write(int(addr_calc), value.to_bytes(4, "little"))
-        return CONTINUE, -1
+# Load instructions (124-130) 
+_e = CyTableEntry(); _e.fn = load_ind_u8; _e.gas_cost = 1; _e.is_terminating = False; TABLE[124] = _e
+_e = CyTableEntry(); _e.fn = load_ind_i8; _e.gas_cost = 1; _e.is_terminating = False; TABLE[125] = _e
+_e = CyTableEntry(); _e.fn = load_ind_u16; _e.gas_cost = 1; _e.is_terminating = False; TABLE[126] = _e
+_e = CyTableEntry(); _e.fn = load_ind_i16; _e.gas_cost = 1; _e.is_terminating = False; TABLE[127] = _e
+_e = CyTableEntry(); _e.fn = load_ind_u32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[128] = _e
+_e = CyTableEntry(); _e.fn = load_ind_i32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[129] = _e
+_e = CyTableEntry(); _e.fn = load_ind_u64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[130] = _e
 
-    cdef tuple  store_ind_u64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC123: Store register ra as u64 to address (rb + vx)."""
-        value = int(registers[ra] % 2**64)
-        cdef uint64_t reg_val = <uint64_t>(registers[rb] & 0xFFFFFFFFFFFFFFFF)
-        cdef uint64_t addr_calc = (reg_val + vx) & 0xFFFFFFFF
-        memory.write(int(addr_calc), value.to_bytes(8, "little"))
-        return CONTINUE, -1
+# Arithmetic and logic instructions (131-159)
+_e = CyTableEntry(); _e.fn = add_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[131] = _e
+_e = CyTableEntry(); _e.fn = and_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[132] = _e
+_e = CyTableEntry(); _e.fn = xor_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[133] = _e
+_e = CyTableEntry(); _e.fn = or_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[134] = _e
+_e = CyTableEntry(); _e.fn = mul_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[135] = _e
+_e = CyTableEntry(); _e.fn = set_lt_u_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[136] = _e
+_e = CyTableEntry(); _e.fn = set_lt_s_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[137] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[138] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[139] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[140] = _e
+_e = CyTableEntry(); _e.fn = neg_add_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[141] = _e
+_e = CyTableEntry(); _e.fn = set_gt_u_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[142] = _e
+_e = CyTableEntry(); _e.fn = set_gt_s_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[143] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[144] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[145] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[146] = _e
+_e = CyTableEntry(); _e.fn = cmov_iz_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[147] = _e
+_e = CyTableEntry(); _e.fn = cmov_nz_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[148] = _e
 
-    # Load indirect instructions
-    cdef tuple  load_ind_u8(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC124: Load u8 from address (rb + vx) to register ra."""
-        data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 1)
-        value = int.from_bytes(data, "little")
-        registers[ra] = value
-        return CONTINUE, -1
+# 64-bit operations (149-161)
+_e = CyTableEntry(); _e.fn = add_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[149] = _e
+_e = CyTableEntry(); _e.fn = mul_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[150] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[151] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[152] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[153] = _e
+_e = CyTableEntry(); _e.fn = neg_add_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[154] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_alt_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[155] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_alt_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[156] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_alt_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[157] = _e
+_e = CyTableEntry(); _e.fn = rot_r_64_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[158] = _e
+_e = CyTableEntry(); _e.fn = rot_r_64_imm_alt; _e.gas_cost = 1; _e.is_terminating = False; TABLE[159] = _e
+_e = CyTableEntry(); _e.fn = rot_r_32_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[160] = _e
+_e = CyTableEntry(); _e.fn = rot_r_32_imm_alt; _e.gas_cost = 1; _e.is_terminating = False; TABLE[161] = _e
+_e = CyTableEntry(); _e.fn = set_lt_u_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[136] = _e
+_e = CyTableEntry(); _e.fn = set_lt_s_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[137] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[138] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[139] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[140] = _e
+_e = CyTableEntry(); _e.fn = neg_add_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[141] = _e
+_e = CyTableEntry(); _e.fn = set_gt_u_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[142] = _e
+_e = CyTableEntry(); _e.fn = set_gt_s_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[143] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[144] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[145] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[146] = _e
+_e = CyTableEntry(); _e.fn = cmov_iz_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[147] = _e
+_e = CyTableEntry(); _e.fn = cmov_nz_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[148] = _e
 
-    cdef tuple  load_ind_i8(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC125: Load i8 from address (rb + vx) to register ra."""
-        cdef bytes data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 1)
-        value = int.from_bytes(data, "little")
-        # Sign extend from 8-bit to 64-bit
-        value = z_inv(z(value, 1), 8)
-        registers[ra] = value
-        return CONTINUE, -1
-
-    cdef tuple  load_ind_u16(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC126: Load u16 from address (rb + vx) to register ra."""
-        cdef uint64_t address = <uint64_t>(registers[rb] + vx)
-        data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 2)
-        value = int.from_bytes(data, "little")
-        registers[ra] = value
-        return CONTINUE, -1
-
-    cdef tuple  load_ind_i16(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC127: Load i16 from address (rb + vx) to register ra."""
-        cdef bytes data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 2)
-        value = int.from_bytes(data, "little")
-        # Sign extend from 16-bit to 64-bit
-        value = z_inv(z(value, 2), 8)
-        registers[ra] = value
-        return CONTINUE, -1
-
-    cdef tuple  load_ind_u32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC128: Load u32 from address (rb + vx) to register ra."""
-        data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 4)
-        value = int.from_bytes(data, "little")
-        registers[ra] = value
-        return CONTINUE, -1
-
-    cdef tuple  load_ind_i32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC129: Load i32 from address (rb + vx) to register ra."""
-        cdef bytes data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 4)
-        value = int.from_bytes(data, "little")
-        # Sign extend from 32-bit to 64-bit
-        value = z_inv(z(value, 4), 8)
-        registers[ra] = value
-        return CONTINUE, -1
-
-    cdef tuple  load_ind_u64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC130: Load u64 from address (rb + vx) to register ra."""
-        data = memory.read((registers[rb] + vx) & 0xFFFFFFFF, 8)
-        value = int.from_bytes(data, "little")
-        registers[ra] = value
-        return CONTINUE, -1
-
-    # Arithmetic and logic operations with immediate values
-    cdef tuple  add_imm_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC131: Add immediate value to register (32-bit)."""
-        cdef uint64_t value = (registers[rb] + vx) % 2**32
-        registers[ra] = chi(value, 4)
-        return CONTINUE, -1
-
-    cdef tuple  and_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC132: Bitwise AND with immediate value."""
-        cdef list wb_bits = b(registers[rb], 8)
-        cdef list vx_bits = b(vx, 8)
-        cdef list result_bits = compare_bits_vectorized(wb_bits, vx_bits, "and")
-        registers[ra] = b_inv(result_bits)
-        return CONTINUE, -1
-
-    cdef tuple  xor_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC133: Bitwise XOR with immediate value."""
-        cdef list wb_bits = b(registers[rb], 8)
-        cdef list vx_bits = b(vx, 8)
-        cdef list result_bits = compare_bits_vectorized(wb_bits, vx_bits, "xor")
-        registers[ra] = b_inv(result_bits)
-        return CONTINUE, -1
-
-    cdef tuple  or_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC134: Bitwise OR with immediate value."""
-        cdef list wb_bits = b(registers[rb], 8)
-        cdef list vx_bits = b(vx, 8)
-        cdef list result_bits = compare_bits_vectorized(wb_bits, vx_bits, "or")
-        registers[ra] = b_inv(result_bits)
-        return CONTINUE, -1
-
-    cdef tuple  mul_imm_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC135: Multiply with immediate value (32-bit)."""
-        cdef uint64_t value = (registers[rb] * vx) % 2**32
-        registers[ra] = chi(value, 4)
-        return CONTINUE, -1
-
-    cdef tuple  set_lt_u_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC136: Set if less than (unsigned) immediate."""
-        registers[ra] = 1 if registers[rb] < vx else 0
-        return CONTINUE, -1
-
-    cdef tuple  set_lt_s_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC137: Set if less than (signed) immediate."""
-        cdef int64_t a = z(registers[rb], 8)
-        cdef int64_t b = z(vx, 8)
-        registers[ra] = 1 if a < b else 0
-        return CONTINUE, -1
-
-    cdef tuple  shlo_l_imm_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC138: Shift left immediate (32-bit)."""
-        cdef uint64_t a = registers[rb]
-        cdef uint64_t shift = vx % 32
-        cdef uint64_t result = (a * (2 ** shift)) % 2**32
-        registers[ra] = chi(result, 4)
-        return CONTINUE, -1
-
-    cdef tuple  shlo_r_imm_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC139: Shift right logical immediate (32-bit)."""
-        cdef uint64_t a = registers[rb] % 2**32
-        cdef uint64_t shift = vx % 32
-        cdef uint64_t result = a >> shift
-        registers[ra] = chi(result, 4)
-        return CONTINUE, -1
-
-    cdef tuple  shar_r_imm_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC140: Shift right arithmetic immediate (32-bit)."""
-        cdef int64_t a = z(registers[rb] % 2**32, 4)
-        cdef uint64_t shift = vx % 32
-        cdef int64_t result = a >> shift
-        registers[ra] = z_inv(result, 8)
-        return CONTINUE, -1
-
-    cdef tuple  neg_add_imm_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC141: Negate and add immediate (32-bit)."""
-        cdef uint64_t value = (vx + 2**32 - registers[rb]) % 2**32
-        registers[ra] = chi(value, 4)
-        return CONTINUE, -1
-
-    cdef tuple  set_gt_u_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC142: Set if greater than (unsigned) immediate."""
-        registers[ra] = 1 if registers[rb] > vx else 0
-        return CONTINUE, -1
-
-    cdef tuple  set_gt_s_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC143: Set if greater than (signed) immediate."""
-        cdef int64_t a = z(registers[rb], 8)
-        cdef int64_t b = z(vx, 8)
-        registers[ra] = 1 if a > b else 0
-        return CONTINUE, -1
-
-    cdef tuple  shlo_l_imm_alt_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC144: Shift left immediate alternate (32-bit) - operands swapped."""
-        cdef uint64_t a = vx
-        cdef uint64_t shift = registers[rb] % 32
-        cdef uint64_t result = (a * (2 ** shift)) % 2**32
-        registers[ra] = chi(result, 4)
-        return CONTINUE, -1
-
-    cdef tuple  shlo_r_imm_alt_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC145: Shift right logical immediate alternate (32-bit) - operands swapped."""
-        cdef uint64_t a = vx % 2**32
-        cdef uint64_t shift = registers[rb] % 32
-        cdef uint64_t result = a >> shift
-        registers[ra] = chi(result, 4)
-        return CONTINUE, -1
-
-    cdef tuple  shar_r_imm_alt_32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC146: Shift right arithmetic immediate alternate (32-bit) - operands swapped."""
-        cdef int64_t a = z(vx % 2**32, 4)
-        cdef uint64_t shift = registers[rb] % 32
-        cdef int64_t result = a >> shift
-        registers[ra] = z_inv(result, 8)
-        return CONTINUE, -1
-
-    cdef tuple  cmov_iz_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC147: Conditional move if zero immediate."""
-        if registers[rb] == 0:
-            registers[ra] = vx
-        return CONTINUE, -1
-
-    cdef tuple  cmov_nz_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC148: Conditional move if not zero immediate."""
-        if registers[rb] != 0:
-            registers[ra] = vx
-        return CONTINUE, -1
-
-    # 64-bit operations
-    cdef tuple  add_imm_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC149: Add immediate value to register (64-bit)."""
-        registers[ra] = (registers[rb] + vx) % 2**64
-        return CONTINUE, -1
-
-    cdef tuple  mul_imm_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC150: Multiply with immediate value (64-bit)."""
-        registers[ra] = registers[rb] * vx
-        return CONTINUE, -1
-
-    cdef tuple  shlo_l_imm_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC151: Shift left immediate (64-bit)."""
-        cdef uint64_t a = registers[rb]
-        cdef uint64_t shift = vx % 64
-        cdef uint64_t result = (a << shift) % 2**64
-        registers[ra] = result
-        return CONTINUE, -1
-
-    cdef tuple  shlo_r_imm_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC152: Shift right logical immediate (64-bit)."""
-        cdef uint64_t a = registers[rb]
-        cdef uint64_t shift = vx % 64
-        cdef uint64_t result = a >> shift
-        registers[ra] = result
-        return CONTINUE, -1
-
-    cdef tuple  shar_r_imm_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC153: Shift right arithmetic immediate (64-bit)."""
-        cdef uint64_t a = <uint64_t>registers[rb]
-        cdef uint64_t shift = vx % 64
-        cdef int64_t result = a >> shift
-        registers[ra] = <uint64_t>result
-        return CONTINUE, -1
-
-    cdef tuple  neg_add_imm_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC154: Negate and add immediate (64-bit)."""
-        cdef uint64_t value = (vx + 2**64 - registers[rb]) % 2**64
-        registers[ra] = value
-        return CONTINUE, -1
-
-    cdef tuple  shlo_l_imm_alt_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC155: Shift left immediate alternate (64-bit) - operands swapped."""
-        cdef uint64_t a = vx
-        cdef uint64_t shift = registers[rb] % 64
-        cdef uint64_t result = (a << shift) % 2**64
-        registers[ra] = result
-        return CONTINUE, -1
-
-    cdef tuple  shlo_r_imm_alt_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC156: Shift right logical immediate alternate (64-bit) - operands swapped."""
-        cdef uint64_t a = vx
-        cdef uint64_t shift = registers[rb] % 64
-        cdef uint64_t result = a >> shift
-        registers[ra] = result
-        return CONTINUE, -1
-
-    cdef tuple  shar_r_imm_alt_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC157: Shift right arithmetic immediate alternate (64-bit) - operands swapped."""
-        cdef int64_t a = <int64_t>vx
-        cdef uint64_t shift = registers[rb] % 64
-        cdef int64_t result = a >> shift
-        registers[ra] = <uint64_t>result
-        return CONTINUE, -1
-
-    # Rotation operations
-    cdef tuple  rot_r_64_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC158: Rotate right 64-bit immediate."""
-        cdef uint64_t a_val = registers[rb]
-        cdef uint64_t b_val = vx % 64
-        cdef list a_bits = b(a_val, 8)
-        cdef list result_bits = [a_bits[(i + b_val) % 64] for i in range(64)]
-        registers[ra] = b_inv(result_bits)
-        return CONTINUE, -1
-
-    cdef tuple  rot_r_64_imm_alt(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC159: Rotate right 64-bit immediate alternate - operands swapped."""
-        cdef uint64_t a_val = vx
-        cdef uint64_t b_val = registers[rb] % 64
-        cdef list a_bits = b(a_val, 8)
-        cdef list result_bits = [a_bits[(i + b_val) % 64] for i in range(64)]
-        registers[ra] = b_inv(result_bits)
-        return CONTINUE, -1
-
-    cdef tuple  rot_r_32_imm(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC160: Rotate right 32-bit immediate."""
-        cdef uint64_t a_val = registers[rb] % 2**32
-        cdef uint64_t b_val = vx % 32
-        cdef list a_bits = b(a_val, 4)
-        cdef list result_bits = [a_bits[(i + b_val) % 32] for i in range(32)]
-        cdef uint64_t result = b_inv(result_bits)
-        registers[ra] = chi(result, 4)
-        return CONTINUE, -1
-
-    cdef tuple  rot_r_32_imm_alt(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t rb, uint32_t lx, uint64_t vx):
-        """OPC161: Rotate right 32-bit immediate alternate - operands swapped."""
-        cdef uint64_t a_val = vx % 2**32
-        cdef uint64_t b_val = registers[rb] % 32
-        cdef list a_bits = b(a_val, 4)
-        cdef list result_bits = [a_bits[(i + b_val) % 32] for i in range(32)]
-        cdef uint64_t result = b_inv(result_bits)
-        registers[ra] = chi(result, 4)
-        return CONTINUE, -1
-
+# 64-bit arithmetic instructions
+_e = CyTableEntry(); _e.fn = add_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[149] = _e
+_e = CyTableEntry(); _e.fn = mul_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[150] = _e

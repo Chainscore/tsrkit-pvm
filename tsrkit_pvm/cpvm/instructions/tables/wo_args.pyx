@@ -4,36 +4,60 @@
 # cython: cdivision=True
 # cython: profile=True
 
-from typing import Dict
-from libc.stdint cimport uint32_t, uint64_t
+"""
+Cython optimized wo_args instruction table.
+Instructions without arguments (opcodes 0-9).
+"""
+
+from libc.stdint cimport uint32_t, uint64_t, uint8_t
 from tsrkit_pvm.common.status import PvmError, CONTINUE, PANIC
-from tsrkit_pvm.core.opcode import OpCode, OpReturn
+from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
+from ...cy_program cimport CyProgram
 
-cdef class InstructionsWoArgs:
-    cdef uint32_t counter
-    cdef object program
-    cdef uint32_t skip_index
+# Separate dispatch functions for instructions
 
-    def __init__(self, uint32_t counter, object program, uint32_t skip_index):
-        self.counter = counter
-        self.program = program
-        self.skip_index = skip_index
+cdef tuple trap_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """
+    OPC0: Trap - Raise panic error.
+    All arguments unused for this instruction.
+    
+    Returns:
+        Tuple of (PANIC, next_pc)
+    """
+    # Trap instruction causes panic and terminates execution
+    return (PANIC, <uint32_t>0xFFFFFFFF)
 
-    cpdef list get_props(self):
-        return []
+cdef tuple fallthrough_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """
+    OPC1: Fallthrough - Continue execution.
+    All arguments unused for this instruction.
+    
+    Returns:
+        Tuple of (CONTINUE, next_pc)
+    """
+    return (CONTINUE, <uint32_t>0xFFFFFFFF)
 
-    @classmethod
-    def table(cls) -> Dict[int, OpCode]:
-        return {
-            0: OpCode(name="trap", fn=cls.trap, gas=1, is_terminating=True),
-            1: OpCode(name="fallthrough", fn=cls.fallthrough, gas=1, is_terminating=True),
-        }
+cdef class InstructionsWoArgs(CyTable):
+    """
+    Cython optimized instruction table for instructions without arguments.
+    """
+    
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
+        """
+        No arguments to extract for these instructions.
+        Returns (vx, vy, ra, rb, rd) all as 0.
+        """
+        return (0, 0, 0, 0, 0)
+    
+    cpdef dict get_table(self):
+        """Return the instruction table mapping opcodes to their handlers."""
+        return TABLE
 
-    cdef tuple  trap(self, uint64_t *registers, CyMemory memory):
-        raise PvmError(PANIC, -1, "Trap instruction executed")
-
-    cdef tuple  fallthrough(self, uint64_t *registers, CyMemory memory):
-        return CONTINUE, -1
+# Prebuilt table (opcode -> CyTableEntry)
+cdef dict TABLE = {}
+cdef CyTableEntry _e
+_e = CyTableEntry(); _e.fn = trap_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[0] = _e
+_e = CyTableEntry(); _e.fn = fallthrough_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[1] = _e
 
 

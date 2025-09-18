@@ -29,6 +29,7 @@ if __name__ == "__main__":
                 "tsrkit_pvm/cpvm/cy_program.pyx",
                 "tsrkit_pvm/cpvm/cy_block.pyx",
                 "tsrkit_pvm/cpvm/cy_memory.pyx",
+                "tsrkit_pvm/cpvm/instructions/cy_table.pyx",
                 "tsrkit_pvm/cpvm/instructions/tables/wo_args.pyx",
                 "tsrkit_pvm/cpvm/instructions/tables/i_imm.pyx",
                 "tsrkit_pvm/cpvm/instructions/tables/ii_reg.pyx",

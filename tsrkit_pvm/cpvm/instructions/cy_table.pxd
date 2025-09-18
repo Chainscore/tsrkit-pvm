@@ -9,32 +9,32 @@ from ..cy_program cimport CyProgram
 from ..cy_memory cimport CyMemory
 
 # Define the unified instruction function pointer type
-ctypedef int (*instr_fn_t)(uint64_t *registers,
-                           CyMemory memory,
-                           uint64_t vx,
-                           uint64_t vy,
-                           uint8_t ra,
-                           uint8_t rb, 
-                           uint8_t rc)
+# Returns tuple of (execution_status, next_pc)
+ctypedef tuple (*instr_fn_t)(
+    CyProgram program,
+    uint64_t *registers,
+    CyMemory memory,
+    uint32_t counter,
+    uint64_t vx,
+    uint64_t vy,
+    uint8_t ra,
+    uint8_t rb, 
+    uint8_t rd
+)
 
-# Define the table entry structure
-ctypedef struct CyTableEntry:
-    instr_fn_t fn
-    uint32_t gas_cost
-    bint is_terminating
+# Define the table entry as a Python-visible Cython class, so it
+# can be stored in Python dicts and carried around easily.
+cdef class CyTableEntry:
+    cdef instr_fn_t fn
+    cdef public uint32_t gas_cost
+    cdef public bint is_terminating
 
 cdef class CyTable:
     """
     Base class for all instruction tables.
-    Provides unified interface for instruction argument extraction and table access.
+    Provides unified interface for instruction argument extraction.
     """
     
     # Unified argument extraction - returns (vx, vy, ra, rb, rc)
     # All tables must implement this to provide arguments in standard format
-    @staticmethod
-    cdef tuple get_props(uint32_t program_counter, CyProgram program)
-    
-    # Table access - returns mapping of opcode -> CyTableEntry
-    # Each table must implement this class method
-    @staticmethod
-    cdef dict get_table()
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program)

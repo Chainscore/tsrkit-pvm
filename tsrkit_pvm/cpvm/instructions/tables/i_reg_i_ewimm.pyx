@@ -1,57 +1,66 @@
-# cython: boundscheck=False, wraparound=False, cdivision=True
+# cython: language_level=3
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: cdivision=True
+# cython: profile=True
+
 """
-Cython optimized instruction table for 1 register + 1 extended width immediate argument instructions.
-
-This table handles instructions that take one register and one 64-bit immediate argument:
-- load_imm_64: Load 64-bit immediate value into register
+Cython optimized i_reg_i_ewimm instruction table.
+Instructions with 1 register + 1 extended width immediate argument (opcode 20).
 """
 
-from typing import Dict
-cimport cython
-from libc.stdint cimport uint32_t, uint64_t
-
+from libc.stdint cimport uint32_t, uint64_t, uint8_t
 from tsrkit_pvm.common.status import CONTINUE
 from tsrkit_pvm.common.utils import clamp_12
-from tsrkit_pvm.core.opcode import OpCode
+from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
+from ...cy_program cimport CyProgram
 
-
-cdef class CyInstructionsWArgs1Reg1EwImm:
+# Unified dispatch function for load_imm_64 instruction
+cdef tuple load_imm_64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
-    Cython optimized instruction table for 1 register + 1 extended width immediate argument instructions.
+    OPC20: Load 64-bit immediate value into register.
     
-    This class provides high-performance implementations of instructions that
-    take one register and one 64-bit immediate argument, optimized with Cython for speed.
+    Args:
+        program: Current program state
+        registers: Register array
+        memory: Memory object
+        counter: Current program counter
+        vx: 64-bit immediate value to load
+        vy, rb, rd: Unused for this instruction
+        ra: Target register index
+        
+    Returns:
+        Tuple of (execution_status, next_pc)
+    """
+    registers[ra] = vx
+    return (CONTINUE, <uint32_t>0xFFFFFFFF)
+
+cdef class CyInstructionsWArgs1Reg1EwImm(CyTable):
+    """
+    Cython optimized instruction table for instructions with 1 register + 1 extended width immediate argument.
     """
     
-    cdef public uint32_t counter
-    cdef public object program  # INT_Program - keeping as Python object for now
-    cdef public uint32_t skip_index
-    
-    def __init__(self, uint32_t counter, program, uint32_t skip_index):
-        self.counter = counter
-        self.program = program
-        self.skip_index = skip_index
-
-    cpdef list get_props(self):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
         """
-        Extract register and 64-bit immediate arguments from the instruction stream.
-        Returns [ra, vx] where ra is register, vx is the 64-bit immediate value.
+        Extract register and 64-bit immediate arguments from program bytes.
+        Returns (vx, vy, ra, rb, rd) where vx is the 64-bit immediate value, ra is register index, others are 0.
         """
-        cdef bytes zeta_slice = self.program.zeta[self.counter + 1: self.counter + 10]
-        cdef uint32_t ra = clamp_12(zeta_slice[0] % 16)
+        # Extract 9 bytes: 1 for register + 8 for 64-bit immediate
+        cdef bytes zeta_slice = program.zeta[program_counter + 1: program_counter + 10]
+        cdef uint8_t ra = clamp_12(zeta_slice[0] % 16)
         cdef bytes vx_bytes = bytes(zeta_slice[1:9])
         cdef uint64_t vx = int.from_bytes(vx_bytes, "little")
-        return [ra, vx]
+        
+        # Return in unified format: (vx, vy, ra, rb, rd)
+        return (vx, 0, ra, 0, 0)
 
-    @classmethod
-    def table(cls) -> Dict[int, OpCode]:
+    cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""
-        return {
-            20: OpCode(name="load_imm_64", fn=cls.load_imm_64, gas=1, is_terminating=False),
-        }
+        return TABLE
 
-    cdef tuple load_imm_64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint64_t vx):
-        """OPC20: Load 64-bit immediate value into register."""
-        registers[ra] = vx
-        return CONTINUE, -1
+# Prebuilt table (opcode -> CyTableEntry)
+cdef dict TABLE = {}
+cdef CyTableEntry _e
+_e = CyTableEntry(); _e.fn = load_imm_64_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[20] = _e
+

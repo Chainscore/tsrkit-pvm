@@ -22,7 +22,8 @@ Usage:
 
 # Import main Cython components
 from .cy_pvm import CyInterpreter
-from .mapper import CyInstMapper, CyCompiledInstruction, CyBlockInfo
+from .mapper import CyInstMapper
+from .cy_block import CyCompiledInstruction, CyBlockInfo
 from .instructions import ALL_CY_TABLES, ALL_TABLES
 from .cy_memory import CyMemory
 from .cy_status import (

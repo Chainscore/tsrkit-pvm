@@ -6,93 +6,83 @@ This table handles instructions that take one register and two immediate argumen
 - store_imm_ind_u8/u16/u32/u64: Store immediate value at indirect address with offset
 """
 
-from typing import Dict
-from libc.stdint cimport uint32_t, uint64_t
+from libc.stdint cimport uint32_t, uint64_t, uint8_t
 
 from tsrkit_pvm.common.status import CONTINUE
 from tsrkit_pvm.common.utils import chi, clamp_12, clamp_4, clamp_4_max0
-from tsrkit_pvm.core.opcode import OpCode
+from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
+from ...cy_program cimport CyProgram
 
 
-cdef class CyInstructionsWArgs1Reg2Imm:
+# Store immediate indirect instructions
+cdef tuple store_imm_ind_u8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC70: Store immediate vy as u8 at address (ra + vx)."""
+    value = int(vy % (2**8))
+    memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(1, "little"))
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple store_imm_ind_u16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC71: Store immediate vy as u16 at address (ra + vx)."""
+    value = int(vy % (2**16))
+    memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(2, "little"))
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple store_imm_ind_u32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC72: Store immediate vy as u32 at address (ra + vx)."""
+    value = int(vy % (2**32))
+    memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(4, "little"))
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef tuple store_imm_ind_u64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC73: Store immediate vy as u64 at address (ra + vx)."""
+    value = int(vy % (2**64))
+    memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(8, "little"))
+    return CONTINUE, <uint32_t>0xFFFFFFFF
+
+cdef class CyInstructionsWArgs1Reg2Imm(CyTable):
     """
-    Cython optimized instruction table for 1 register + 2 immediate argument instructions.
-    
-    This class provides high-performance implementations of instructions that
-    take one register and two immediate arguments, including:
-    - Memory store operations with immediate values at indirect addresses
-    All optimized with Cython for maximum performance.
+    Cython optimized instruction table for instructions with 1 register + 2 immediate arguments.
     """
     
-    cdef public uint32_t counter
-    cdef public object program  # INT_Program - keeping as Python object for now
-    cdef public uint32_t skip_index
-    
-    def __init__(self, uint32_t counter, program, uint32_t skip_index):
-        self.counter = counter
-        self.program = program
-        self.skip_index = skip_index
-
-    cpdef list get_props(self):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
         """
-        Extract one register and two immediate arguments from the instruction stream.
-        Returns [ra, lx, ly, vx, vy] where ra is register, lx/ly are lengths, vx/vy are immediates.
+        Extract register and two immediate arguments from program bytes.
+        Returns (vx, vy, ra, rb, rd) where vx/vy are immediate values, ra is register, others are 0.
         """
-        cdef uint32_t byte_val = self.program.zeta[self.counter + 1]
-        cdef uint32_t ra = clamp_12(byte_val & 0x0F)           # Lower 4 bits
+        cdef uint32_t skip_index = program.skip(program_counter)
+        cdef uint32_t byte_val = program.zeta[program_counter + 1]
+        cdef uint8_t ra = clamp_12(byte_val & 0x0F)           # Lower 4 bits
         cdef uint32_t lx = clamp_4((byte_val >> 4) & 0x07)     # Next 3 bits
-        cdef uint32_t ly = clamp_4_max0(self.skip_index - lx - 1)
+        cdef uint32_t ly = clamp_4_max0(skip_index - lx - 1)
         
         # Extract first immediate value
-        cdef uint32_t start = self.counter + 2
+        cdef uint32_t start = program_counter + 2
         cdef uint32_t end = start + lx
-        cdef bytes vx_slice = self.program.zeta[start:end]
+        cdef bytes vx_slice = program.zeta[start:end]
         cdef uint64_t vx = 0
         if lx > 0:
             vx = chi(int.from_bytes(vx_slice, "little"), lx)
         
         # Extract second immediate value
-        start = self.counter + 2 + lx
+        start = program_counter + 2 + lx
         end = start + ly
-        cdef bytes vy_slice = self.program.zeta[start:end]
+        cdef bytes vy_slice = program.zeta[start:end]
         cdef uint64_t vy = 0
         if ly > 0:
             vy = chi(int.from_bytes(vy_slice, "little"), ly)
         
-        return [ra, lx, ly, vx, vy]
+        # Return in unified format: (vx, vy, ra, rb, rd)
+        return (vx, vy, ra, 0, 0)
 
-    @classmethod
-    def table(cls) -> Dict[int, OpCode]:
+    cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""
-        return {
-            70: OpCode(name="store_imm_ind_u8", fn=cls.store_imm_ind_u8, gas=1, is_terminating=False),
-            71: OpCode(name="store_imm_ind_u16", fn=cls.store_imm_ind_u16, gas=1, is_terminating=False),
-            72: OpCode(name="store_imm_ind_u32", fn=cls.store_imm_ind_u32, gas=1, is_terminating=False),
-            73: OpCode(name="store_imm_ind_u64", fn=cls.store_imm_ind_u64, gas=1, is_terminating=False),
-        }
+        return TABLE
 
-    # Store immediate indirect instructions
-    cdef tuple  store_imm_ind_u8(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
-        """OPC70: Store immediate vy as u8 at address (ra + vx)."""
-        value = int(vy % (2**8))
-        memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(1, "little"))
-        return CONTINUE, -1
-
-    cdef tuple  store_imm_ind_u16(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
-        """OPC71: Store immediate vy as u16 at address (ra + vx)."""
-        value = int(vy % (2**16))
-        memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(2, "little"))
-        return CONTINUE, -1
-
-    cdef tuple  store_imm_ind_u32(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
-        """OPC72: Store immediate vy as u32 at address (ra + vx)."""
-        value = int(vy % (2**32))
-        memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(4, "little"))
-        return CONTINUE, -1
-
-    cdef tuple  store_imm_ind_u64(self, uint64_t *registers, CyMemory memory, uint32_t ra, uint32_t lx, uint32_t ly, uint64_t vx, uint64_t vy):
-        """OPC73: Store immediate vy as u64 at address (ra + vx)."""
-        value = int(vy % (2**64))
-        memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(8, "little"))
-        return CONTINUE, -1
+# Prebuilt table (opcode -> CyTableEntry)
+cdef dict TABLE = {}
+cdef CyTableEntry _e
+_e = CyTableEntry(); _e.fn = store_imm_ind_u8_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[70] = _e
+_e = CyTableEntry(); _e.fn = store_imm_ind_u16_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[71] = _e
+_e = CyTableEntry(); _e.fn = store_imm_ind_u32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[72] = _e
+_e = CyTableEntry(); _e.fn = store_imm_ind_u64_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[73] = _e

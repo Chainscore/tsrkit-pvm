@@ -31,6 +31,7 @@ MANIFEST
 /tsrkit_pvm/cpvm/**/*.c
 /tsrkit_pvm/cpvm/**/*.so
 /tsrkit_pvm/cpvm/**/*.html
+/tsrkit_pvm/cpvm/**/*.h
 *.so
 
 # PyInstaller

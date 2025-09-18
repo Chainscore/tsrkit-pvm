@@ -7,6 +7,10 @@ cdef enum Accessibility:
     ACC_WRITE
     ACC_NONE
 
+READ = ACC_READ
+WRITE = ACC_WRITE
+NONE = ACC_NONE
+
 cdef class CyMemory:
     cdef public dict _pages
     cdef public set _r_pages

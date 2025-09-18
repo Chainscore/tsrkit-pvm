@@ -18,19 +18,14 @@ cdef class CyTable:
     Base class implementation for all instruction tables.
     """
     
-    @staticmethod
-    cdef tuple get_props(uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
         """
         Default implementation returns zeros for all arguments.
         Subclasses should override this to extract actual arguments.
         Returns: (vx, vy, ra, rb, rc)
         """
         return (0, 0, 0, 0, 0)
-    
-    @staticmethod
-    cdef dict get_table():
-        """
-        Default implementation returns empty table.
-        Subclasses must override this to provide their instruction mappings.
-        """
-        return {}
+
+# Provide an empty implementation body for CyTableEntry
+cdef class CyTableEntry:
+    pass

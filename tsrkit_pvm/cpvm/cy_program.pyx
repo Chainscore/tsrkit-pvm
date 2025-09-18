@@ -22,7 +22,7 @@ from ..common.status import (
     PANIC as PVM_PANIC,           # ← import the *code* constant
 )
 from ..common.constants import PVM_ADDR_ALIGNMENT
-from .mapper import inst_map
+from .mapper cimport inst_map
 from tsrkit_types.integers import Uint   # ← use same helper as Python version
 from tsrkit_types import Bits
 
