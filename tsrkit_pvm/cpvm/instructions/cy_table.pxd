@@ -37,4 +37,4 @@ cdef class CyTable:
     
     # Unified argument extraction - returns (vx, vy, ra, rb, rc)
     # All tables must implement this to provide arguments in standard format
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program)
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index)

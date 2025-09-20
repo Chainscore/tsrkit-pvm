@@ -34,7 +34,6 @@ cdef class CyInstMapper:
     
     def __init__(self):
         self._dispatch_table = [None] * 256
-        self._basic_blocks = {}
         self._init_dispatch_table()
                     
     cdef void _init_dispatch_table(self):
@@ -87,12 +86,12 @@ cdef class CyInstMapper:
     
     cdef CyBlockInfo get_block(self, CyProgram program, int32_t start_pc):
         """Get compiled block from cache or compile new one."""
-        if start_pc in self._basic_blocks:
-            return self._basic_blocks[start_pc]
+        if start_pc in program._exec_blocks:
+            return program._exec_blocks[start_pc]
         
         # Compile block and cache it
         block = self._compile_block(program, start_pc)
-        self._basic_blocks[start_pc] = block
+        program._exec_blocks[start_pc] = block
         return block
     
     cdef CyBlockInfo _compile_block(self, CyProgram program, int32_t start_pc):
@@ -104,7 +103,8 @@ cdef class CyInstMapper:
         cdef CyTableEntry entry
         cdef uint32_t total_gas = 0
         cdef tuple props
-        
+        cdef uint64_t skip_index
+
         compiled_instructions = []
         
         while True:
@@ -116,11 +116,11 @@ cdef class CyInstMapper:
             
             table_class, entry = handler_entry
             
-            # Get instruction arguments using the unified interface
-            props = table_class().get_props(current_pc, program)
-            vx, vy, ra, rb, rd = props[0], props[1], props[2], props[3], props[4]
-        
             skip_index = program.skip(current_pc)
+
+            # Get instruction arguments using the unified interface
+            props = table_class().get_props(current_pc, program, skip_index)
+            vx, vy, ra, rb, rd = props[0], props[1], props[2], props[3], props[4]
 
             next_pc = current_pc + skip_index + 1
             # Create compiled instruction with pre-cached function and flags

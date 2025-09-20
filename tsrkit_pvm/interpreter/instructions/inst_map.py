@@ -107,7 +107,6 @@ class InstMapper:
     """
 
     _dispatch_table: List[Union[InstructionHandler, None]] = [None] * 256
-    _exec_blocks: Dict[int, BlockInfo]
 
     def __init__(self):
         self._dispatch_table = [None] * 256
@@ -120,7 +119,6 @@ class InstMapper:
                     table_class=table_class,
                 )
                 self._dispatch_table[opcode] = handler
-        self._exec_blocks = {}
 
     def process_instruction(
         self, program: Any, program_counter: int, registers: List[int], memory: Any
@@ -162,10 +160,10 @@ class InstMapper:
     def get_block(self, program: Any, start_pc: int) -> BlockInfo:
         """Get a compiled block from cache or compile it if not cached."""
         try:
-            block = self._exec_blocks[start_pc]
+            block = program._exec_blocks[start_pc]
         except KeyError:
             block = self._compile_block(program, start_pc)
-            self._exec_blocks[start_pc] = block
+            program._exec_blocks[start_pc] = block
         return block
 
     def _compile_block(self, program: Any, start_pc: int) -> BlockInfo:

@@ -13,7 +13,7 @@ cdef class InstructionsWoArgs(CyTable):
     Cython optimized instruction table for instructions without arguments.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program)
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index)
     
     cpdef dict get_table(self)
 

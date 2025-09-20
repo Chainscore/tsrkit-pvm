@@ -1,14 +1,8 @@
 # cython: language_level=3
-"""
-Simple Cython status definitions for PVM.
-"""
 
-from libc.stdint cimport int32_t, uint64_t
+from libc.stdint cimport int32_t, uint8_t, uint32_t, uint64_t
 
-# Fixed-size registers array - 13 registers as per PVM spec
-ctypedef uint64_t registers_t[13]
 
-# Simple C enum for status codes
 cdef enum PvmStatus:
     PVM_HALT = 0
     PVM_PANIC = 1  
@@ -17,12 +11,22 @@ cdef enum PvmStatus:
     PVM_OUT_OF_GAS = 4
     PVM_CONTINUE = 5
 
-# Simple struct for status with optional register
-cdef struct StatusValue:
-    int32_t code
-    int32_t register  # -1 if not used
 
-# Simple error class
+cdef class CyStatus:
+    cdef public uint8_t code     
+    cdef public uint32_t register
+    
+    cdef void set_values(self, uint8_t code, uint32_t register)
+
+# Status constants declarations for external use
+cdef CyStatus CONTINUE
+cdef CyStatus HALT
+cdef CyStatus PANIC  
+cdef CyStatus OUT_OF_GAS
+cdef CyStatus PAGE_FAULT(uint32_t register)
+cdef CyStatus HOST(uint32_t register)
+
+
 cdef class PvmError(Exception):
     cdef public int32_t code
     cdef public int32_t register

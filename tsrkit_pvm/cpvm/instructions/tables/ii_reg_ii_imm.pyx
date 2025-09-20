@@ -6,9 +6,8 @@ This table handles instructions with complex argument parsing:
 2 registers and 2 immediate values with varying bit layouts.
 """
 
-from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t
-from tsrkit_pvm.common.status import CONTINUE, PANIC
-from tsrkit_pvm.common.utils import chi, clamp_12, clamp_4, clamp_4_max0
+from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t, int8_t
+from ...cy_utils cimport chi, clamp_12, clamp_4, clamp_4_max0
 from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
@@ -26,40 +25,39 @@ cdef class CyInstructionsWArgs2Reg2Imm(CyTable):
     Cython optimized instruction table for instructions with 2 register + 2 immediate arguments.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract two registers and two immediate arguments from program bytes.
         Returns (vx, vy, ra, rb, rd) where vx/vy are immediates, ra/rb are registers, rd is 0.
         """
-        cdef uint32_t skip_index = program.skip(program_counter)
         cdef bytes zeta_slice = program.zeta[program_counter + 1:program_counter + 8]
         cdef uint32_t byte1_val = zeta_slice[0]
         cdef uint32_t byte2_val = zeta_slice[1] if len(zeta_slice) > 1 else 0
         
         # Parse registers from first byte
-        cdef uint8_t ra = clamp_12(byte1_val & 0x0F)         # Lower 4 bits
-        cdef uint8_t rb = clamp_12((byte1_val >> 4) & 0x0F)  # Upper 4 bits
+        cdef uint8_t ra = clamp_12(<uint8_t>(byte1_val & 0x0F))         # Lower 4 bits
+        cdef uint8_t rb = clamp_12(<uint8_t>((byte1_val >> 4) & 0x0F))  # Upper 4 bits
         
         # Parse immediate lengths from second byte  
-        cdef uint32_t lx = clamp_4(byte2_val & 0x07)          # Lower 3 bits
-        cdef uint32_t ly = clamp_4((byte2_val >> 3) & 0x07)   # Next 3 bits
+        cdef uint32_t lx = clamp_4(<uint8_t>(byte2_val & 0x07))          # Lower 3 bits
+        cdef uint32_t ly = clamp_4(<uint8_t>((byte2_val >> 3) & 0x07))   # Next 3 bits
         
         # Clamp ly based on available space
-        ly = clamp_4_max0(int(skip_index) - lx - 2)
+        ly = clamp_4_max0(<int8_t>(int(skip_index) - lx - 2))
         
         # Extract first immediate value
         cdef uint64_t vx = 0
         cdef bytes imm1_slice
         if lx > 0:
             imm1_slice = zeta_slice[2:2+lx]
-            vx = chi(int.from_bytes(imm1_slice, "little"), lx)
+            vx = <uint64_t>chi(<uint64_t>int.from_bytes(imm1_slice, "little"), <uint8_t>lx)
         
         # Extract second immediate value  
         cdef uint64_t vy = 0
         cdef bytes imm2_slice
         if ly > 0:
             imm2_slice = zeta_slice[2+lx:2+lx+ly]
-            vy = chi(int.from_bytes(imm2_slice, "little"), ly)
+            vy = <uint64_t>chi(<uint64_t>int.from_bytes(imm2_slice, "little"), <uint8_t>ly)
         
         # Return in unified format: (vx, vy, ra, rb, rd)
         return (vx, vy, ra, rb, 0)

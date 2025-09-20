@@ -15,12 +15,7 @@ from libc.stdlib cimport malloc, free
 from libc.math cimport floor
 from typing import Any, Dict, Tuple, Union
 
-from ..common.status import (
-    CONTINUE,
-    HALT,
-    PvmError,
-    PANIC as PVM_PANIC,           # ← import the *code* constant
-)
+from .cy_status cimport PvmError, CONTINUE, PVM_PANIC, HALT
 from ..common.constants import PVM_ADDR_ALIGNMENT
 from .mapper cimport inst_map
 from tsrkit_types.integers import Uint   # ← use same helper as Python version
@@ -102,32 +97,32 @@ cdef class CyProgram:
             free(self._skip_cache)
 
     # ------------------------------------------------------------ fast helpers
-    def skip(self, int32_t pc):
+    cdef uint32_t skip(self, int32_t pc):
         return 0 if pc < 0 or pc >= self._skip_cache_len else self._skip_cache[pc]
 
-    cpdef tuple branch(self, int32_t counter, int32_t branch, bint cond):
+    cdef tuple branch(self, int32_t counter, int32_t branch, bint cond):
         if not cond:
             return CONTINUE, counter
         if branch not in self._basic_blocks_set:
-            raise PvmError(PVM_PANIC, -1, "invalid branch target")
+            raise PvmError(PVM_PANIC)
         return CONTINUE, branch
 
-    cpdef tuple djump(self, uint32_t counter, uint32_t a):
+    cdef tuple djump(self, uint32_t counter, uint32_t a):
         # halt sentinel ----------------------------------------------------
         if a == 0xFFFF_FFFF - 0xFFFF:
             return HALT, counter
 
         # address sanity ---------------------------------------------------
         if a == 0 or a % PVM_ADDR_ALIGNMENT:
-            raise PvmError(PVM_PANIC, -1, "invalid jump address")
+            raise PvmError(PVM_PANIC)
 
         cdef int32_t idx = <int32_t>(a // PVM_ADDR_ALIGNMENT) - 1
         if idx < 0 or idx >= self.jump_table_len:
-            raise PvmError(PVM_PANIC, -1, "jump index OOB")
+            raise PvmError(PVM_PANIC)
 
         cdef int32_t target = self.jump_table[idx]
         if target not in self._basic_blocks_set:
-            raise PvmError(PVM_PANIC, -1, "invalid jump target")
+            raise PvmError(PVM_PANIC)
 
         return CONTINUE, target
 

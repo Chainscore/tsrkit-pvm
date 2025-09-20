@@ -328,6 +328,8 @@ class INT_Memory:
         # print(f"READ \t\t | Start: {int(read_start).to_bytes(4).hex()} \t | End {int(read_pages[-1] * PVM_MEMORY_PAGE_SIZE).to_bytes(4).hex()}")
         for i, byt in enumerate(read):
             memory[read_start + i] = int(byt)
+            
+        print(read_pages)
 
         write_start = 2 * PVM_INIT_ZONE_SIZE + total_zone_size(len(read))
         write_pages = get_pages(
@@ -349,6 +351,7 @@ class INT_Memory:
                 total_page_size(s),
             )
         )
+        print(write_pages)
 
         arg_start = 2**32 - PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE
         read_pages.extend(get_pages(arg_start, total_page_size(len(args))))

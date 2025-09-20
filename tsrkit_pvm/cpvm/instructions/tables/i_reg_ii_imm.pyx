@@ -6,10 +6,10 @@ This table handles instructions that take one register and two immediate argumen
 - store_imm_ind_u8/u16/u32/u64: Store immediate value at indirect address with offset
 """
 
-from libc.stdint cimport uint32_t, uint64_t, uint8_t
+from libc.stdint cimport uint32_t, uint64_t, uint8_t, int8_t
 
-from tsrkit_pvm.common.status import CONTINUE
-from tsrkit_pvm.common.utils import chi, clamp_12, clamp_4, clamp_4_max0
+from ...cy_status cimport CONTINUE
+from ...cy_utils cimport chi, clamp_12, clamp_4, clamp_4_max0
 from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
@@ -45,16 +45,15 @@ cdef class CyInstructionsWArgs1Reg2Imm(CyTable):
     Cython optimized instruction table for instructions with 1 register + 2 immediate arguments.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract register and two immediate arguments from program bytes.
         Returns (vx, vy, ra, rb, rd) where vx/vy are immediate values, ra is register, others are 0.
         """
-        cdef uint32_t skip_index = program.skip(program_counter)
         cdef uint32_t byte_val = program.zeta[program_counter + 1]
-        cdef uint8_t ra = clamp_12(byte_val & 0x0F)           # Lower 4 bits
-        cdef uint32_t lx = clamp_4((byte_val >> 4) & 0x07)     # Next 3 bits
-        cdef uint32_t ly = clamp_4_max0(skip_index - lx - 1)
+        cdef uint8_t ra = clamp_12(<uint8_t>(byte_val & 0x0F))           # Lower 4 bits
+        cdef uint32_t lx = clamp_4(<uint8_t>((byte_val >> 4) & 0x07))     # Next 3 bits
+        cdef uint32_t ly = clamp_4_max0(<int8_t>(skip_index - lx - 1))
         
         # Extract first immediate value
         cdef uint32_t start = program_counter + 2
@@ -62,7 +61,7 @@ cdef class CyInstructionsWArgs1Reg2Imm(CyTable):
         cdef bytes vx_slice = program.zeta[start:end]
         cdef uint64_t vx = 0
         if lx > 0:
-            vx = chi(int.from_bytes(vx_slice, "little"), lx)
+            vx = <uint64_t>chi(<uint64_t>int.from_bytes(vx_slice, "little"), <uint8_t>lx)
         
         # Extract second immediate value
         start = program_counter + 2 + lx
@@ -70,7 +69,7 @@ cdef class CyInstructionsWArgs1Reg2Imm(CyTable):
         cdef bytes vy_slice = program.zeta[start:end]
         cdef uint64_t vy = 0
         if ly > 0:
-            vy = chi(int.from_bytes(vy_slice, "little"), ly)
+            vy = <uint64_t>chi(<uint64_t>int.from_bytes(vy_slice, "little"), <uint8_t>ly)
         
         # Return in unified format: (vx, vy, ra, rb, rd)
         return (vx, vy, ra, 0, 0)

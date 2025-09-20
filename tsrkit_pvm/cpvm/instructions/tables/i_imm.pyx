@@ -10,13 +10,12 @@ Instructions with 1 immediate argument (opcodes 10-19).
 """
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t
-from tsrkit_pvm.common.status import HOST
-from tsrkit_pvm.common.utils import chi, clamp_4
+from ...cy_status cimport HOST
+from ...cy_utils cimport chi, clamp_4
 from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
-# Separate dispatch function for ecalli instruction
 cdef tuple ecalli_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
     OPC10: Ecalli - Execute call immediate.
@@ -41,14 +40,12 @@ cdef class CyInstructionsWArgs1Imm(CyTable):
     Cython optimized instruction table for instructions with 1 immediate argument.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract immediate value from program bytes.
         Returns (vx, vy, ra, rb, rc) where vx is the immediate value, others are 0.
         """
-        # Get skip index from program
-        cdef uint32_t skip_index = program.skip(program_counter)
-        cdef uint32_t lx = clamp_4(skip_index)
+        cdef uint32_t lx = clamp_4(<uint8_t>skip_index)
         cdef uint32_t start = program_counter + 1
         cdef uint32_t end = start + lx
         
@@ -57,7 +54,7 @@ cdef class CyInstructionsWArgs1Imm(CyTable):
         cdef uint64_t immediate_value = int.from_bytes(byte_slice, "little")
         
         # Apply chi transformation
-        cdef uint64_t vx = chi(immediate_value, lx)
+        cdef uint64_t vx = <uint64_t>chi(<uint64_t>immediate_value, <uint8_t>lx)
         
         # Return in unified format: (vx, vy, ra, rb, rd)
         return (vx, 0, 0, 0, 0)

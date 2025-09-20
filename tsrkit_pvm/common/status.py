@@ -47,19 +47,16 @@ def PAGE_FAULT(register: int) -> ExecutionStatus:
 # Halt
 HALT: ExecutionStatus = ExecutionStatus(ExecutionStatus.HALT)
 
-
 # Host call with a register value
 def HOST(register: int) -> ExecutionStatus:
     result: Any = ExecutionStatus.HOST
     result.value.register = register
     return ExecutionStatus(result)
 
-
 # Out of gas
 OUT_OF_GAS: ExecutionStatus = ExecutionStatus(ExecutionStatus.OUT_OF_GAS)
 # Continue
 CONTINUE: ExecutionStatus = ExecutionStatus(ExecutionStatus.CONTINUE)
-
 
 class PvmError(Exception):
     def __init__(self, code: ExecutionStatus, message: str = "") -> None:

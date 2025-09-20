@@ -10,7 +10,7 @@ Instructions without arguments (opcodes 0-9).
 """
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t
-from tsrkit_pvm.common.status import PvmError, CONTINUE, PANIC
+from ...cy_status cimport PvmError, PANIC, CONTINUE
 from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
@@ -26,7 +26,7 @@ cdef tuple trap_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint
         Tuple of (PANIC, next_pc)
     """
     # Trap instruction causes panic and terminates execution
-    return (PANIC, <uint32_t>0xFFFFFFFF)
+    raise PvmError(PANIC)
 
 cdef tuple fallthrough_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
@@ -43,7 +43,7 @@ cdef class InstructionsWoArgs(CyTable):
     Cython optimized instruction table for instructions without arguments.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         No arguments to extract for these instructions.
         Returns (vx, vy, ra, rb, rd) all as 0.

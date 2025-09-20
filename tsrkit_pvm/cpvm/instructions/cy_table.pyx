@@ -18,7 +18,7 @@ cdef class CyTable:
     Base class implementation for all instruction tables.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Default implementation returns zeros for all arguments.
         Subclasses should override this to extract actual arguments.

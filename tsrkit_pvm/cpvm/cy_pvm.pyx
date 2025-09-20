@@ -9,13 +9,16 @@ Provides identical API to the interpreter version but with C-level performance.
 """
 
 cimport cython
-from libc.stdint cimport int32_t, int64_t, uint32_t, uint64_t
+from libc.stdint cimport int32_t, int64_t, uint32_t, uint64_t, uint8_t
 from typing import Any, List, Tuple, Union
 
+from libc.stdint cimport uint8_t, int32_t
 from .cy_program cimport CyProgram
 from .cy_memory cimport CyMemory
 from .mapper cimport CyInstMapper, inst_map
-from tsrkit_pvm.common.status import OUT_OF_GAS, PAGE_FAULT, PANIC, ExecutionStatus, PvmError, CONTINUE
+from .cy_status cimport OUT_OF_GAS, PAGE_FAULT, PVM_HALT, PVM_PANIC, PVM_PAGE_FAULT, PVM_OUT_OF_GAS, PVM_HOST, CyStatus, CONTINUE, PVM_CONTINUE
+from .cy_status cimport PvmError, PvmStatus
+from ..common.status import ExecutionStatus, HALT, PANIC, OUT_OF_GAS as EXEC_OUT_OF_GAS, CONTINUE as EXEC_CONTINUE, HOST, PAGE_FAULT as EXEC_PAGE_FAULT
 from .mapper cimport inst_map
 
 cdef class CyInterpreter:
@@ -57,7 +60,6 @@ cdef class CyInterpreter:
             )
 
         status, pc, remaining_gas = _execute_internal(program, pc, remaining_gas, reg_arr, memory)
-
         if logger:
             logger.info(
                 "PVM result",
@@ -72,7 +74,28 @@ cdef class CyInterpreter:
         for i in range(13):
             py_registers.append(int(reg_arr[i]))
         
-        return status, int(pc), int(remaining_gas), py_registers, memory
+        # Convert CyStatus to Python ExecutionStatus for compatibility
+        cdef object execution_status = None
+        # Convert CyStatus to Python ExecutionStatus based on status code
+        if status.code == PVM_HALT:
+            execution_status = HALT
+        elif status.code == PVM_PANIC:
+            execution_status = PANIC
+        elif status.code == PVM_OUT_OF_GAS:
+            execution_status = EXEC_OUT_OF_GAS
+        elif status.code == PVM_CONTINUE:
+            execution_status = EXEC_CONTINUE
+        elif status.code == PVM_HOST:
+            # For HOST status, create with register value
+            execution_status = HOST(status.register)
+        elif status.code == PVM_PAGE_FAULT:
+            # For PAGE_FAULT status, create with register value
+            execution_status = EXEC_PAGE_FAULT(status.register)
+        else:
+            # Default to HALT for unknown status codes
+            execution_status = HALT
+        
+        return execution_status, int(pc), int(remaining_gas), py_registers, memory
 
 
 cdef tuple _execute_internal(
@@ -91,9 +114,9 @@ cdef tuple _execute_internal(
     cdef int32_t gas_cost
     cdef bint should_break = False
     cdef tuple result
-    cdef object status = None
+    cdef CyStatus status = CONTINUE
+    cdef int status_code = 0
     
-    # Main execution loop - this is the critical hot path
     while not should_break:
         try:
             # Execute instruction using optimized mapper
@@ -107,21 +130,15 @@ cdef tuple _execute_internal(
                 should_break = True
                 continue
 
-            # Optimize status checking
-            if status == ExecutionStatus.HALT:
-                should_break = True
-                continue
-            elif status == ExecutionStatus.HOST:
+            if status.code == PVM_HALT or status.code == PVM_HOST:
                 should_break = True
                 continue
 
         except PvmError as e:
-            if e.code == PANIC:
-                status = PANIC
+            if e.code == PVM_PANIC or e.code == PVM_PAGE_FAULT:  # PVM_PAGE_FAULT
                 should_break = True
-            elif e.code == ExecutionStatus.PAGE_FAULT:
-                status = PAGE_FAULT(e.code.value.register)
-                should_break = True
+                status.code = e.code 
+                status.register = e.register
             else:
                 raise e
         except Exception as e:

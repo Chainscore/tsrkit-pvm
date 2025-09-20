@@ -9,9 +9,9 @@ This table handles instructions that take two immediate arguments:
 - store_imm_u64: Store immediate 64-bit value
 """
 
-from libc.stdint cimport uint32_t, uint64_t, uint8_t, uint16_t
-from tsrkit_pvm.common.status import CONTINUE
-from tsrkit_pvm.common.utils import chi, clamp_4, clamp_4_max0
+from libc.stdint cimport uint32_t, uint64_t, uint8_t, uint16_t, int8_t
+from ...cy_status cimport CONTINUE
+from ...cy_utils cimport chi, clamp_4, clamp_4_max0
 from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
@@ -50,26 +50,25 @@ cdef class CyInstructionsWArgs2Imm(CyTable):
     Cython optimized instruction table for 2 immediate argument instructions.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract two immediate arguments from the instruction stream.
         Returns (vx, vy, ra, rb, rd) where vx/vy are the immediate values, others are 0.
         """
-        cdef uint32_t skip_index = program.skip(program_counter)
-        cdef uint32_t lx = clamp_4(program.zeta[program_counter + 1])
-        cdef uint32_t ly = clamp_4_max0(skip_index - int(lx) - 1)
+        cdef uint32_t lx = clamp_4(<uint8_t>program.zeta[program_counter + 1])
+        cdef uint32_t ly = clamp_4_max0(<int8_t>(skip_index - int(lx) - 1))
         
         # Extract first immediate (vx)
         cdef uint32_t start = program_counter + 2
         cdef uint32_t end = start + lx
         cdef bytes vx_bytes = program.zeta[start:end]
-        cdef uint64_t vx = chi(int.from_bytes(vx_bytes, "little"), lx)
+        cdef uint64_t vx = <uint64_t>chi(<uint64_t>int.from_bytes(vx_bytes, "little"), <uint8_t>lx)
         
         # Extract second immediate (vy)
         start = program_counter + 2 + lx
         end = start + ly
         cdef bytes vy_bytes = program.zeta[start:end]
-        cdef uint64_t vy = chi(int.from_bytes(vy_bytes, "little"), ly)
+        cdef uint64_t vy = <uint64_t>chi(<uint64_t>int.from_bytes(vy_bytes, "little"), <uint8_t>ly)
 
         # Return in unified format: (vx, vy, ra, rb, rd)
         return (vx, vy, 0, 0, 0)

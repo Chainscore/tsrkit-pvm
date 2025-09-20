@@ -3,7 +3,7 @@ from typing import Any, Dict, Tuple
 from tsrkit_pvm.core.program_base import Program
 from ..common.constants import PVM_ADDR_ALIGNMENT
 from ..common.status import CONTINUE, HALT, PANIC, ExecutionStatus, PvmError
-from .instructions.inst_map import inst_map
+from .instructions.inst_map import BlockInfo, inst_map
 
 
 class INT_Program(Program):
@@ -14,7 +14,7 @@ class INT_Program(Program):
         # Initialize instance attributes
         self._skip_cache: list[int] = []
         self._basic_blocks_set: set[int] = set()
-        self._exec_blocks: Dict[int, Any] = {}
+        self._exec_blocks: Dict[int, BlockInfo] = {}
         
         # Pre-compute skip values for all positions to eliminate runtime overhead.
         bitmask_len = len(self.offset_bitmask)

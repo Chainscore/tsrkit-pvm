@@ -1,19 +1,13 @@
-# cython: language_level=3
-# cython: boundscheck=False
-# cython: wraparound=False  
-# cython: cdivision=True
-# cython: profile=True
-
 """
 Cython optimized ii_reg instruction table.
-Instructions with 2 register arguments (opcodes 100<uint32_t>0xFFFFFFFF11).
+Instructions with 2 register arguments (opcodes 100-111).
 """
 
 from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t
-from tsrkit_pvm.common.status import CONTINUE
-from tsrkit_pvm.common.utils import clamp_12, z, z_inv
+from ...cy_status cimport CONTINUE
+from ...cy_utils cimport clamp_12, z, z_inv, b
 from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
-from ...cy_memory cimport CyMemory, WRITE
+from ...cy_memory cimport CyMemory, ACC_WRITE
 from ...cy_program cimport CyProgram
 
 # ----------------------------#
@@ -63,10 +57,11 @@ cdef tuple sbrk(CyProgram program, uint64_t *registers, CyMemory memory, uint32_
                 uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC101: Expand heap by ra bytes and store old break in rd."""
     cdef int64_t req = registers[ra]  # bytes requested
-    memory.alter_accessibility(memory.heap_break, req, WRITE)
+    memory.alter_accessibility(memory.heap_break, req, ACC_WRITE)
     
-    # Store old heap break in destination register
-    registers[rd] = memory.heap_break
+    # Store old heap break in destination register (before updating it)
+    cdef uint64_t old_heap_break = memory.heap_break
+    registers[rd] = old_heap_break
     
     # Update heap break
     memory.heap_break = memory.heap_break + req
@@ -76,61 +71,59 @@ cdef tuple sbrk(CyProgram program, uint64_t *registers, CyMemory memory, uint32_
 # Bit counting instructions with C-level optimizations
 cdef tuple  count_set_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC102: Count set bits in 64-bit value."""
-    cdef uint64_t val = registers[ra] % (2**64)
-    cdef uint32_t count = _count_set_bits_c(val)
-    registers[rd] = count
+    registers[rd] = _count_set_bits_c(registers[ra] & 0xFFFFFFFFFFFFFFFF)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 cdef tuple  count_set_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC103: Count set bits in 32-bit value."""
-    cdef uint32_t val = registers[ra] % (2**32)
-    cdef uint32_t count = _count_set_bits_c(val)
-    registers[rd] = count
+    registers[rd] = _count_set_bits_c(registers[ra] & 0xFFFFFFFF)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 # Leading zero counting with C optimizations
 cdef tuple  leading_zero_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC104: Count leading zero bits in 64-bit value."""
-    cdef uint64_t val = registers[ra] % (2**64)
-    cdef uint32_t count = _leading_zeros_c(val, 64)
-    registers[rd] = count
+    registers[rd] = _leading_zeros_c(registers[ra] & 0xFFFFFFFFFFFFFFFF, 64)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 cdef tuple  leading_zero_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC105: Count leading zero bits in 32-bit value."""
-    cdef uint32_t val = registers[ra] % (2**32)
-    cdef uint32_t count = _leading_zeros_c(val, 32)
-    registers[rd] = count
+    registers[rd] = _leading_zeros_c(registers[ra] & 0xFFFFFFFF, 32)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 # Trailing zero counting with C optimizations  
 cdef tuple  trailing_zero_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC106: Count trailing zero bits in 64-bit value."""
-    cdef uint64_t val = registers[ra] % (2**64)
-    cdef uint32_t count = _trailing_zeros_c(val, 64)
-    registers[rd] = count
+    registers[rd] = _trailing_zeros_c(registers[ra] & 0xFFFFFFFFFFFFFFFF, 64)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 cdef tuple  trailing_zero_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC107: Count trailing zero bits in 32-bit value."""
-    cdef uint32_t val = registers[ra] % (2**32)
-    cdef uint32_t count = _trailing_zeros_c(val, 32)
-    registers[rd] = count
+    registers[rd] = _trailing_zeros_c(registers[ra] & 0xFFFFFFFF, 32)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 # Sign extension instructions
 cdef tuple  sign_extend_8(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC108: Sign extend 8-bit value to 64-bit."""
-    registers[rd] = z_inv(
-        z(registers[ra] % 2**8, 8 // 8), 8
-    )
+    cdef uint64_t val = registers[ra] & 0xFF  # Get low 8 bits
+    # Check if sign bit (bit 7) is set
+    if val & 0x80:
+        # Sign extend by setting upper 56 bits to 1
+        registers[rd] = val | 0xFFFFFFFFFFFFFF00
+    else:
+        # Zero extend
+        registers[rd] = val
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 cdef tuple  sign_extend_16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC109: Sign extend 16-bit value to 64-bit."""
-    registers[rd] = z_inv(
-        z(registers[ra] % 2**16, 16 // 8), 8
-    )
+    cdef uint64_t val = registers[ra] & 0xFFFF  # Get low 16 bits
+    # Check if sign bit (bit 15) is set
+    if val & 0x8000:
+        # Sign extend by setting upper 48 bits to 1
+        registers[rd] = val | 0xFFFFFFFFFFFF0000
+    else:
+        # Zero extend
+        registers[rd] = val
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 cdef tuple  zero_extend_16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
@@ -141,9 +134,20 @@ cdef tuple  zero_extend_16(CyProgram program, uint64_t *registers, CyMemory memo
 
 cdef tuple  reverse_bytes(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC111: Reverse byte order of 64-bit value."""
-    registers[rd] = int.from_bytes(
-        registers[ra].to_bytes(8, "little")[::<uint32_t>0xFFFFFFFF], "little"
-    )
+    cdef uint64_t val = registers[ra]
+    cdef uint64_t result = 0
+    
+    # Fast byte reversal using C bit operations
+    result |= ((val & 0x00000000000000FF) << 56)
+    result |= ((val & 0x000000000000FF00) << 40)
+    result |= ((val & 0x0000000000FF0000) << 24)
+    result |= ((val & 0x00000000FF000000) << 8)
+    result |= ((val & 0x000000FF00000000) >> 8)
+    result |= ((val & 0x0000FF0000000000) >> 24)
+    result |= ((val & 0x00FF000000000000) >> 40)
+    result |= ((val & 0xFF00000000000000) >> 56)
+    
+    registers[rd] = result
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 cdef class CyInstructionsWArgs2Reg(CyTable):
@@ -151,18 +155,19 @@ cdef class CyInstructionsWArgs2Reg(CyTable):
     Cython optimized instruction table for instructions with 2 register arguments.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program):
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract register indices from program bytes.
-        Returns (vx, vy, ra, rb, rd) where ra/rb are register indices, others are 0.
+        Returns (vx, vy, ra, rb, rd) where ra is source, rd is destination, others are 0.
         """
         # Extract byte value using C-style operations for speed
         cdef uint8_t byte_val = program.zeta[program_counter + 1]
-        cdef uint8_t ra = clamp_12(byte_val >> 4)    # Upper 4 bits (source)
-        cdef uint8_t rb = clamp_12(byte_val & 0x0F)  # Lower 4 bits (destination)
+        cdef uint8_t rd_val = clamp_12(<uint8_t>(byte_val & 0x0F))  # Lower 4 bits (destination)
+        cdef uint8_t ra_val = clamp_12(<uint8_t>(byte_val >> 4))    # Upper 4 bits (source)
         
         # Return in unified format: (vx, vy, ra, rb, rd)
-        return (0, 0, ra, rb, 0)
+        # Interpreter signature is (rd, ra), so map to (vx=0, vy=0, ra=source, rb=0, rd=destination)
+        return (0, 0, ra_val, 0, rd_val)
 
     cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""

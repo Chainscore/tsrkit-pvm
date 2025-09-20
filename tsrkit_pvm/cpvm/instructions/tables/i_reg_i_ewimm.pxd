@@ -13,7 +13,7 @@ cdef class CyInstructionsWArgs1Reg1EwImm(CyTable):
     Cython optimized instruction table for instructions with 1 register + 1 EwImm argument.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program)
+    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index)
     
     cpdef dict get_table(self)
 

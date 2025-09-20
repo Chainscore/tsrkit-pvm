@@ -37,5 +37,6 @@ cdef class CyProgram:
     cdef int32_t encode_into(self, bytearray buffer, int32_t offset)
     
     # Public methods that can be called from other Cython modules
-    cpdef tuple branch(self, int32_t counter, int32_t branch, bint cond)
-    cpdef tuple djump(self, uint32_t counter, uint32_t a)
+    cdef tuple branch(self, int32_t counter, int32_t branch, bint cond)
+    cdef uint32_t skip(self, int32_t pc)
+    cdef tuple djump(self, uint32_t counter, uint32_t a)
