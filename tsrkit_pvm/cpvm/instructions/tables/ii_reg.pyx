@@ -57,7 +57,7 @@ cdef tuple sbrk(CyProgram program, uint64_t *registers, CyMemory memory, uint32_
                 uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC101: Expand heap by ra bytes and store old break in rd."""
     cdef int64_t req = registers[ra]  # bytes requested
-    memory.alter_accessibility(memory.heap_break, req, ACC_WRITE)
+    memory._alter_accessibility_c(memory.heap_break, req, ACC_WRITE)
     
     # Store old heap break in destination register (before updating it)
     cdef uint64_t old_heap_break = memory.heap_break

@@ -17,6 +17,7 @@ from libc.stdint cimport uint32_t, uint8_t, uint64_t, uintptr_t
 from libc.string cimport memset, memcpy
 from libc.stdlib cimport malloc, free
 from cpython.mem cimport PyMem_Malloc, PyMem_Free
+from .cy_memory cimport Accessibility, ACC_READ, ACC_WRITE, ACC_NONE
 # ---------------------------------------------------------------------------
 # Local accessibility enum – avoids importing Python-only symbol
 # ---------------------------------------------------------------------------
@@ -36,6 +37,22 @@ from .cy_status cimport PAGE_FAULT, PvmError
 cdef inline uint32_t _norm(uint32_t addr) noexcept:
     """Wrap address into 32-bit space."""
     return addr & 0xFFFF_FFFF
+
+cdef inline uint32_t _get_start_page(uint32_t addr) noexcept:
+    """Get page index for address."""
+    return addr >> 12  # addr // PAGE_SIZE
+
+cdef inline uint32_t _get_page_offset(uint32_t addr) noexcept:
+    """Get offset within page."""
+    return addr & 0xFFF  # addr % PAGE_SIZE
+
+cdef inline void _get_page_range(uint32_t start_addr, uint32_t length, 
+                                uint32_t *start_page, uint32_t *num_pages) noexcept:
+    """Calculate page range for address range."""
+    start_page[0] = start_addr >> 12
+    cdef uint32_t end_addr = start_addr + length - 1
+    cdef uint32_t end_page = end_addr >> 12
+    num_pages[0] = end_page - start_page[0] + 1
 
 
 cdef class CyMemory:
@@ -82,17 +99,10 @@ cdef class CyMemory:
         self.heap_break = heap
 
         # Initialize C-level bitsets to zero
-        cdef int i
-        for i in range(16384):  # MAX_PAGES / 64
-            self._r_bitset[i] = 0
-            self._w_bitset[i] = 0
+        self._clear_bitsets()
 
         # Set initial permissions in bitsets
-        cdef int pg
-        for pg in self._r_pages:
-            self._set_access_c(pg, ACC_READ, True)
-        for pg in self._w_pages:
-            self._set_access_c(pg, ACC_WRITE, True)
+        self._sync_bitsets_from_sets()
 
         if data:
             for addr, val in data.items():
@@ -104,13 +114,17 @@ cdef class CyMemory:
         for ptr_val in self._pages.values():
             PyMem_Free(<void*>ptr_val)
 
-    def _sync_bitsets_from_sets(self):
-        """Synchronize C-level bitsets from Python sets."""
-        # Clear all bitsets first
+    cdef void _clear_bitsets(self) noexcept:
+        """Clear all C-level bitsets."""
         cdef int i
         for i in range(16384):  # MAX_PAGES / 64
             self._r_bitset[i] = 0
             self._w_bitset[i] = 0
+
+    cpdef void _sync_bitsets_from_sets(self):
+        """Synchronize C-level bitsets from Python sets."""
+        # Clear all bitsets first
+        self._clear_bitsets()
         
         # Set read permissions
         cdef int pg
@@ -122,9 +136,9 @@ cdef class CyMemory:
             self._set_access_c(pg, ACC_WRITE, True)
 
     # ───────────────────── C-level bitset access control ───────────────────
-    cdef bint _has_access_c(self, uint32_t page_idx, int mode) nogil:
+    cdef bint _has_access_c(self, uint32_t page_idx, int mode) noexcept nogil:
         """Check if page has access permission using C-level bitsets."""
-        if page_idx >= 1048576:  # MAX_PAGES
+        if page_idx >= MAX_PAGES:
             return False
         
         cdef uint32_t word_idx = page_idx >> 6  # divide by 64
@@ -136,9 +150,9 @@ cdef class CyMemory:
         else:  # ACC_READ
             return ((self._r_bitset[word_idx] | self._w_bitset[word_idx]) & mask) != 0
 
-    cdef void _set_access_c(self, uint32_t page_idx, int mode, bint value) nogil:
+    cdef void _set_access_c(self, uint32_t page_idx, int mode, bint value) noexcept nogil:
         """Set page access permission using C-level bitsets."""
-        if page_idx >= 1048576:  # MAX_PAGES
+        if page_idx >= MAX_PAGES:
             return
             
         cdef uint32_t word_idx = page_idx >> 6  # divide by 64
@@ -156,6 +170,12 @@ cdef class CyMemory:
             else:
                 self._r_bitset[word_idx] &= ~mask
 
+    cdef void _set_access_range_c(self, uint32_t start_page, uint32_t num_pages, int mode, bint value) noexcept nogil:
+        """Set access permission for a range of pages using C-level bitsets."""
+        cdef uint32_t i
+        for i in range(num_pages):
+            self._set_access_c(start_page + i, mode, value)
+
     cdef void _check_access_c(self, uint32_t start_page, uint32_t num_pages, int mode, uint32_t fault_addr):
         """Fast C-level access checking using bitsets."""
         cdef uint32_t i
@@ -163,26 +183,66 @@ cdef class CyMemory:
             if not self._has_access_c(start_page + i, mode):
                 raise PvmError(2, fault_addr)
 
+    cdef void _alter_accessibility_c(self, uint32_t start_addr, uint32_t length, uint8_t access):
+        """Ultra-fast C-level accessibility alteration."""
+        cdef uint32_t start_page, num_pages
+        _get_page_range(start_addr, length, &start_page, &num_pages)
+        
+        # Update bitsets directly
+        if access == ACC_WRITE:
+            self._set_access_range_c(start_page, num_pages, ACC_WRITE, True)
+            self._set_access_range_c(start_page, num_pages, ACC_READ, False)
+        elif access == ACC_READ:
+            self._set_access_range_c(start_page, num_pages, ACC_READ, True)
+            self._set_access_range_c(start_page, num_pages, ACC_WRITE, False)
+        else:  # NONE
+            self._set_access_range_c(start_page, num_pages, ACC_READ, False)
+            self._set_access_range_c(start_page, num_pages, ACC_WRITE, False)
+
     # ───────────────────── single-byte helpers (C-level) ───────────────────
-    cdef void _set_byte_c(self, uint32_t addr, uint8_t value):
-        cdef uint32_t pg = addr // PAGE_SIZE
-        cdef uint32_t off = addr & (PAGE_SIZE - 1)
+    cdef void _set_byte_c(self, uint32_t addr, uint8_t value) noexcept:
+        cdef uint32_t pg = _get_start_page(addr)
+        cdef uint32_t off = _get_page_offset(addr)
         (<unsigned char*>self._get_cpage(pg, True))[off] = value
 
-    cdef uint8_t _get_byte_c(self, uint32_t addr):
-        cdef uint32_t pg = addr // PAGE_SIZE
-        cdef uint32_t off = addr & (PAGE_SIZE - 1)
+    cdef uint8_t _get_byte_c(self, uint32_t addr) noexcept:
+        cdef uint32_t pg = _get_start_page(addr)
+        cdef uint32_t off = _get_page_offset(addr)
         cdef unsigned char* buf = self._get_cpage(pg, False)
         if buf == NULL:
             return 0
         return buf[off]
 
-    # Python-level wrappers -------------------------------------------------
+    cdef void _zero_memory_range_c(self, uint32_t start_page, uint32_t num_pages) noexcept:
+        """Zero a range of pages using C-level operations."""
+        if num_pages <= 0:
+            return
+        cdef uint32_t pg
+        cdef unsigned char* buf
+        for pg in range(start_page, start_page + num_pages):
+            buf = self._get_cpage(pg, True)
+            memset(buf, 0, PAGE_SIZE)
+
+    cdef bint _is_accessible_c(self, uint32_t address, uint32_t length, int access) noexcept:
+        """Fast C-level accessibility check."""
+        if length <= 0:
+            return True
+        
+        cdef uint32_t start_page, num_pages
+        _get_page_range(address, length, &start_page, &num_pages)
+        
+        cdef uint32_t i
+        for i in range(num_pages):
+            if not self._has_access_c(start_page + i, access):
+                return False
+        return True
+
+    # Python-level wrappers (keep minimal for external API) -----------------
     cpdef _set_byte(self, uint32_t addr, uint8_t value):
-        self._set_byte_c(addr, value)       # call the *bound* cdef helper
+        self._set_byte_c(addr, value)
 
     cpdef int _get_byte(self, uint32_t addr):
-        return self._get_byte_c(addr)       # call the *bound* cdef helper
+        return self._get_byte_c(addr)
 
     # ---------------------------------------------------------------- read --
     cpdef bytes read(self, uint32_t address, int length):
@@ -191,10 +251,8 @@ cdef class CyMemory:
         address = _norm(address)
         
         # Fast C-level access check using bitsets
-        cdef uint32_t start_page = address // PAGE_SIZE
-        cdef uint32_t end_addr = address + length - 1
-        cdef uint32_t end_page = end_addr // PAGE_SIZE
-        cdef uint32_t num_pages = end_page - start_page + 1
+        cdef uint32_t start_page, num_pages
+        _get_page_range(address, length, &start_page, &num_pages)
         self._check_access_c(start_page, num_pages, ACC_READ, address)
 
         cdef bytearray out = bytearray(length)
@@ -208,8 +266,8 @@ cdef class CyMemory:
 
         # Ultra-fast C-level memory copying
         while remaining > 0:
-            pg = cur // PAGE_SIZE
-            off = cur & (PAGE_SIZE - 1)
+            pg = _get_start_page(cur)
+            off = _get_page_offset(cur)
             chunk_size = PAGE_SIZE - off
             if chunk_size > remaining:
                 chunk_size = remaining
@@ -235,10 +293,8 @@ cdef class CyMemory:
         cdef int length = in_mv.shape[0]
 
         # Fast C-level access check using bitsets
-        cdef uint32_t start_page = address // PAGE_SIZE
-        cdef uint32_t end_addr = address + length - 1
-        cdef uint32_t end_page = end_addr // PAGE_SIZE
-        cdef uint32_t num_pages = end_page - start_page + 1
+        cdef uint32_t start_page, num_pages
+        _get_page_range(address, length, &start_page, &num_pages)
         self._check_access_c(start_page, num_pages, ACC_WRITE, address)
 
         cdef uint32_t cur = address
@@ -248,8 +304,8 @@ cdef class CyMemory:
         cdef unsigned char* dst
 
         while remaining:
-            pg   = cur // PAGE_SIZE
-            off  = cur & (PAGE_SIZE - 1)
+            pg = _get_start_page(cur)
+            off = _get_page_offset(cur)
             chunk = PAGE_SIZE - off
             if chunk > remaining:
                 chunk = remaining
@@ -263,44 +319,15 @@ cdef class CyMemory:
 
     # -------------------------------------------------------- misc helpers --
     def is_accessible(self, uint32_t address, uint32_t length, int access = ACC_READ):
-        if length <= 0:
-            return True
-        
-        # Fast C-level access check using bitsets
-        cdef uint32_t start_page = address // PAGE_SIZE
-        cdef uint32_t end_addr = address + length - 1
-        cdef uint32_t end_page = end_addr // PAGE_SIZE
-        cdef uint32_t num_pages = end_page - start_page + 1
-        
-        cdef uint32_t i
-        for i in range(num_pages):
-            if not self._has_access_c(start_page + i, access):
-                return False
-        return True
+        """Python wrapper for accessibility check."""
+        return self._is_accessible_c(address, length, access)
 
-    def alter_accessibility(self, uint32_t start, uint32_t len_, int access):
-        pages = get_pages(start, len_)
-        if access == ACC_WRITE:
-            self._w_pages.update(pages)
-            self._r_pages.difference_update(pages)
-        elif access == ACC_READ:
-            self._r_pages.update(pages)
-            self._w_pages.difference_update(pages)
-        else:  # NONE
-            self._r_pages.difference_update(pages)
-            self._w_pages.difference_update(pages)
-        
-        # Sync C-level bitsets after updating Python sets
-        self._sync_bitsets_from_sets()
+    cpdef void alter_accessibility(self, uint32_t start, uint32_t len_, uint8_t access):
+        self._alter_accessibility_c(start, len_, access)
 
     def zero_memory_range(self, int start_page, int num_pages):
-        if num_pages <= 0:
-            return
-        cdef int pg
-        cdef unsigned char* buf
-        for pg in range(start_page, start_page + num_pages):
-            buf = self._get_cpage(pg, True)
-            memset(buf, 0, PAGE_SIZE)
+        """Python wrapper for memory zeroing."""
+        self._zero_memory_range_c(start_page, num_pages)
 
     # ----------------------------------------------------------- from_pc --
     @classmethod
@@ -312,6 +339,7 @@ cdef class CyMemory:
         """
         cdef uint32_t last_page
         mem = cls(data={}, allowed_read_pages=[], allowed_write_pages=[], heap=heap)
+        
         # read zone
         read_start = PVM_INIT_ZONE_SIZE
         for i, b in enumerate(read):
