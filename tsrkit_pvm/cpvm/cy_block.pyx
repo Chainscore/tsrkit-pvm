@@ -14,7 +14,7 @@ from typing import List, Any
 from libc.stdint cimport int64_t, int32_t, uint8_t, uint32_t, uint64_t
 from libc.time cimport time_t, clock, CLOCKS_PER_SEC
 import time
-from .cy_status cimport CONTINUE, PVM_CONTINUE, CyStatus
+from .cy_status cimport CONTINUE, PVM_CONTINUE, CyStatus, PvmExit
 from .cy_memory cimport CyMemory 
 from .cy_program cimport CyProgram
 from .instructions.cy_table cimport CyTableEntry
@@ -41,7 +41,6 @@ cdef class CyBlockInfo:
         """Execute block with optimized loop - minimal Python object creation."""
         cdef uint32_t current_pc = start_pc
         cdef uint32_t i
-        cdef CyStatus status = CONTINUE
         cdef uint32_t next_pc
         cdef CyCompiledInstruction compiled_inst
         cdef CyTableEntry handler
@@ -57,27 +56,33 @@ cdef class CyBlockInfo:
             compiled_inst = instructions[i]
             handler = compiled_inst.handler
             
+            # print(i, "🚨" if handler.is_terminating else "✅", "opcode:", compiled_inst.opcode, "at PC:", current_pc)
+
             # Call the instruction function directly
-            result = handler.fn(
-                program, reg_arr, memory, current_pc, 
-                compiled_inst.vx, compiled_inst.vy, 
-                compiled_inst.ra, compiled_inst.rb, compiled_inst.rd
-            )
-            
-            status = result[0]
-            next_pc = result[1]
+            try:
+                next_pc = handler.fn(
+                    program, reg_arr, memory, current_pc, 
+                    compiled_inst.vx, compiled_inst.vy, 
+                    compiled_inst.ra, compiled_inst.rb, compiled_inst.rd
+                )
+            except PvmExit as e:
+                e.next_pc = compiled_inst.next_pc
+                e.gas_cost = i + 1
+                raise e
 
             if next_pc == 0xFFFF_FFFF:
                 next_pc = compiled_inst.next_pc
 
+            # print("-> Next PC:", next_pc)
+
             # Use pre-cached termination flag
             if handler.is_terminating:
-                return (status, next_pc), total_gas
-            elif status.code != PVM_CONTINUE:
-                return (status, next_pc), i + 1
-            else:
-                # For non-terminating instructions, advance PC normally
-                current_pc = compiled_inst.next_pc
+                # print("🏁 Block terminated at PC:", current_pc, "with opcode:", compiled_inst.opcode)
+                return next_pc, total_gas
+
+            # For non-terminating instructions, advance PC normally
+            current_pc = next_pc
                 
         # Block completed normally (shouldn't happen as blocks end with terminating instructions)
-        return (status, current_pc), total_gas
+        print("⚠️ Block ended without termination instruction")
+        return current_pc, total_gas

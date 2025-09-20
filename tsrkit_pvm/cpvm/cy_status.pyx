@@ -35,9 +35,11 @@ cdef CyStatus PAGE_FAULT(uint32_t register):
     status.register = register
     return status
 
-cdef class PvmError(Exception):
-    def __cinit__(self, int32_t code, int32_t register=-1, str message=""):
+cdef class PvmExit(Exception):
+    def __cinit__(self, uint32_t code, uint32_t register=0, uint32_t next_pc=-1, uint32_t gas_cost=0, str message=""):
         self.code = code
         self.register = register 
         self.message = message
-        super().__init__(f"PVM Error {code}: {message}")
+        self.next_pc = next_pc
+        self.gas_cost = gas_cost
+        super().__init__(f"PVM Exit {code}: {message}")

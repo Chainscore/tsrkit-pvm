@@ -23,7 +23,8 @@ cdef class CyProgram:
     cdef public int32_t            instruction_set_len
     cdef public int32_t            jump_table_len
     cdef public list               _extended_bitmask
-    cdef public bytes              zeta
+    cdef public uint8_t*           zeta
+    cdef public int32_t            zeta_len
     cdef public set                _basic_blocks_set
     cdef public dict               _exec_blocks
     
@@ -37,6 +38,6 @@ cdef class CyProgram:
     cdef int32_t encode_into(self, bytearray buffer, int32_t offset)
     
     # Public methods that can be called from other Cython modules
-    cdef tuple branch(self, int32_t counter, int32_t branch, bint cond)
+    cdef uint32_t branch(self, int32_t counter, int32_t branch, bint cond)
     cdef uint32_t skip(self, int32_t pc) nogil
-    cdef tuple djump(self, uint32_t counter, uint32_t a)
+    cdef uint32_t djump(self, uint32_t counter, uint32_t a)

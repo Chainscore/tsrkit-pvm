@@ -27,7 +27,9 @@ cdef CyStatus PAGE_FAULT(uint32_t register)
 cdef CyStatus HOST(uint32_t register)
 
 
-cdef class PvmError(Exception):
-    cdef public int32_t code
-    cdef public int32_t register
+cdef class PvmExit(Exception):
+    cdef public uint32_t code
+    cdef public uint32_t register
+    cdef public uint32_t next_pc
+    cdef public uint32_t gas_cost
     cdef public str message

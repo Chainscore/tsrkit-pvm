@@ -5,31 +5,29 @@
 
 from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t, int8_t
 from ...cy_utils cimport chi, clamp_12, clamp_4, clamp_4_max0
-from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
+from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t, InstructionProps
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
-from math import floor
 
-cdef inline tuple load_imm_jump_ind_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t load_imm_jump_ind_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC180: Load immediate value into register and jump indirect."""
     wb = registers[rb]
     registers[ra] = vx
-    status, target_counter = program.djump(counter, floor(wb + vy) % 2**32)
-    return status, target_counter
+    return program.djump(counter, (wb + vy) % 2**32)
 
 cdef class CyInstructionsWArgs2Reg2Imm(CyTable):
     """
     Cython optimized instruction table for instructions with 2 register + 2 immediate arguments.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
+    cdef InstructionProps get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract two registers and two immediate arguments from program bytes.
-        Returns (vx, vy, ra, rb, rd) where vx/vy are immediates, ra/rb are registers, rd is 0.
+        Returns InstructionProps struct where vx/vy are immediates, ra/rb are registers, rd is 0.
         """
-        cdef bytes zeta_slice = program.zeta[program_counter + 1:program_counter + 8]
-        cdef uint32_t byte1_val = zeta_slice[0]
-        cdef uint32_t byte2_val = zeta_slice[1] if len(zeta_slice) > 1 else 0
+        cdef uint8_t* zeta_ptr = program.zeta
+        cdef uint32_t byte1_val = zeta_ptr[program_counter + 1]
+        cdef uint32_t byte2_val = zeta_ptr[program_counter + 2] if program_counter + 2 < program.zeta_len else 0
         
         # Parse registers from first byte
         cdef uint8_t ra = clamp_12(<uint8_t>(byte1_val & 0x0F))         # Lower 4 bits
@@ -42,22 +40,32 @@ cdef class CyInstructionsWArgs2Reg2Imm(CyTable):
         # Clamp ly based on available space
         ly = clamp_4_max0(<int8_t>(int(skip_index) - lx - 2))
         
-        # Extract first immediate value
+        # Extract first immediate value using pointer arithmetic
         cdef uint64_t vx = 0
-        cdef bytes imm1_slice
+        cdef uint32_t i
+        cdef uint32_t start_x = program_counter + 3
         if lx > 0:
-            imm1_slice = zeta_slice[2:2+lx]
-            vx = <uint64_t>chi(<uint64_t>int.from_bytes(imm1_slice, "little"), <uint8_t>lx)
+            for i in range(lx):
+                vx |= (<uint64_t>zeta_ptr[start_x + i]) << (8 * i)
+            vx = <uint64_t>chi(<uint64_t>vx, <uint8_t>lx)
         
-        # Extract second immediate value  
+        # Extract second immediate value using pointer arithmetic
         cdef uint64_t vy = 0
-        cdef bytes imm2_slice
+        cdef uint32_t start_y = start_x + lx
         if ly > 0:
-            imm2_slice = zeta_slice[2+lx:2+lx+ly]
-            vy = <uint64_t>chi(<uint64_t>int.from_bytes(imm2_slice, "little"), <uint8_t>ly)
+            for i in range(ly):
+                vy |= (<uint64_t>zeta_ptr[start_y + i]) << (8 * i)
+            vy = <uint64_t>chi(<uint64_t>vy, <uint8_t>ly)
         
-        # Return in unified format: (vx, vy, ra, rb, rd)
-        return (vx, vy, ra, rb, 0)
+        # Return InstructionProps struct
+        cdef InstructionProps props
+        props.vx = vx
+        props.vy = vy
+        props.ra = ra
+        props.rb = rb
+        props.rd = 0  # Not used in this instruction type
+        
+        return props
 
     cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""

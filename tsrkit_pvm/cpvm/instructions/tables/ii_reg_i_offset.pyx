@@ -3,136 +3,76 @@
 # cython: profile=False, linetrace=False
 # cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
-cimport cython
 from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t, int8_t
-
-from ...cy_status cimport CONTINUE, PANIC, PVM_CONTINUE
 from ...cy_utils cimport clamp_12, clamp_4_max0, z
-from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
+from ..cy_table cimport CyTable, CyTableEntry, InstructionProps
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
 
-cdef inline tuple branch_eq_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t branch_eq_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC170: Branch if ra == rb to offset vx."""
-    cdef object status_result
-    cdef object status
-    cdef uint32_t target_counter
-    if registers[ra] == registers[rb]:
-        status_result = program.branch(counter, vx, True)
-        status = status_result[0]
-        target_counter = status_result[1]
-        if status.code == PVM_CONTINUE and target_counter != counter:
-            return status, target_counter
-    
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return program.branch(counter, vx, registers[ra] == registers[rb])
 
-cdef inline tuple branch_ne_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t branch_ne_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC171: Branch if ra != rb to offset vx."""
-    cdef object status_result
-    cdef object status
-    cdef uint32_t target_counter
-    if registers[ra] != registers[rb]:
-        status_result = program.branch(counter, vx, True)
-        status = status_result[0]
-        target_counter = status_result[1]
-        if status.code == PVM_CONTINUE and target_counter != counter:
-            return status, target_counter
-    
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return program.branch(counter, vx, registers[ra] != registers[rb])
 
-cdef inline tuple branch_lt_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t branch_lt_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC172: Branch if ra < rb (unsigned) to offset vx."""
-    cdef object status_result
-    cdef object status
-    cdef uint32_t target_counter
-    if registers[ra] < registers[rb]:
-        status_result = program.branch(counter, vx, True)
-        status = status_result[0]
-        target_counter = status_result[1]
-        if status.code == PVM_CONTINUE and target_counter != counter:
-            return status, target_counter
-    
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return program.branch(counter, vx, registers[ra] < registers[rb])
 
-cdef inline tuple branch_lt_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t branch_lt_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC173: Branch if ra < rb (signed) to offset vx."""
-    cdef int64_t a = z(<uint64_t>registers[ra], <uint8_t>8)
-    cdef int64_t b = z(<uint64_t>registers[rb], <uint8_t>8)
-    cdef object status_result
-    cdef object status
-    cdef uint32_t target_counter
-    if a < b:
-        status_result = program.branch(counter, vx, True)
-        status = status_result[0]
-        target_counter = status_result[1]
-        if status.code == PVM_CONTINUE and target_counter != counter:
-            return status, target_counter
-    
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return program.branch(counter, vx, <int64_t>registers[ra] < <int64_t>registers[rb])
 
-cdef inline tuple branch_ge_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t branch_ge_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC174: Branch if ra >= rb (unsigned) to offset vx."""
-    cdef uint64_t a = registers[ra]
-    cdef uint64_t b = registers[rb]
-    cdef object status_result
-    cdef object status
-    cdef uint32_t target_counter
-    if a >= b:
-        status_result = program.branch(counter, vx, True)
-        status = status_result[0]
-        target_counter = status_result[1]
-        if status.code == PVM_CONTINUE and target_counter != counter:
-            return status, target_counter
-    
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return program.branch(counter, vx, registers[ra] >= registers[rb])
 
-cdef inline tuple branch_ge_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t branch_ge_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC175: Branch if ra >= rb (signed) to offset vx."""
-    cdef int64_t a = z(<uint64_t>registers[ra], <uint8_t>8)
-    cdef int64_t b = z(<uint64_t>registers[rb], <uint8_t>8)
-    cdef object status_result
-    cdef object status
-    cdef uint32_t target_counter
-    if a >= b:
-        status_result = program.branch(counter, vx, True)
-        status = status_result[0]
-        target_counter = status_result[1]
-        if status.code == PVM_CONTINUE and target_counter != counter:
-            return status, target_counter
-    
-    return CONTINUE, <uint32_t>0xFFFFFFFF
-
+    return program.branch(counter, vx, <int64_t>registers[ra] >= <int64_t>registers[rb])
 
 cdef class CyInstructionsWArgs2Reg1Offset(CyTable):
     """
     Cython optimized instruction table for instructions with 2 register + 1 offset argument.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
+    cdef InstructionProps get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract register indices and offset value from program bytes.
-        Returns (vx, vy, ra, rb, rd) where vx is offset, ra/rb are registers, others are 0.
+        Returns InstructionProps struct where vx is offset, ra/rb are registers, others are 0.
         """
-        cdef bytes zeta_slice = program.zeta[program_counter + 1:program_counter + 7]
-        cdef uint32_t byte_val = zeta_slice[0]
+        cdef uint8_t* zeta_ptr = program.zeta
+        cdef uint32_t byte_val = zeta_ptr[program_counter + 1]
         
         cdef uint8_t ra = clamp_12(<uint8_t>(byte_val & 0x0F))  # Lower 4 bits
         cdef uint8_t rb = clamp_12(<uint8_t>(byte_val >> 4))    # Upper 4 bits
         cdef uint32_t lx = clamp_4_max0(<int8_t>(skip_index - 1))
         
         cdef uint64_t vx
-        cdef bytes offset_slice
-        cdef uint32_t raw_offset
-        if lx > 0:
-            offset_slice = zeta_slice[1:1+lx]
-            raw_offset = int.from_bytes(offset_slice, "little")
-            vx = <uint64_t>(int(program_counter)) + <uint64_t>z(<uint64_t>raw_offset, <uint8_t>lx)
-        else:
-            vx = int(program_counter)
+        cdef uint32_t raw_offset = 0
+        cdef uint32_t i
+        cdef uint32_t start = program_counter + 2
         
-        # Return in unified format: (vx, vy, ra, rb, rd)
-        return (vx, 0, ra, rb, 0)
+        # Extract offset using pointer arithmetic
+        if lx > 0:
+            for i in range(lx):
+                raw_offset |= (<uint32_t>zeta_ptr[start + i]) << (8 * i)
+            vx = <uint64_t>(program_counter) + <uint64_t>z(<uint64_t>raw_offset, <uint8_t>lx)
+        else:
+            vx = <uint64_t>program_counter
+        
+        # Return InstructionProps struct
+        cdef InstructionProps props
+        props.vx = vx
+        props.vy = 0  # Not used in this instruction type
+        props.ra = ra
+        props.rb = rb
+        props.rd = 0  # Not used in this instruction type
+        
+        return props
 
     cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""

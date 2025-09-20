@@ -18,21 +18,15 @@ from libc.string cimport memset, memcpy
 from libc.stdlib cimport malloc, free
 from cpython.mem cimport PyMem_Malloc, PyMem_Free
 from .cy_memory cimport Accessibility, ACC_READ, ACC_WRITE, ACC_NONE
-# ---------------------------------------------------------------------------
-# Local accessibility enum – avoids importing Python-only symbol
-# ---------------------------------------------------------------------------
+from .cy_status cimport PAGE_FAULT, PvmExit, PVM_PAGE_FAULT
+from .cy_utils cimport get_pages, total_page_size, total_zone_size
 
-from tsrkit_pvm.common.utils import get_pages, total_page_size, total_zone_size
-from tsrkit_pvm.common.constants import (
-    PVM_INIT_DATA_SIZE,
-    PVM_INIT_ZONE_SIZE,
-    PVM_MEMORY_PAGE_SIZE,
-)
-
-# Page size constant for fast operations  
-DEF PAGE_SIZE = 4096  # PVM_MEMORY_PAGE_SIZE = 2**12
+DEF PVM_ADDR_ALIGNMENT = 2
+DEF PVM_INIT_DATA_SIZE = 2**24
+DEF PVM_INIT_ZONE_SIZE = 2**16
+DEF PAGE_SIZE = 4096  # PAGE_SIZE = 2**12
 DEF MAX_PAGES = 1048576  # 1M pages for 4GB address space
-from .cy_status cimport PAGE_FAULT, PvmError
+
 
 cdef inline uint32_t _norm(uint32_t addr) noexcept:
     """Wrap address into 32-bit space."""
@@ -181,7 +175,7 @@ cdef class CyMemory:
         cdef uint32_t i
         for i in range(num_pages):
             if not self._has_access_c(start_page + i, mode):
-                raise PvmError(2, fault_addr)
+                raise PvmExit(2, fault_addr)
 
     cdef void _alter_accessibility_c(self, uint32_t start_addr, uint32_t length, uint8_t access):
         """Ultra-fast C-level accessibility alteration."""
@@ -352,13 +346,13 @@ cdef class CyMemory:
             mem._set_byte(write_start + i, b)
         w_pages = get_pages(
             write_start,
-            total_page_size(len(write)) + (z * PVM_MEMORY_PAGE_SIZE),
+            total_page_size(len(write)) + (z * PAGE_SIZE),
         )
         mem._w_pages.update(w_pages)
 
         # heap
         if len(w_pages) > 0:
-            mem.heap_break = (w_pages[len(w_pages) - 1] + 1) * PVM_MEMORY_PAGE_SIZE
+            mem.heap_break = (w_pages[len(w_pages) - 1] + 1) * PAGE_SIZE
 
         # stack
         stack_start = 2**32 - 2 * PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE - total_page_size(s)

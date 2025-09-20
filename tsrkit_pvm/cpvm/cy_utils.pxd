@@ -10,7 +10,7 @@ from libc.string cimport memset, memcpy
 # Memory utilities - ultra-fast C implementations
 cdef uint32_t total_page_size(uint32_t blob_len) nogil except? 0
 cdef uint32_t total_zone_size(uint32_t blob_len) nogil except? 0
-cdef void get_pages(uint32_t start_index, uint32_t length, uint32_t* pages, uint32_t* count) nogil except *
+cdef list get_pages(uint32_t start_index, uint32_t length)
 
 cdef int64_t chi(uint64_t value, uint8_t n) nogil except? -1
 cdef int64_t z(uint64_t x, uint8_t n) nogil except? -1

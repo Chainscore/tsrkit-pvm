@@ -19,7 +19,7 @@ from .cy_program cimport CyProgram
 from .cy_memory cimport CyMemory
 from .mapper cimport CyInstMapper, inst_map
 from .cy_status cimport OUT_OF_GAS, PAGE_FAULT, PVM_HALT, PVM_PANIC, PVM_PAGE_FAULT, PVM_OUT_OF_GAS, PVM_HOST, CyStatus, CONTINUE, PVM_CONTINUE
-from .cy_status cimport PvmError, PvmStatus
+from .cy_status cimport PvmExit
 from ..common.status import ExecutionStatus, HALT, PANIC, OUT_OF_GAS as EXEC_OUT_OF_GAS, CONTINUE as EXEC_CONTINUE, HOST, PAGE_FAULT as EXEC_PAGE_FAULT
 from .mapper cimport inst_map
 
@@ -58,7 +58,7 @@ cdef class CyInterpreter:
                 inst_size=len(program.instruction_set),
                 initial_pc=program_counter,
                 initial_gas=gas,
-                program_size=len(program.zeta),
+                program_size=program.zeta_len,
             )
 
         status, pc, remaining_gas = _execute_internal(program, pc, remaining_gas, reg_arr, memory)
@@ -122,9 +122,7 @@ cdef tuple _execute_internal(
     while not should_break:
         try:
             # Execute instruction using optimized mapper (this will handle nogil internally)
-            result, gas_cost = inst_map.process_instruction(program, pc, registers, memory)
-            status, pc = result
-
+            pc, gas_cost = inst_map.process_instruction(program, pc, registers, memory)
             remaining_gas -= gas_cost
 
             if remaining_gas < 0:
@@ -132,19 +130,15 @@ cdef tuple _execute_internal(
                 should_break = True
                 continue
 
-            if status.code == PVM_HALT or status.code == PVM_HOST:
-                should_break = True
-                continue
-
-        except PvmError as e:
-            if e.code == PVM_PANIC or e.code == PVM_PAGE_FAULT:  # PVM_PAGE_FAULT
+        except PvmExit as e:
+            if e.code < 5:
                 should_break = True
                 status.code = e.code 
                 status.register = e.register
+                remaining_gas -= e.gas_cost
+                pc = e.next_pc
             else:
                 raise e
-        except Exception as e:
-            raise e
 
     return status, pc, remaining_gas
 

@@ -39,8 +39,6 @@ cdef void _init_lookup_tables():
 # Initialize tables
 _init_lookup_tables()
 
-# ═══════════════════════ IMPLEMENTATIONS MATCHING .pxd DECLARATIONS ═══════════════════════
-
 # Memory utilities - ultra-fast C implementations
 cdef uint32_t total_page_size(uint32_t blob_len) nogil except? 0:
     """Calculate total page size needed for a blob - matches Python version exactly."""
@@ -51,17 +49,23 @@ cdef uint32_t total_zone_size(uint32_t blob_len) nogil except? 0:
     cdef uint32_t zone_mask = PVM_INIT_ZONE_SIZE - 1
     return ((blob_len + zone_mask) >> PVM_INIT_ZONE_SHIFT) << PVM_INIT_ZONE_SHIFT
 
-cdef void get_pages(uint32_t start_index, uint32_t length, uint32_t* pages, uint32_t* count) nogil except *:
+cdef list get_pages(uint32_t start_index, uint32_t length):
     """Get list of page numbers spanning a memory range - matches Python version exactly."""
     cdef uint32_t start = start_index >> PVM_MEMORY_PAGE_SHIFT
-    cdef uint32_t end_index = start_index + (length if length > 0 else 1) - 1  # Use max() like Python version
+    cdef uint32_t max_length = length if length > 0 else 1  # max(length, 1)
+    cdef uint32_t end_index = start_index + max_length - 1
     cdef uint32_t end = end_index >> PVM_MEMORY_PAGE_SHIFT
-    cdef uint32_t i, idx = 0
+    cdef uint32_t i
     
-    for i in range(start, end + 1):
-        pages[idx] = i
-        idx += 1
-    count[0] = idx
+    # Pre-allocate list with exact size for efficiency
+    cdef uint32_t page_count = end - start + 1
+    cdef list result = [0] * page_count
+    
+    # Fill the list efficiently
+    for i in range(page_count):
+        result[i] = start + i
+    
+    return result
 
 # Bit manipulation utilities - C-level performance with inline optimization
 @cython.cfunc

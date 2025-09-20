@@ -8,9 +8,17 @@ from libc.stdint cimport uint32_t, uint64_t, uint8_t, int32_t
 from ..cy_program cimport CyProgram
 from ..cy_memory cimport CyMemory
 
+# C struct for instruction properties - eliminates Python tuple overhead
+cdef struct InstructionProps:
+    uint64_t vx
+    uint64_t vy
+    uint8_t ra
+    uint8_t rb
+    uint8_t rd
+
 # Define the unified instruction function pointer type
 # Returns tuple of (execution_status, next_pc)
-ctypedef tuple (*instr_fn_t)(
+ctypedef uint32_t (*instr_fn_t)(
     CyProgram program,
     uint64_t *registers,
     CyMemory memory,
@@ -35,6 +43,6 @@ cdef class CyTable:
     Provides unified interface for instruction argument extraction.
     """
     
-    # Unified argument extraction - returns (vx, vy, ra, rb, rc)
+    # Unified argument extraction - returns InstructionProps C struct
     # All tables must implement this to provide arguments in standard format
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index)
+    cdef InstructionProps get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index)

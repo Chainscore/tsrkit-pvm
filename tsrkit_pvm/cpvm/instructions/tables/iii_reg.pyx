@@ -13,53 +13,51 @@
 from libc.stdint cimport uint32_t, int32_t, int64_t, uint32_t, uint64_t, uint8_t
 from math import trunc
 from ...cy_status cimport CONTINUE
-from tsrkit_pvm.common.utils import clamp_12, smod, z, z_inv
-from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
+from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t, InstructionProps
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
-# Import ultra-fast C utility functions
-from ...cy_utils cimport chi, b_inv, b
+from ...cy_utils cimport chi, b_inv, b, clamp_12, smod, z, z_inv
 
 
 # 32-bit arithmetic operations with C-level optimizations
-cdef tuple add_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t add_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC190: 32-bit addition."""
-    cdef uint32_t a = <uint32_t>(registers[ra] & 0xFFFFFFFF)
-    cdef uint32_t b = <uint32_t>(registers[rb] & 0xFFFFFFFF)
+    cdef uint32_t a = <uint32_t>(registers[ra])
+    cdef uint32_t b = <uint32_t>(registers[rb])
     cdef uint32_t result = a + b
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple sub_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t sub_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC191: 32-bit subtraction."""
-    cdef uint32_t a = <uint32_t>(registers[ra] & 0xFFFFFFFF)
-    cdef uint32_t b = <uint32_t>(registers[rb] & 0xFFFFFFFF)
+    cdef uint32_t a = <uint32_t>(registers[ra])
+    cdef uint32_t b = <uint32_t>(registers[rb])
     cdef uint32_t result = a - b
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple mul_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t mul_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC192: 32-bit multiplication."""
-    cdef uint32_t a = <uint32_t>(registers[ra] & 0xFFFFFFFF)
-    cdef uint32_t b = <uint32_t>(registers[rb] & 0xFFFFFFFF)
+    cdef uint32_t a = <uint32_t>(registers[ra])
+    cdef uint32_t b = <uint32_t>(registers[rb])
     cdef uint32_t result = a * b
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple div_u_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t div_u_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC193: 32-bit unsigned division."""
-    cdef uint32_t a = <uint32_t>(registers[ra] & 0xFFFFFFFF)
-    cdef uint32_t b = <uint32_t>(registers[rb] & 0xFFFFFFFF)
+    cdef uint32_t a = <uint32_t>(registers[ra])
+    cdef uint32_t b = <uint32_t>(registers[rb])
     if b == 0:
         registers[rd] = 0xFFFFFFFFFFFFFFFF  # 2**64 - 1
     else:
         registers[rd] = <uint64_t>chi(<uint64_t>(a // b), <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple div_s_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t div_s_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC194: 32-bit signed division."""
-    a = z(registers[ra] % 2**32, 4)
-    b = z(registers[rb] % 2**32, 4)
+    a = <int32_t>registers[ra]
+    b = <int32_t>registers[rb]
     if b == 0:
         value = 2**64 - 1
     elif a == -(2**31) and b == -1:
@@ -68,49 +66,49 @@ cdef tuple div_s_32_fn(CyProgram program, uint64_t *registers, CyMemory memory, 
         value = z_inv(trunc(a / b), 8)
 
     registers[rd] = value
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  rem_u_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  rem_u_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC195: 32-bit unsigned remainder."""
-    cdef uint32_t a = <uint32_t>(registers[ra] & 0xFFFFFFFF)
-    cdef uint32_t b = <uint32_t>(registers[rb] & 0xFFFFFFFF)
+    cdef uint32_t a = <uint32_t>(registers[ra])
+    cdef uint32_t b = <uint32_t>(registers[rb])
     cdef uint32_t result = a if b == 0 else a % b
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple rem_s_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t rem_s_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC196: 32-bit signed remainder."""
-    cdef int64_t a = z(registers[ra] & 0xFFFFFFFF, 4)
-    cdef int64_t b = z(registers[rb] & 0xFFFFFFFF, 4)
+    cdef int64_t a = <int64_t>(registers[ra])
+    cdef int64_t b = <int64_t>(registers[rb])
     if a == -2147483648 and b == -1:  # -(2**31) and -1
         registers[rd] = 0
     else:
         registers[rd] = z_inv(smod(a, b), 8)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # 64-bit arithmetic operations  
-cdef tuple  add_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  add_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC200: 64-bit addition."""
     registers[rd] = (registers[ra] + registers[rb]) % (2**64)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  sub_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  sub_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC201: 64-bit subtraction."""
     cdef uint64_t a = registers[ra]
     cdef uint64_t b = registers[rb]
     cdef uint64_t result = (a - b) % (2**64)
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  mul_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  mul_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC202: 64-bit multiplication."""
     cdef uint64_t a = registers[ra]
     cdef uint64_t b = registers[rb]
     cdef uint64_t result = (a * b) % (2**64)
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  div_u_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  div_u_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC203: 64-bit unsigned division."""
     cdef uint64_t a = registers[ra]
     cdef uint64_t b = registers[rb]
@@ -118,9 +116,9 @@ cdef tuple  div_u_64(CyProgram program, uint64_t *registers, CyMemory memory, ui
         registers[rd] = 0xFFFFFFFFFFFFFFFF  # 2**64 - 1
     else:
         registers[rd] = a // b  # Native unsigned division
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  div_s_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  div_s_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC204: 64-bit signed division."""
     cdef uint64_t a = registers[ra]
     cdef uint64_t b = registers[rb]
@@ -128,223 +126,221 @@ cdef tuple  div_s_64(CyProgram program, uint64_t *registers, CyMemory memory, ui
         registers[rd] = 0xFFFFFFFFFFFFFFFF  # 2**64 - 1
     else:
         # Handle signed division with proper overflow check
-        cdef int64_t signed_a = <int64_t>a
-        cdef int64_t signed_b = <int64_t>b
-        if signed_a == -9223372036854775808LL and signed_b == -1:  # -(2**63) and -1
+        if <int64_t>a == -9223372036854775808LL and <int64_t>b == -1:  # -(2**63) and -1
             registers[rd] = a  # Return original value for overflow case
         else:
-            registers[rd] = <uint64_t>(<int64_t>(signed_a / signed_b))
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+            registers[rd] = <uint64_t>(<int64_t>(<int64_t>a / <int64_t>b))
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  rem_u_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  rem_u_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC205: 64-bit unsigned remainder."""
     a = registers[ra]
     b = registers[rb]
     registers[rd] = a if b == 0 else a % b
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  rem_s_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  rem_s_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC206: 64-bit signed remainder."""
-    a = z(registers[ra], 8)
-    b = z(registers[rb], 8)
+    a = <int64_t>registers[ra]
+    b = <int64_t>registers[rb]
     if a == -(2**31) and b == -1:
         registers[rd] = 0
     else:
         registers[rd] = z_inv(smod(a, b), 8)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # Shift operations
-cdef tuple  shlo_l_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  shlo_l_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC197: 32-bit logical left shift."""
     cdef uint32_t value = <uint32_t>(registers[ra] & 0xFFFFFFFF)
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef uint32_t result = value << shift
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  shlo_r_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  shlo_r_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC198: 32-bit logical right shift."""
     cdef uint32_t value = <uint32_t>(registers[ra] & 0xFFFFFFFF)
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef uint32_t result = value >> shift
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  shar_r_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  shar_r_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC199: 32-bit arithmetic shift right."""
-    cdef int64_t signed_value = z(registers[ra] & 0xFFFFFFFF, 4)
+    cdef int64_t signed_value = <int32_t>registers[ra]
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef int64_t result = signed_value >> shift
-    registers[rd] = z_inv(result, 8)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    registers[rd] = <uint64_t>(result)
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  shlo_l_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  shlo_l_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC207: 64-bit logical shift left."""
     cdef uint64_t value = registers[ra]
     cdef uint64_t shift = registers[rb] & 63
     registers[rd] = value << shift
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  shlo_r_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  shlo_r_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC208: 64-bit logical shift right."""
     cdef uint64_t value = registers[ra]
     cdef uint64_t shift = registers[rb] & 63
     registers[rd] = value >> shift
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  shar_r_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  shar_r_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC209: 64-bit arithmetic shift right."""
-    cdef int64_t value = z(registers[ra], 8)
+    cdef int64_t value = <int64_t>registers[ra]
     cdef uint64_t shift = registers[rb] & 63
     cdef int64_t result = value >> shift
     registers[rd] = z_inv(result, 8)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # Bitwise operations
-cdef tuple  and_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  and_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC210: Bitwise AND."""
     registers[rd] = registers[ra] & registers[rb]
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  xor_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  xor_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC211: Bitwise XOR."""
     registers[rd] = registers[ra] ^ registers[rb]
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  or_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  or_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC212: Bitwise OR."""
     registers[rd] = registers[ra] | registers[rb]
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # Multiplication upper bits
-cdef tuple  mul_upper_s_s(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  mul_upper_s_s(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC213: Signed multiplication upper 64 bits."""
-    registers[rd] = z_inv(
-        z(registers[ra], 8) * z(registers[rb], 8) // 2**64, 8
-    )
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    cdef int64_t signed_a = <int64_t>registers[ra]
+    cdef int64_t signed_b = <int64_t>registers[rb]
+    registers[rd] = <uint64_t>(signed_a * signed_b) // 2**64
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  mul_upper_u_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  mul_upper_u_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC214: Unsigned multiplication upper 64 bits."""
     registers[rd] = (
         int(registers[ra]) * int(registers[rb])
     ) // 2**64
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  mul_upper_s_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  mul_upper_s_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC215: Signed-unsigned multiplication upper 64 bits."""
     registers[rd] = z_inv(
         z(int(registers[ra]), 8) * int(registers[rb]) // 2**64, 8
     )
 
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # Comparison operations
-cdef tuple  set_lt_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  set_lt_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC216: Set less than unsigned."""
     registers[rd] = int(registers[ra] < registers[rb])
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  set_lt_s(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  set_lt_s(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC217: Set less than signed."""
     registers[rd] = int(z(registers[ra], 8) < z(registers[rb], 8))
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # Conditional move operations
-cdef tuple  cmov_iz(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  cmov_iz(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC218: Conditional move if zero."""
     if registers[rb] == 0:
         registers[rd] = registers[ra]
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  cmov_nz(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  cmov_nz(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC219: Conditional move if not zero."""
     if registers[rb] != 0:
         registers[rd] = registers[ra]
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # Rotation operations
-cdef tuple  rot_l_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  rot_l_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC220: 64-bit rotate left."""
     cdef uint64_t value = registers[ra]
     cdef uint64_t shift = registers[rb] & 63
     registers[rd] = (value << shift) | (value >> (64 - shift))
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  rot_l_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  rot_l_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC221: 32-bit rotate left."""
     cdef uint32_t value = <uint32_t>(registers[ra] & 0xFFFFFFFF)
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef uint32_t result = (value << shift) | (value >> (32 - shift))
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  rot_r_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  rot_r_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC222: 64-bit rotate right."""
     cdef uint64_t value = registers[ra]
     cdef uint64_t shift = registers[rb] & 63
     registers[rd] = (value >> shift) | (value << (64 - shift))
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  rot_r_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  rot_r_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC223: 32-bit rotate right."""
     cdef uint32_t value = <uint32_t>(registers[ra] & 0xFFFFFFFF)
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef uint32_t result = (value >> shift) | (value << (32 - shift))
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # Inverted bitwise operations
-cdef tuple  and_inv(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  and_inv(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC224: Bitwise AND with inverted rb."""
     cdef uint64_t result = registers[ra] & (~registers[rb])
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  or_inv(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  or_inv(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC225: Bitwise OR with inverted rb."""
     cdef uint64_t result = registers[ra] | (~registers[rb])
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  xnor(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  xnor(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC226: Bitwise XNOR (XOR with inverted result)."""
     cdef uint64_t result = ~(registers[ra] ^ registers[rb])
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 # Min/max operations
-cdef tuple  max_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  max_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC227: Maximum signed."""
     cdef int64_t a = <int64_t>registers[ra]
     cdef int64_t b = <int64_t>registers[rb]
     cdef uint64_t result = <uint64_t>(a if a > b else b)
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  max_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  max_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC228: Maximum unsigned."""
     cdef uint64_t a = registers[ra]
     cdef uint64_t b = registers[rb]
     cdef uint64_t result = a if a > b else b
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  min_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  min_op(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC229: Minimum signed."""
     cdef int64_t a = <int64_t>registers[ra]
     cdef int64_t b = <int64_t>registers[rb]
     cdef uint64_t result = <uint64_t>(a if a < b else b)
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
-cdef tuple  min_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t  min_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC230: Minimum unsigned."""
     cdef uint64_t a = registers[ra]
     cdef uint64_t b = registers[rb]
     cdef uint64_t result = a if a < b else b
     registers[rd] = result
-    return CONTINUE, <uint32_t>0xFFFFFFFF
+    return <uint32_t>0xFFFFFFFF
 
 
 cdef class CyInstructionsWArgs3Reg(CyTable):
@@ -352,19 +348,21 @@ cdef class CyInstructionsWArgs3Reg(CyTable):
     Cython optimized instruction table for instructions with 3 register arguments.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
+    cdef InstructionProps get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
-        Extract 3 register indices from program bytes.
-        Returns (vx, vy, ra, rb, rd) where ra/rb are sources, rd is destination.
+        Extract 3 register indices from program bytes using C struct.
+        Returns InstructionProps struct with ra/rb as sources, rd as destination.
         """
-        cdef bytes zeta_slice = program.zeta[program_counter + 1:program_counter + 3]
-        cdef uint32_t byte_val = zeta_slice[0]
-        cdef uint8_t ra = clamp_12(byte_val & 0x0F)  # Lower 4 bits
-        cdef uint8_t rb = clamp_12(byte_val >> 4)    # Upper 4 bits  
-        cdef uint8_t rd = clamp_12(zeta_slice[1])    # Third register
+        cdef InstructionProps props
+        cdef uint8_t byte_val = program.zeta[program_counter + 1]
         
-        # Return in unified format: (vx, vy, ra, rb, rd)
-        return (0, 0, ra, rb, rd)
+        props.ra = clamp_12(byte_val & 0x0F)  # Lower 4 bits
+        props.rb = clamp_12(byte_val >> 4)    # Upper 4 bits  
+        props.rd = clamp_12(program.zeta[program_counter + 2])    # Third register
+        props.vx = 0  # Not used in 3-register instructions
+        props.vy = 0  # Not used in 3-register instructions
+        
+        return props
 
     cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""

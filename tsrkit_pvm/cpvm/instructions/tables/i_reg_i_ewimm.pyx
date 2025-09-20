@@ -6,12 +6,12 @@
 from libc.stdint cimport uint32_t, uint64_t, uint8_t
 from ...cy_status cimport CONTINUE
 from ...cy_utils cimport clamp_12
-from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
+from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t, InstructionProps
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
 # Unified dispatch function for load_imm_64 instruction
-cdef inline tuple load_imm_64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t load_imm_64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
     OPC20: Load 64-bit immediate value into register.
     
@@ -28,25 +28,36 @@ cdef inline tuple load_imm_64_fn(CyProgram program, uint64_t *registers, CyMemor
         Tuple of (execution_status, next_pc)
     """
     registers[ra] = vx
-    return (CONTINUE, <uint32_t>0xFFFFFFFF)
+    return <uint32_t>0xFFFFFFFF
 
 cdef class CyInstructionsWArgs1Reg1EwImm(CyTable):
     """
     Cython optimized instruction table for instructions with 1 register + 1 extended width immediate argument.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
+    cdef InstructionProps get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract register and 64-bit immediate arguments from program bytes.
-        Returns (vx, vy, ra, rb, rd) where vx is the 64-bit immediate value, ra is register index, others are 0.
+        Returns InstructionProps struct where vx is the 64-bit immediate value, ra is register index, others are 0.
         """
-        # Extract 9 bytes: 1 for register + 8 for 64-bit immediate
-        cdef bytes zeta_slice = program.zeta[program_counter + 1: program_counter + 10]
-        cdef uint8_t ra = clamp_12(<uint8_t>(zeta_slice[0] % 16))
-        cdef uint64_t vx = int.from_bytes(bytes(zeta_slice[1:9]), "little")
+        # Extract register index directly
+        cdef uint8_t ra = clamp_12(<uint8_t>(program.zeta[program_counter + 1] % 16))
         
-        # Return in unified format: (vx, vy, ra, rb, rd)
-        return (vx, 0, ra, 0, 0)
+        # Extract 64-bit immediate using pointer arithmetic (8 bytes)
+        cdef uint64_t vx = 0
+        cdef uint32_t i
+        for i in range(8):
+            vx |= (<uint64_t>program.zeta[program_counter + 2 + i]) << (8 * i)
+        
+        # Return InstructionProps struct
+        cdef InstructionProps props
+        props.vx = vx
+        props.vy = 0  # Not used in this instruction type
+        props.ra = ra
+        props.rb = 0  # Not used in this instruction type
+        props.rd = 0  # Not used in this instruction type
+        
+        return props
 
     cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""

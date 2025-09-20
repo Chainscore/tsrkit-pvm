@@ -4,13 +4,13 @@
 # cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t
-from ...cy_status cimport HOST
+from ...cy_status cimport PVM_HOST, PvmExit
 from ...cy_utils cimport chi, clamp_4
-from ..cy_table cimport CyTable, CyTableEntry, instr_fn_t
+from ..cy_table cimport CyTable, CyTableEntry, InstructionProps
 from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
-cdef inline tuple ecalli_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline uint32_t ecalli_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
     OPC10: Ecalli - Execute call immediate.
     Performs a host call with the immediate value.
@@ -26,32 +26,39 @@ cdef inline tuple ecalli_fn(CyProgram program, uint64_t *registers, CyMemory mem
     Returns:
         Tuple of (execution_status, next_pc)
     """
-    # Call HOST with the immediate value (vx) and return status with next_pc
-    return (HOST(vx), <uint32_t>0xFFFFFFFF)
+    raise PvmExit(PVM_HOST, vx)
 
 cdef class CyInstructionsWArgs1Imm(CyTable):
     """
     Cython optimized instruction table for instructions with 1 immediate argument.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
+    cdef InstructionProps get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index):
         """
         Extract immediate value from program bytes.
-        Returns (vx, vy, ra, rb, rc) where vx is the immediate value, others are 0.
+        Returns InstructionProps struct where vx is the immediate value, others are 0.
         """
         cdef uint32_t lx = clamp_4(<uint8_t>skip_index)
         cdef uint32_t start = program_counter + 1
-        cdef uint32_t end = start + lx
         
-        # Extract bytes and convert to integer
-        cdef bytes byte_slice = program.zeta[start:end]
-        cdef uint64_t immediate_value = int.from_bytes(byte_slice, "little")
+        # Extract immediate value using pointer arithmetic
+        cdef uint64_t immediate_value = 0
+        cdef uint32_t i
+        for i in range(lx):
+            immediate_value |= (<uint64_t>program.zeta[start + i]) << (8 * i)
         
         # Apply chi transformation
         cdef uint64_t vx = <uint64_t>chi(<uint64_t>immediate_value, <uint8_t>lx)
         
-        # Return in unified format: (vx, vy, ra, rb, rd)
-        return (vx, 0, 0, 0, 0)
+        # Return InstructionProps struct
+        cdef InstructionProps props
+        props.vx = vx
+        props.vy = 0  # Not used in single immediate instructions
+        props.ra = 0  # Not used in immediate instructions
+        props.rb = 0  # Not used in immediate instructions
+        props.rd = 0  # Not used in immediate instructions
+        
+        return props
 
     cpdef dict get_table(self):
         """Return the instruction table mapping opcodes to their handlers."""

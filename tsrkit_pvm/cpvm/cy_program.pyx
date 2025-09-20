@@ -11,30 +11,23 @@
 # cython: infer_types=True
 # cython: optimize.unpack_method_calls=True
 
-"""
-Cython optimized INT_Program implementation.
-
-This provides the same interface as interpreter/program.py but with C-level performance
-for skip calculations, basic block management, and branching operations.
-"""
-
 cimport cython
-from libc.stdint cimport int32_t, uint32_t, uint64_t, uint8_t
+from libc.stdint cimport int32_t, uint32_t, uint8_t
 from libc.stdlib cimport malloc, free
-from libc.math cimport floor
-from typing import Any, Dict, Tuple, Union
-
-from .cy_status cimport PvmError, CONTINUE, PVM_PANIC, HALT
+from .cy_status cimport PvmExit, PVM_PANIC, PVM_HALT
 from ..common.constants import PVM_ADDR_ALIGNMENT
 from .mapper cimport inst_map
-from tsrkit_types.integers import Uint   # ← use same helper as Python version
+from tsrkit_types.integers import Uint
 from tsrkit_types import Bits
+
 
 cdef class CyProgram:
     def __cinit__(self):
         # ensure safe defaults even on constructor failure
         self._skip_cache = NULL
         self._skip_cache_len = 0
+        self.zeta = NULL
+        self.zeta_len = 0
 
     def __init__(
         self,
@@ -54,7 +47,22 @@ cdef class CyProgram:
         self.jump_table_len      = len(jump_table)
 
         self._extended_bitmask = self.offset_bitmask + [True] * 1000
-        self.zeta              = self.instruction_set + bytes([0] * 1000)
+        
+        # Allocate and initialize zeta as C array for ultra-fast access
+        cdef int32_t total_len = self.instruction_set_len + 1000
+        self.zeta_len = total_len
+        self.zeta = <uint8_t*>malloc(total_len * sizeof(uint8_t))
+        if self.zeta == NULL:
+            raise MemoryError("failed to allocate zeta buffer")
+        
+        # Copy instruction set to C array with padding
+        cdef int32_t i
+        for i in range(self.instruction_set_len):
+            self.zeta[i] = self.instruction_set[i]
+        # Zero-fill padding bytes
+        for i in range(self.instruction_set_len, total_len):
+            self.zeta[i] = 0
+            
         self._exec_blocks      = {}
 
         self._precompute_cache()
@@ -95,7 +103,7 @@ cdef class CyProgram:
                 # Optimized termination check with early exit
                 if (opcode < 256 and 
                     inst_map.is_terminating(opcode) and 
-                    inst_map._dispatch_table[opcode] is not None):
+                    inst_map._dispatch_table[opcode] != <void*>0):
                     bb.append(i + 1 + self._skip_cache[i])  # Use cached skip value
                     
         self.basic_blocks      = bb
@@ -105,6 +113,8 @@ cdef class CyProgram:
     def __dealloc__(self):
         if self._skip_cache != NULL:
             free(self._skip_cache)
+        if self.zeta != NULL:
+            free(self.zeta)
 
     # ------------------------------------------------------------ fast helpers
     @cython.cfunc
@@ -117,35 +127,35 @@ cdef class CyProgram:
 
     @cython.cfunc
     @cython.inline
-    cdef tuple branch(self, int32_t counter, int32_t branch, bint cond):
+    cdef uint32_t branch(self, int32_t counter, int32_t branch, bint cond):
         """Optimized conditional branch with fast set lookup."""
         if not cond:
-            return CONTINUE, counter
+            return <uint32_t>0xFFFF_FFFF
         if branch not in self._basic_blocks_set:
-            raise PvmError(PVM_PANIC)
-        return CONTINUE, branch
+            raise PvmExit(PVM_PANIC)
+        return branch
 
     @cython.cfunc
     @cython.inline  
-    cdef tuple djump(self, uint32_t counter, uint32_t a):
+    cdef uint32_t djump(self, uint32_t counter, uint32_t a):
         """Optimized dynamic jump with safer type handling."""
         # halt sentinel - original comparison
         if a == 0xFFFF_FFFF - 0xFFFF:
-            return HALT, counter
+            raise PvmExit(PVM_HALT)
 
         # address sanity - keep original modulo check for safety
         if a == 0 or a % PVM_ADDR_ALIGNMENT:
-            raise PvmError(PVM_PANIC)
+            raise PvmExit(PVM_PANIC)
 
         cdef int32_t idx = <int32_t>(a // PVM_ADDR_ALIGNMENT) - 1
         if idx < 0 or idx >= self.jump_table_len:
-            raise PvmError(PVM_PANIC)
+            raise PvmExit(PVM_PANIC)
 
         cdef int32_t target = self.jump_table[idx]
         if target not in self._basic_blocks_set:
-            raise PvmError(PVM_PANIC)
+            raise PvmExit(PVM_PANIC)
 
-        return CONTINUE, target
+        return target
 
     # Optimized encode/decode functions with C-level performance
     @cython.cfunc

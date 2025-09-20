@@ -5,7 +5,7 @@ Cython header file for i_offset instruction table.
 """
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t
-from ..cy_table cimport CyTable
+from ..cy_table cimport CyTable, InstructionProps
 from ...cy_program cimport CyProgram
 
 cdef class CyWArgsOneOffset(CyTable):
@@ -13,7 +13,7 @@ cdef class CyWArgsOneOffset(CyTable):
     Cython optimized instruction table for instructions with 1 offset argument.
     """
     
-    cpdef tuple get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index)
+    cdef InstructionProps get_props(self, uint32_t program_counter, CyProgram program, uint32_t skip_index)
     
     cpdef dict get_table(self)
 
