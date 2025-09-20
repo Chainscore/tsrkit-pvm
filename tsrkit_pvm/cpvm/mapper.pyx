@@ -2,7 +2,13 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: cdivision=True
-# cython: profile=True
+# cython: profile=False
+# cython: linetrace=False
+# cython: nonecheck=False
+# cython: initializedcheck=False
+# cython: overflowcheck=False
+# cython: infer_types=True
+# cython: optimize.unpack_method_calls=True
 
 from typing import List, Any
 from libc.stdint cimport int64_t, int32_t, uint8_t, uint32_t, uint64_t
@@ -140,11 +146,8 @@ cdef class CyInstMapper:
 
             # Move to next instruction
             current_pc = next_pc
-                
-        return CyBlockInfo(
-            total_gas=total_gas,
-            instructions=compiled_instructions,
-        )
+        
+        return CyBlockInfo(total_gas, compiled_instructions)
 
 # Global instance for compatibility with Python version
 cdef public CyInstMapper inst_map = CyInstMapper()

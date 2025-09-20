@@ -2,7 +2,13 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: cdivision=True
-# cython: profile=True
+# cython: profile=False
+# cython: linetrace=False
+# cython: nonecheck=False
+# cython: initializedcheck=False
+# cython: overflowcheck=False
+# cython: infer_types=True
+# cython: optimize.unpack_method_calls=True
 
 from typing import List, Any
 from libc.stdint cimport int64_t, int32_t, uint8_t, uint32_t, uint64_t
@@ -32,7 +38,7 @@ cdef class CyBlockInfo:
         self.instructions = instructions
     
     cdef tuple execute(self, CyProgram program, uint32_t start_pc, uint64_t *reg_arr, CyMemory memory):
-        """Execute block with optimized loop."""
+        """Execute block with optimized loop - minimal Python object creation."""
         cdef uint32_t current_pc = start_pc
         cdef uint32_t i
         cdef CyStatus status = CONTINUE
@@ -41,14 +47,17 @@ cdef class CyBlockInfo:
         cdef CyTableEntry handler
         cdef tuple result
         
-        # Pre-cache data to eliminate repeated attribute access
-        instructions = self.instructions
-        total_gas = self.total_gas
+        # Pre-cache the list and size to avoid repeated attribute lookups
+        cdef list instructions = self.instructions
+        cdef uint32_t instructions_size = len(instructions)
+        cdef uint32_t total_gas = self.total_gas
         
-        for i in range(len(instructions)):
+        # Execute instructions with minimal overhead
+        for i in range(instructions_size):
             compiled_inst = instructions[i]
             handler = compiled_inst.handler
             
+            # Call the instruction function directly
             result = handler.fn(
                 program, reg_arr, memory, current_pc, 
                 compiled_inst.vx, compiled_inst.vy, 

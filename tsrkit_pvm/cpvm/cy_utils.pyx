@@ -5,6 +5,7 @@
 # cython: initializedcheck=False
 """Ultra-optimized C-level utilities for maximum PVM performance."""
 
+cimport cython
 from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t
 from libc.stdlib cimport malloc, free
 from libc.string cimport memset, memcpy
@@ -62,25 +63,31 @@ cdef void get_pages(uint32_t start_index, uint32_t length, uint32_t* pages, uint
         idx += 1
     count[0] = idx
 
-# Bit manipulation utilities - C-level performance
+# Bit manipulation utilities - C-level performance with inline optimization
+@cython.cfunc
+@cython.inline
 cdef int64_t chi(uint64_t value, uint8_t n) nogil except? -1:
-    """Make value (of size n) an unbounded integer - ultra-simplified version."""
+    """Make value (of size n) an unbounded integer - ultra-fast inline version."""
     if n <= 0: return value
     if n >= 8: return <int64_t>value  # Already unbounded
     cdef uint8_t bits = n << 3  # 8 * n
     cdef uint64_t sign_bit = 1ULL << (bits - 1)
     return <int64_t>value if (value & sign_bit) == 0 else <int64_t>(value | (~((1ULL << bits) - 1)))
 
+@cython.cfunc
+@cython.inline
 cdef int64_t z(uint64_t x, uint8_t n) nogil except? -1:
-    """Z function - convert unsigned to signed using simple casting."""
+    """Z function - convert unsigned to signed - ultra-fast inline version."""
     if n <= 0 or n >= 8: return <int64_t>x  # Edge cases
     cdef uint8_t bits = n << 3  # 8 * n
     cdef uint64_t mask = (1ULL << bits) - 1
     cdef uint64_t sign_bit = 1ULL << (bits - 1)
     return <int64_t>((x & mask) ^ sign_bit) - sign_bit  # Proper two's complement
 
+@cython.cfunc
+@cython.inline
 cdef uint64_t z_inv(int64_t x, uint8_t n) nogil except? 0:
-    """Z_inv function - convert signed to unsigned using simple masking."""
+    """Z_inv function - convert signed to unsigned - ultra-fast inline version."""
     if n <= 0 or n >= 8: return <uint64_t>x  # Edge cases
     return <uint64_t>x & ((1ULL << (n << 3)) - 1)  # Just mask to n bytes
 
@@ -224,17 +231,23 @@ cdef int64_t smod(int64_t a, int64_t b) nogil except? -1:
     cdef int64_t sign_a = 1 if a >= 0 else -1
     return sign_a * (abs_a % abs_b)
 
-# Clamp functions - branchless C implementations
+# Clamp functions - branchless C implementations with inline optimization
+@cython.cfunc
+@cython.inline
 cdef uint8_t clamp_12(uint8_t val) nogil except? 255:
-    """Clamp to range [0, 12] - matches Python version exactly."""
+    """Clamp to range [0, 12] - ultra-fast inline branchless version."""
     return val if val <= 12 else 12
 
+@cython.cfunc
+@cython.inline
 cdef uint8_t clamp_4(uint8_t val) nogil except? 255:
-    """Clamp to range [0, 4] - matches Python version exactly."""
+    """Clamp to range [0, 4] - ultra-fast inline branchless version."""
     return val if val <= 4 else 4
 
+@cython.cfunc
+@cython.inline
 cdef uint8_t clamp_4_max0(int8_t val) nogil except? 255:
-    """Clamp to range [0, 4] with max(0, val) - matches Python version exactly."""
+    """Clamp to range [0, 4] with max(0, val) - ultra-fast inline version."""
     if val <= 0:
         return 0
     return <uint8_t>val if val <= 4 else 4

@@ -1,10 +1,7 @@
-# cython: boundscheck=False, wraparound=False, cdivision=True
-"""
-Cython optimized instruction table for 1 register + 2 immediate argument instructions.
-
-This table handles instructions that take one register and two immediate arguments:
-- store_imm_ind_u8/u16/u32/u64: Store immediate value at indirect address with offset
-"""
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t, int8_t
 
@@ -16,25 +13,25 @@ from ...cy_program cimport CyProgram
 
 
 # Store immediate indirect instructions
-cdef tuple store_imm_ind_u8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple store_imm_ind_u8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC70: Store immediate vy as u8 at address (ra + vx)."""
     value = int(vy % (2**8))
     memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(1, "little"))
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple store_imm_ind_u16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple store_imm_ind_u16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC71: Store immediate vy as u16 at address (ra + vx)."""
     value = int(vy % (2**16))
     memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(2, "little"))
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple store_imm_ind_u32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple store_imm_ind_u32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC72: Store immediate vy as u32 at address (ra + vx)."""
     value = int(vy % (2**32))
     memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(4, "little"))
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple store_imm_ind_u64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple store_imm_ind_u64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC73: Store immediate vy as u64 at address (ra + vx)."""
     value = int(vy % (2**64))
     memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(8, "little"))

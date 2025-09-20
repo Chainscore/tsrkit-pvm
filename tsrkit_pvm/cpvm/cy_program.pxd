@@ -38,5 +38,5 @@ cdef class CyProgram:
     
     # Public methods that can be called from other Cython modules
     cdef tuple branch(self, int32_t counter, int32_t branch, bint cond)
-    cdef uint32_t skip(self, int32_t pc)
+    cdef uint32_t skip(self, int32_t pc) nogil
     cdef tuple djump(self, uint32_t counter, uint32_t a)

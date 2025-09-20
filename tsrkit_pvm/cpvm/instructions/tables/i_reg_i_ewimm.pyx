@@ -1,13 +1,7 @@
-# cython: language_level=3
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: profile=True
-
-"""
-Cython optimized i_reg_i_ewimm instruction table.
-Instructions with 1 register + 1 extended width immediate argument (opcode 20).
-"""
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t
 from ...cy_status cimport CONTINUE
@@ -17,7 +11,7 @@ from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
 # Unified dispatch function for load_imm_64 instruction
-cdef tuple load_imm_64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple load_imm_64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
     OPC20: Load 64-bit immediate value into register.
     

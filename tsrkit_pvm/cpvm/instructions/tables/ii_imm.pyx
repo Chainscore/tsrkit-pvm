@@ -1,13 +1,7 @@
-# cython: boundscheck=False, wraparound=False, cdivision=True
-"""
-Cython optimized instruction table for 2 immediate argument instructions.
-
-This table handles instructions that take two immediate arguments:
-- store_imm_u8: Store immediate 8-bit value
-- store_imm_u16: Store immediate 16-bit value  
-- store_imm_u32: Store immediate 32-bit value
-- store_imm_u64: Store immediate 64-bit value
-"""
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t, uint16_t, int8_t
 from ...cy_status cimport CONTINUE
@@ -17,28 +11,28 @@ from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
 
-cdef tuple store_imm_u8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple store_imm_u8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC30: Store immediate 8-bit value."""
     cdef uint8_t value = <uint8_t>(vy % 2**8)
     cdef uint64_t address = <uint64_t>vx
     memory.write(address & 0xFFFFFFFF, value.to_bytes(1, 'little'))
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple store_imm_u16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple store_imm_u16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC31: Store immediate 16-bit value."""
     cdef uint16_t value = <uint16_t>(vy % 2**16)
     cdef uint64_t address = <uint64_t>vx
     memory.write(address & 0xFFFFFFFF, value.to_bytes(2, 'little'))
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple store_imm_u32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple store_imm_u32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC32: Store immediate 32-bit value."""
     cdef uint32_t value = <uint32_t>(vy % 2**32)
     cdef uint64_t address = <uint64_t>vx
     memory.write(address & 0xFFFFFFFF, value.to_bytes(4, 'little'))
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple store_imm_u64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple store_imm_u64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC33: Store immediate 64-bit value."""
     cdef uint64_t value = <uint64_t>(vy % 2**64)
     cdef uint64_t address = <uint64_t>vx

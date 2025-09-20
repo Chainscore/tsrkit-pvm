@@ -12,7 +12,6 @@ cdef uint32_t total_page_size(uint32_t blob_len) nogil except? 0
 cdef uint32_t total_zone_size(uint32_t blob_len) nogil except? 0
 cdef void get_pages(uint32_t start_index, uint32_t length, uint32_t* pages, uint32_t* count) nogil except *
 
-# Bit manipulation utilities - C-level performance
 cdef int64_t chi(uint64_t value, uint8_t n) nogil except? -1
 cdef int64_t z(uint64_t x, uint8_t n) nogil except? -1
 cdef uint64_t z_inv(int64_t x, uint8_t n) nogil except? 0
@@ -35,7 +34,6 @@ cdef uint32_t bytes_to_uint32_le(bytes data)
 cdef uint16_t bytes_to_uint16_le(bytes data)
 cdef uint8_t bytes_to_uint8_le(bytes data)
 
-# Clamp functions - branchless C implementations
 cdef uint8_t clamp_12(uint8_t val) nogil except? 255
 cdef uint8_t clamp_4(uint8_t val) nogil except? 255
 cdef uint8_t clamp_4_max0(int8_t val) nogil except? 255

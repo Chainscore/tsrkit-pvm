@@ -1,11 +1,7 @@
-# cython: boundscheck=False, wraparound=False, cdivision=True
-"""
-Cython optimized instruction table for 1 register + 1 immediate + 1 offset argument instructions.
-
-This table handles instructions that take one register, one immediate, and one offset argument:
-- load_imm_jump: Load immediate and jump
-- branch_eq_imm/ne_imm: Branch if register equals/not equals immediate
-"""
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 cimport cython
 from libc.stdint cimport uint32_t, uint64_t, int64_t, uint8_t, int8_t
@@ -19,7 +15,7 @@ from ...cy_program cimport CyProgram
 
 cdef CyStatus status
 
-cdef tuple load_imm_jump_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple load_imm_jump_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC80: Load immediate value into register and jump to offset."""
     registers[ra] = vx
     status_result = program.branch(counter, vy, True)
@@ -29,7 +25,7 @@ cdef tuple load_imm_jump_fn(CyProgram program, uint64_t *registers, CyMemory mem
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_eq_imm_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_eq_imm_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC81: Branch if register equals immediate."""
     cdef bint condition = registers[ra] == vx
     status_result = program.branch(counter, vy, condition)
@@ -39,7 +35,7 @@ cdef tuple branch_eq_imm_fn(CyProgram program, uint64_t *registers, CyMemory mem
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_ne_imm_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_ne_imm_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC82: Branch if register not equals immediate."""
     cdef bint condition = registers[ra] != vx
     status_result = program.branch(counter, vy, condition)
@@ -49,7 +45,7 @@ cdef tuple branch_ne_imm_fn(CyProgram program, uint64_t *registers, CyMemory mem
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_lt_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_lt_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC83: Branch if register less than immediate (unsigned)."""
     cdef bint condition = registers[ra] < vx
     status_result = program.branch(counter, vy, condition)
@@ -59,7 +55,7 @@ cdef tuple branch_lt_u_imm(CyProgram program, uint64_t *registers, CyMemory memo
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_le_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_le_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC84: Branch if register less than or equal immediate (unsigned)."""
     cdef bint condition = registers[ra] <= vx
     status_result = program.branch(counter, vy, condition)
@@ -69,7 +65,7 @@ cdef tuple branch_le_u_imm(CyProgram program, uint64_t *registers, CyMemory memo
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_ge_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_ge_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC85: Branch if register greater than or equal immediate (unsigned)."""
     cdef bint condition = registers[ra] >= vx
     status_result = program.branch(counter, vy, condition)
@@ -79,7 +75,7 @@ cdef tuple branch_ge_u_imm(CyProgram program, uint64_t *registers, CyMemory memo
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_gt_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_gt_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC86: Branch if register greater than immediate (unsigned)."""
     cdef bint condition = registers[ra] > vx
     status_result = program.branch(counter, vy, condition)
@@ -89,7 +85,7 @@ cdef tuple branch_gt_u_imm(CyProgram program, uint64_t *registers, CyMemory memo
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_lt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_lt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC87: Branch if register less than immediate (signed)."""
     cdef bint condition = z(<uint64_t>registers[ra], <uint8_t>8) < z(<uint64_t>vx, <uint8_t>8)
     status_result = program.branch(counter, vy, condition)
@@ -99,7 +95,7 @@ cdef tuple branch_lt_s_imm(CyProgram program, uint64_t *registers, CyMemory memo
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_le_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_le_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC88: Branch if register less than or equal immediate (signed)."""
     cdef bint condition = z(<uint64_t>registers[ra], <uint8_t>8) <= z(<uint64_t>vx, <uint8_t>8)
     status_result = program.branch(counter, vy, condition)
@@ -109,7 +105,7 @@ cdef tuple branch_le_s_imm(CyProgram program, uint64_t *registers, CyMemory memo
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_ge_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_ge_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC89: Branch if register greater than or equal immediate (signed)."""
     cdef bint condition = z(<uint64_t>registers[ra], <uint8_t>8) >= z(<uint64_t>vx, <uint8_t>8)
     status_result = program.branch(counter, vy, condition)
@@ -119,7 +115,7 @@ cdef tuple branch_ge_s_imm(CyProgram program, uint64_t *registers, CyMemory memo
         return status, target_counter
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_gt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_gt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC90: Branch if register greater than immediate (signed)."""
     cdef bint condition = z(<uint64_t>registers[ra], <uint8_t>8) > z(<uint64_t>vx, <uint8_t>8)
     status_result = program.branch(counter, vy, condition)

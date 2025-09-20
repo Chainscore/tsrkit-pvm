@@ -1,10 +1,7 @@
-# cython: boundscheck=False, wraparound=False, cdivision=True
-"""
-Cython optimized instruction table for 2 register + 1 offset argument instructions.
-
-This table handles instructions that take two registers and one offset argument:
-- branch_eq/ne/lt_u/ge_u/lt_s/ge_s: Conditional branch with offset
-"""
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 cimport cython
 from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t, int8_t
@@ -16,7 +13,7 @@ from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
 
-cdef tuple branch_eq_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_eq_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC170: Branch if ra == rb to offset vx."""
     cdef object status_result
     cdef object status
@@ -30,7 +27,7 @@ cdef tuple branch_eq_fn(CyProgram program, uint64_t *registers, CyMemory memory,
     
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_ne_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_ne_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC171: Branch if ra != rb to offset vx."""
     cdef object status_result
     cdef object status
@@ -44,7 +41,7 @@ cdef tuple branch_ne_fn(CyProgram program, uint64_t *registers, CyMemory memory,
     
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_lt_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_lt_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC172: Branch if ra < rb (unsigned) to offset vx."""
     cdef object status_result
     cdef object status
@@ -58,7 +55,7 @@ cdef tuple branch_lt_u_fn(CyProgram program, uint64_t *registers, CyMemory memor
     
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_lt_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_lt_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC173: Branch if ra < rb (signed) to offset vx."""
     cdef int64_t a = z(<uint64_t>registers[ra], <uint8_t>8)
     cdef int64_t b = z(<uint64_t>registers[rb], <uint8_t>8)
@@ -74,7 +71,7 @@ cdef tuple branch_lt_s_fn(CyProgram program, uint64_t *registers, CyMemory memor
     
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_ge_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_ge_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC174: Branch if ra >= rb (unsigned) to offset vx."""
     cdef uint64_t a = registers[ra]
     cdef uint64_t b = registers[rb]
@@ -90,7 +87,7 @@ cdef tuple branch_ge_u_fn(CyProgram program, uint64_t *registers, CyMemory memor
     
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple branch_ge_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple branch_ge_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC175: Branch if ra >= rb (signed) to offset vx."""
     cdef int64_t a = z(<uint64_t>registers[ra], <uint8_t>8)
     cdef int64_t b = z(<uint64_t>registers[rb], <uint8_t>8)

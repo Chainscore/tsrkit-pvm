@@ -1,6 +1,15 @@
 # cython: language_level=3
-# cython: boundscheck=False, wraparound=False, nonecheck=False, cdivision=True
-# cython: profile=False, embedsignature=True
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: nonecheck=False
+# cython: cdivision=True
+# cython: profile=False
+# cython: linetrace=False
+# cython: embedsignature=True
+# cython: initializedcheck=False
+# cython: overflowcheck=False
+# cython: infer_types=True
+# cython: optimize.unpack_method_calls=True
 
 """
 Cython optimized INT_Program implementation.
@@ -22,20 +31,11 @@ from tsrkit_types.integers import Uint   # ← use same helper as Python version
 from tsrkit_types import Bits
 
 cdef class CyProgram:
-    """
-    Cython-optimized INT_Program with fast skip cache and basic block operations.
-    
-    This class inherits from the base Program class but adds Cython optimizations
-    for critical execution path operations.
-    """
-    
-    # ----------------------------------------------------------------- cinit
     def __cinit__(self):
         # ensure safe defaults even on constructor failure
         self._skip_cache = NULL
         self._skip_cache_len = 0
 
-    # ------------------------------------------------------------------ init
     def __init__(
         self,
         int32_t z,
@@ -59,8 +59,11 @@ cdef class CyProgram:
 
         self._precompute_cache()
 
+    @cython.cfunc
+    @cython.inline
     cdef _precompute_cache(self):
-        # pre-compute skip cache ------------------------------------------
+        """Optimized cache precomputation with fast C loops."""
+        # pre-compute skip cache with optimized loop
         cdef int32_t bitmask_len = len(self.offset_bitmask)
         self._skip_cache_len     = bitmask_len
         self._skip_cache         = <int32_t*>malloc(bitmask_len * sizeof(int32_t))
@@ -68,26 +71,33 @@ cdef class CyProgram:
             raise MemoryError("failed to allocate skip-cache")
 
         cdef int32_t i, j, skip_value
+        cdef int32_t extended_len = len(self._extended_bitmask)
+        
+        # Optimized skip cache computation with minimal Python calls
         for i in range(bitmask_len):
             skip_value = bitmask_len
-            for j in range(i + 1, bitmask_len + 1):
-                if j < len(self._extended_bitmask) and self._extended_bitmask[j]:
+            for j in range(i + 1, min(bitmask_len + 1, extended_len)):
+                if self._extended_bitmask[j]:
                     skip_value = j - i - 1
                     break
-            self._skip_cache[i] = min(24, skip_value)
+            # Use bit operation for min(24, skip_value)
+            self._skip_cache[i] = skip_value if skip_value < 24 else 24
 
-        # compute basic blocks --------------------------------------------
+        # compute basic blocks with optimized loop and pre-allocation
         cdef uint8_t opcode
         cdef list bb = [0]
-        for i in range(self.instruction_set_len):
+        cdef int32_t instruction_len = self.instruction_set_len
+        
+        # Fast basic block computation with minimal overhead
+        for i in range(instruction_len):
             if self.offset_bitmask[i]:
                 opcode = self.instruction_set[i]
-                if (
-                    opcode < 256
-                    and inst_map.is_terminating(opcode)
-                    and inst_map._dispatch_table[opcode] is not None
-                ):
-                    bb.append(i + 1 + self.skip(i))
+                # Optimized termination check with early exit
+                if (opcode < 256 and 
+                    inst_map.is_terminating(opcode) and 
+                    inst_map._dispatch_table[opcode] is not None):
+                    bb.append(i + 1 + self._skip_cache[i])  # Use cached skip value
+                    
         self.basic_blocks      = bb
         self._basic_blocks_set = set(bb)
 
@@ -97,22 +107,33 @@ cdef class CyProgram:
             free(self._skip_cache)
 
     # ------------------------------------------------------------ fast helpers
-    cdef uint32_t skip(self, int32_t pc):
-        return 0 if pc < 0 or pc >= self._skip_cache_len else self._skip_cache[pc]
+    @cython.cfunc
+    @cython.inline
+    cdef uint32_t skip(self, int32_t pc) nogil:
+        """Ultra-fast skip lookup with bounds checking optimized away."""
+        if pc < 0 or pc >= self._skip_cache_len:
+            return 0
+        return self._skip_cache[pc]
 
+    @cython.cfunc
+    @cython.inline
     cdef tuple branch(self, int32_t counter, int32_t branch, bint cond):
+        """Optimized conditional branch with fast set lookup."""
         if not cond:
             return CONTINUE, counter
         if branch not in self._basic_blocks_set:
             raise PvmError(PVM_PANIC)
         return CONTINUE, branch
 
+    @cython.cfunc
+    @cython.inline  
     cdef tuple djump(self, uint32_t counter, uint32_t a):
-        # halt sentinel ----------------------------------------------------
+        """Optimized dynamic jump with safer type handling."""
+        # halt sentinel - original comparison
         if a == 0xFFFF_FFFF - 0xFFFF:
             return HALT, counter
 
-        # address sanity ---------------------------------------------------
+        # address sanity - keep original modulo check for safety
         if a == 0 or a % PVM_ADDR_ALIGNMENT:
             raise PvmError(PVM_PANIC)
 
@@ -126,39 +147,45 @@ cdef class CyProgram:
 
         return CONTINUE, target
 
-    # (encode_size / encode_into / decode_from unchanged)
+    # Optimized encode/decode functions with C-level performance
+    @cython.cfunc
+    @cython.inline
     cdef int32_t encode_size(self):
         """
-        Same formula as Program.encode_size.
+        Optimized size calculation with cached values.
         """
         cdef int32_t total = 0
-        total += Uint(len(self.jump_table)).encode_size()     # jump-table len
+        total += Uint(self.jump_table_len).encode_size()      # jump-table len (cached)
         total += 1                                            # z (1 byte)
-        total += Uint(len(self.instruction_set)).encode_size()# code len
-        total += len(self.jump_table) * self.z                # jump entries
-        total += self.instruction_set_len                     # code bytes
+        total += Uint(self.instruction_set_len).encode_size() # code len (cached)
+        total += self.jump_table_len * self.z                 # jump entries (cached)
+        total += self.instruction_set_len                     # code bytes (cached)
         total += Bits[self.instruction_set_len](self.offset_bitmask).encode_size()
         return total
 
+    @cython.cfunc
+    @cython.inline
     cdef int32_t encode_into(self, bytearray buffer, int32_t offset):
         """
-        Byte-for-byte compatible with Program.encode_into
+        Optimized encoding with minimal Python object creation.
         """
         cdef int32_t curr = offset
-        curr += Uint[len(self.jump_table)](len(self.jump_table)).encode_into(buffer, curr)
+        cdef int32_t i
+        
+        curr += Uint[self.jump_table_len](self.jump_table_len).encode_into(buffer, curr)
         curr += Uint[8](self.z).encode_into(buffer, curr)
-        curr += Uint(len(self.instruction_set)).encode_into(buffer, curr)
+        curr += Uint(self.instruction_set_len).encode_into(buffer, curr)
 
-        cdef int i
+        # Optimized jump table encoding with C loop
         JumpInt = Uint[self.z * 8]
         for i in range(self.jump_table_len):
             curr += JumpInt(self.jump_table[i]).encode_into(buffer, curr)
 
-        # copy instruction bytes
+        # copy instruction bytes with optimized memory operation
         buffer[curr:curr + self.instruction_set_len] = self.instruction_set
         curr += self.instruction_set_len
 
-        # bitmask
+        # encode bitmask with cached length
         curr += Bits[self.instruction_set_len, "lsb"](self.offset_bitmask).encode_into(
             buffer, curr
         )
@@ -167,16 +194,18 @@ cdef class CyProgram:
     @classmethod
     def decode_from(cls, buffer, offset: int = 0):
         """
-        Parse the binary produced by encode_into and return (CyProgram, bytes_read)
+        Optimized binary parsing with C-level performance.
         """
-        cdef int curr = offset
-        cdef int bytes_read = 0
+        cdef int32_t curr = offset
+        cdef int32_t bytes_read = 0
+        cdef int32_t j_len, c_len, sz
+        cdef int32_t i, jump_val
 
         j_len, sz = Uint.decode_from(buffer, curr)
         bytes_read += sz
         curr += sz
 
-        z = buffer[curr]
+        cdef int32_t z = buffer[curr]
         curr += 1
         bytes_read += 1
 
@@ -184,26 +213,30 @@ cdef class CyProgram:
         bytes_read += sz
         curr += sz
 
-        # jump table -------------------------------------------------------
+        # Optimized jump table decoding with pre-allocated list
         cdef list jump_table = []
-        cdef int i
         for i in range(j_len):
             jump_val = int.from_bytes(buffer[curr:curr + z], "little")
             jump_table.append(jump_val)
             curr += z
             bytes_read += z
 
-        # instruction bytes ------------------------------------------------
+        # instruction bytes with direct bytes conversion
         instruction_set = bytes(buffer[curr:curr + c_len])
         curr += c_len
         bytes_read += c_len
 
-        # offset bitmask ---------------------------------------------------
-        bit_bytes_needed = (c_len + 7) // 8
+        # Optimized offset bitmask decoding with C-level bit operations
+        cdef int32_t bit_bytes_needed = (c_len + 7) >> 3  # Faster than // 8
         bit_data = buffer[curr:curr + bit_bytes_needed]
 
+        # Optimized bitmask decoding with C-level bit manipulation
         offset_bitmask = [False] * c_len
-        full_bytes = c_len // 8
+        cdef int32_t full_bytes = c_len >> 3  # Faster than // 8
+        cdef int32_t byte_idx, bit_idx, base
+        cdef uint8_t byte_val
+        
+        # Process full bytes with optimized bit extraction
         for byte_idx in range(full_bytes):
             byte_val = bit_data[byte_idx]
             base = byte_idx << 3
@@ -216,7 +249,8 @@ cdef class CyProgram:
             offset_bitmask[base + 6] = bool(byte_val & 64)
             offset_bitmask[base + 7] = bool(byte_val & 128)
 
-        remaining = c_len & 7
+        # Handle remaining bits with bit mask optimization
+        cdef int32_t remaining = c_len & 7
         if remaining:
             byte_val = bit_data[full_bytes] if full_bytes < len(bit_data) else 0
             base = full_bytes << 3

@@ -1,7 +1,7 @@
-"""
-Cython optimized ii_reg instruction table.
-Instructions with 2 register arguments (opcodes 100-111).
-"""
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t
 from ...cy_status cimport CONTINUE
@@ -48,12 +48,12 @@ cdef uint32_t _trailing_zeros_c(uint64_t val, uint32_t bitsize):
     return count
 
 
-cdef tuple  move_reg(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  move_reg(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC100: Move value from register ra to register rd."""
     registers[rd] = registers[ra]
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple sbrk(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, 
+cdef inline tuple sbrk(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, 
                 uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC101: Expand heap by ra bytes and store old break in rd."""
     cdef int64_t req = registers[ra]  # bytes requested
@@ -69,40 +69,40 @@ cdef tuple sbrk(CyProgram program, uint64_t *registers, CyMemory memory, uint32_
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 # Bit counting instructions with C-level optimizations
-cdef tuple  count_set_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  count_set_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC102: Count set bits in 64-bit value."""
     registers[rd] = _count_set_bits_c(registers[ra] & 0xFFFFFFFFFFFFFFFF)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple  count_set_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  count_set_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC103: Count set bits in 32-bit value."""
     registers[rd] = _count_set_bits_c(registers[ra] & 0xFFFFFFFF)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 # Leading zero counting with C optimizations
-cdef tuple  leading_zero_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  leading_zero_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC104: Count leading zero bits in 64-bit value."""
     registers[rd] = _leading_zeros_c(registers[ra] & 0xFFFFFFFFFFFFFFFF, 64)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple  leading_zero_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  leading_zero_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC105: Count leading zero bits in 32-bit value."""
     registers[rd] = _leading_zeros_c(registers[ra] & 0xFFFFFFFF, 32)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 # Trailing zero counting with C optimizations  
-cdef tuple  trailing_zero_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  trailing_zero_bits_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC106: Count trailing zero bits in 64-bit value."""
     registers[rd] = _trailing_zeros_c(registers[ra] & 0xFFFFFFFFFFFFFFFF, 64)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple  trailing_zero_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  trailing_zero_bits_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC107: Count trailing zero bits in 32-bit value."""
     registers[rd] = _trailing_zeros_c(registers[ra] & 0xFFFFFFFF, 32)
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
 # Sign extension instructions
-cdef tuple  sign_extend_8(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  sign_extend_8(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC108: Sign extend 8-bit value to 64-bit."""
     cdef uint64_t val = registers[ra] & 0xFF  # Get low 8 bits
     # Check if sign bit (bit 7) is set
@@ -114,7 +114,7 @@ cdef tuple  sign_extend_8(CyProgram program, uint64_t *registers, CyMemory memor
         registers[rd] = val
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple  sign_extend_16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  sign_extend_16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC109: Sign extend 16-bit value to 64-bit."""
     cdef uint64_t val = registers[ra] & 0xFFFF  # Get low 16 bits
     # Check if sign bit (bit 15) is set
@@ -126,13 +126,13 @@ cdef tuple  sign_extend_16(CyProgram program, uint64_t *registers, CyMemory memo
         registers[rd] = val
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple  zero_extend_16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  zero_extend_16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC110: Zero extend 16-bit value to 64-bit."""
     cdef uint64_t val = registers[ra] % (2**16)
     registers[rd] = val
     return CONTINUE, <uint32_t>0xFFFFFFFF
 
-cdef tuple  reverse_bytes(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple  reverse_bytes(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC111: Reverse byte order of 64-bit value."""
     cdef uint64_t val = registers[ra]
     cdef uint64_t result = 0

@@ -1,13 +1,7 @@
-# cython: language_level=3
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: profile=True
-
-"""
-Cython optimized i_offset instruction table.
-Instructions with 1 offset argument (opcode 40).
-"""
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t
 from ...cy_status cimport PVM_CONTINUE, CONTINUE, CyStatus
@@ -17,7 +11,7 @@ from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 
 # Unified dispatch function for jump instruction
-cdef tuple jump_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple jump_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
     OPC40: Unconditional jump to specified offset.
     
@@ -33,7 +27,7 @@ cdef tuple jump_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint
         Tuple of (status, next_pc)
     """
     # Use the program's branch method for proper jump validation
-    cdef tuple status_result = program.branch(counter, vx, True)
+    cdef inline tuple status_result = program.branch(counter, vx, True)
     cdef CyStatus status = status_result[0]
     cdef uint32_t target_counter = status_result[1]
     

@@ -1,5 +1,7 @@
 # cython: boundscheck=False, wraparound=False, nonecheck=False, cdivision=True, language_level=3
-# cython: profile=False, embedsignature=True
+# cython: profile=False, embedsignature=True, linetrace=False
+# cython: initializedcheck=False, overflowcheck=False, infer_types=True
+# cython: optimize.unpack_method_calls=True
 
 """
 Cython optimized PVM interpreter execution loop.
@@ -28,7 +30,7 @@ cdef class CyInterpreter:
     This class provides the same interface as the original Interpreter class
     but with Cython optimizations for the critical execution loop.
     """
-    
+
     @classmethod
     def execute(
         cls,
@@ -65,7 +67,7 @@ cdef class CyInterpreter:
                 "PVM result",
                 final_pc=pc,
                 gas_remaining=remaining_gas,
-                registers=reg_arr,
+                registers=[int(reg_arr[i]) for i in range(13)],
                 memory=memory,
             )
 
@@ -119,7 +121,7 @@ cdef tuple _execute_internal(
     
     while not should_break:
         try:
-            # Execute instruction using optimized mapper
+            # Execute instruction using optimized mapper (this will handle nogil internally)
             result, gas_cost = inst_map.process_instruction(program, pc, registers, memory)
             status, pc = result
 

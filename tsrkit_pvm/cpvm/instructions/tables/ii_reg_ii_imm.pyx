@@ -1,10 +1,7 @@
-# cython: boundscheck=False, wraparound=False, cdivision=True
-"""
-Cython optimized instruction table for 2 register + 2 immediate argument instructions.
-
-This table handles instructions with complex argument parsing:
-2 registers and 2 immediate values with varying bit layouts.
-"""
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
 from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t, int8_t
 from ...cy_utils cimport chi, clamp_12, clamp_4, clamp_4_max0
@@ -13,7 +10,7 @@ from ...cy_memory cimport CyMemory
 from ...cy_program cimport CyProgram
 from math import floor
 
-cdef tuple load_imm_jump_ind_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple load_imm_jump_ind_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC180: Load immediate value into register and jump indirect."""
     wb = registers[rb]
     registers[ra] = vx

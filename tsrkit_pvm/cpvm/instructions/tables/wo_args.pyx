@@ -1,13 +1,8 @@
-# cython: language_level=3
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: profile=True
+# cython: cdivision=True, boundscheck=False, wraparound=False, nonecheck=False
+# cython: initializedcheck=False, overflowcheck=False
+# cython: profile=False, linetrace=False
+# cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
-"""
-Cython optimized wo_args instruction table.
-Instructions without arguments (opcodes 0-9).
-"""
 
 from libc.stdint cimport uint32_t, uint64_t, uint8_t
 from ...cy_status cimport PvmError, PANIC, CONTINUE
@@ -17,7 +12,7 @@ from ...cy_program cimport CyProgram
 
 # Separate dispatch functions for instructions
 
-cdef tuple trap_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple trap_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
     OPC0: Trap - Raise panic error.
     All arguments unused for this instruction.
@@ -28,7 +23,7 @@ cdef tuple trap_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint
     # Trap instruction causes panic and terminates execution
     raise PvmError(PANIC)
 
-cdef tuple fallthrough_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+cdef inline tuple fallthrough_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """
     OPC1: Fallthrough - Continue execution.
     All arguments unused for this instruction.
