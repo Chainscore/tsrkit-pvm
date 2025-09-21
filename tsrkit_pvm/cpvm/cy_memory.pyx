@@ -20,6 +20,7 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Free
 from .cy_memory cimport Accessibility, ACC_READ, ACC_WRITE, ACC_NONE
 from .cy_status cimport PAGE_FAULT, PvmExit, PVM_PAGE_FAULT
 from .cy_utils cimport get_pages, total_page_size, total_zone_size
+from ..common.types import Accessibility as CommonAccessibility
 
 DEF PVM_ADDR_ALIGNMENT = 2
 DEF PVM_INIT_DATA_SIZE = 2**24
@@ -312,12 +313,12 @@ cdef class CyMemory:
             cur       += chunk
 
     # -------------------------------------------------------- misc helpers --
-    def is_accessible(self, uint32_t address, uint32_t length, int access = ACC_READ):
+    def is_accessible(self, address, length, access = CommonAccessibility.READ):
         """Python wrapper for accessibility check."""
-        return self._is_accessible_c(address, length, access)
+        return self._is_accessible_c(address, length, access.value)
 
-    cpdef void alter_accessibility(self, uint32_t start, uint32_t len_, uint8_t access):
-        self._alter_accessibility_c(start, len_, access)
+    def alter_accessibility(self, start, len_, access):
+        self._alter_accessibility_c(start, len_, access.value)
 
     def zero_memory_range(self, int start_page, int num_pages):
         """Python wrapper for memory zeroing."""

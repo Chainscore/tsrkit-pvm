@@ -1,7 +1,6 @@
 from enum import Enum
 
-
 class Accessibility(Enum):
-    NULL = "Non-Accessible"
-    WRITE = "Writable"
-    READ = "Readable"
+    READ = 0
+    WRITE = 1
+    NULL = 2

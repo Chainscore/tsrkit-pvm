@@ -1,5 +1,5 @@
 # cython: language_level=3
-
+from ..common.types import Accessibility as CommonAccessibility
 from libc.stdint cimport uint32_t, uint8_t, uint64_t
 
 cdef enum Accessibility:
@@ -37,7 +37,6 @@ cdef class CyMemory:
     cdef void _set_access_range_c(self, uint32_t start_page, uint32_t num_pages, int mode, bint value) noexcept nogil
     cdef void _check_access_c(self, uint32_t start_page, uint32_t num_pages, int mode, uint32_t fault_addr)
     cdef void _alter_accessibility_c(self, uint32_t start_addr, uint32_t length, uint8_t access)
-    cpdef void alter_accessibility(self, uint32_t start, uint32_t len_, uint8_t access)
 
     # C-level memory operations
     cdef void _zero_memory_range_c(self, uint32_t start_page, uint32_t num_pages) noexcept

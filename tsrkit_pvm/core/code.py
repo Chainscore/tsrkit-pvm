@@ -114,15 +114,12 @@ def y_function(
             code.s,
             VMContext.calculate_size(len(program_.jump_table)),
         )
-    elif _PVM_MODE == "cython":
-        # TODO: use cython program/memory once implemented
-        # program_ = INT_Program.decode_from(code.code)[0]
-        program_ = CyProgram.decode_from(code.code)[0]
-        memory = CyMemory.from_pc(code.read, code.r_write, args, code.z, code.s)
-        # memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
-    elif _PVM_MODE == "interpreter":
+    elif _PVM_MODE == "mypyc":
         program_ = INT_Program.decode_from(code.code)[0]
         memory = INT_Memory.from_pc(code.read, code.r_write, args, code.z, code.s)
+    elif _PVM_MODE == "interpreter":
+        program_ = CyProgram.decode_from(code.code)[0]
+        memory = CyMemory.from_pc(code.read, code.r_write, args, code.z, code.s)
     else:
         raise ValueError(f"PVM_MODE {_PVM_MODE} not supported")
 
