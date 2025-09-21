@@ -89,22 +89,18 @@ cdef inline uint32_t rem_s_32(CyProgram program, uint64_t *registers, CyMemory m
 # 64-bit arithmetic operations  
 cdef inline uint32_t  add_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC200: 64-bit addition."""
-    registers[rd] = (registers[ra] + registers[rb]) % (2**64)
+    registers[rd] = <uint64_t>(registers[ra] + registers[rb])
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t  sub_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC201: 64-bit subtraction."""
-    cdef uint64_t a = registers[ra]
-    cdef uint64_t b = registers[rb]
-    cdef uint64_t result = (a - b) % (2**64)
+    cdef uint64_t result = <uint64_t>(registers[ra] - registers[rb])
     registers[rd] = result
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t  mul_64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC202: 64-bit multiplication."""
-    cdef uint64_t a = registers[ra]
-    cdef uint64_t b = registers[rb]
-    cdef uint64_t result = (a * b) % (2**64)
+    cdef uint64_t result = <uint64_t>(registers[ra] * registers[rb]) % (2**64)
     registers[rd] = result
     return <uint32_t>0xFFFFFFFF
 
@@ -152,7 +148,7 @@ cdef inline uint32_t  rem_s_64(CyProgram program, uint64_t *registers, CyMemory 
 # Shift operations
 cdef inline uint32_t  shlo_l_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC197: 32-bit logical left shift."""
-    cdef uint32_t value = <uint32_t>(registers[ra] & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(registers[ra])
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef uint32_t result = value << shift
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
@@ -160,7 +156,7 @@ cdef inline uint32_t  shlo_l_32(CyProgram program, uint64_t *registers, CyMemory
 
 cdef inline uint32_t  shlo_r_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC198: 32-bit logical right shift."""
-    cdef uint32_t value = <uint32_t>(registers[ra] & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(registers[ra])
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef uint32_t result = value >> shift
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
@@ -217,7 +213,7 @@ cdef inline uint32_t  mul_upper_s_s(CyProgram program, uint64_t *registers, CyMe
     """OPC213: Signed multiplication upper 64 bits."""
     cdef int64_t signed_a = <int64_t>registers[ra]
     cdef int64_t signed_b = <int64_t>registers[rb]
-    registers[rd] = <uint64_t>(signed_a * signed_b) // 2**64
+    registers[rd] = <uint64_t>(signed_a * signed_b)
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t  mul_upper_u_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
@@ -243,7 +239,7 @@ cdef inline uint32_t  set_lt_u(CyProgram program, uint64_t *registers, CyMemory 
 
 cdef inline uint32_t  set_lt_s(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC217: Set less than signed."""
-    registers[rd] = int(z(registers[ra], 8) < z(registers[rb], 8))
+    registers[rd] = int(<int64_t>registers[ra] < <int64_t>registers[rb])
     return <uint32_t>0xFFFFFFFF
 
 # Conditional move operations
@@ -269,7 +265,7 @@ cdef inline uint32_t  rot_l_64(CyProgram program, uint64_t *registers, CyMemory 
 
 cdef inline uint32_t  rot_l_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC221: 32-bit rotate left."""
-    cdef uint32_t value = <uint32_t>(registers[ra] & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(registers[ra])
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef uint32_t result = (value << shift) | (value >> (32 - shift))
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)
@@ -284,7 +280,7 @@ cdef inline uint32_t  rot_r_64(CyProgram program, uint64_t *registers, CyMemory 
 
 cdef inline uint32_t  rot_r_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC223: 32-bit rotate right."""
-    cdef uint32_t value = <uint32_t>(registers[ra] & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(registers[ra])
     cdef uint32_t shift = <uint32_t>(registers[rb] & 31)
     cdef uint32_t result = (value >> shift) | (value << (32 - shift))
     registers[rd] = <uint64_t>chi(<uint64_t>result, <uint8_t>4)

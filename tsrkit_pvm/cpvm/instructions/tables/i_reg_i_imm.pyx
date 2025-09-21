@@ -22,64 +22,64 @@ cdef inline uint32_t load_imm_fn(CyProgram program, uint64_t *registers, CyMemor
 
 cdef inline uint32_t load_u8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC52: Load unsigned 8-bit value from memory."""
-    cdef bytes data = memory.read(vx & 0xFFFFFFFF, 1)
+    cdef bytes data = memory.read(vx, 1)
     registers[ra] = int.from_bytes(data, "little")
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t load_i8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC53: Load signed 8-bit value from memory."""
-    cdef bytes data = memory.read(vx & 0xFFFFFFFF, 1)
+    cdef bytes data = memory.read(vx, 1)
     registers[ra] = <uint64_t>chi(<uint64_t>int.from_bytes(data, "little"), <uint8_t>1)
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t load_u16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC54: Load unsigned 16-bit value from memory."""
-    cdef bytes data = memory.read(vx & 0xFFFFFFFF, 2)
+    cdef bytes data = memory.read(vx, 2)
     registers[ra] = int.from_bytes(data, "little")
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t load_i16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC55: Load signed 16-bit value from memory."""
-    cdef bytes data = memory.read(vx & 0xFFFFFFFF, 2)
+    cdef bytes data = memory.read(vx, 2)
     registers[ra] = <uint64_t>chi(<uint64_t>int.from_bytes(data, "little"), <uint8_t>2)
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t load_u32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC56: Load unsigned 32-bit value from memory."""
-    cdef bytes data = memory.read(vx & 0xFFFFFFFF, 4)
+    cdef bytes data = memory.read(vx, 4)
     registers[ra] = int.from_bytes(data, "little")
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t load_i32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC57: Load signed 32-bit value from memory."""
-    cdef bytes data = memory.read(vx & 0xFFFFFFFF, 4)
+    cdef bytes data = memory.read(vx, 4)
     registers[ra] = <uint64_t>chi(<uint64_t>int.from_bytes(data, "little"), <uint8_t>4)
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t load_u64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC58: Load unsigned 64-bit value from memory."""
-    cdef bytes data = memory.read(vx & 0xFFFFFFFF, 8)
+    cdef bytes data = memory.read(vx, 8)
     registers[ra] = int.from_bytes(data, "little")
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t store_u8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC59: Store 8-bit value to memory."""
-    memory.write(vx & 0xFFFFFFFF, int(registers[ra] % (2**8)).to_bytes(1, "little"))
+    memory.write(vx, int(registers[ra] % (2**8)).to_bytes(1, "little"))
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t store_u16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC60: Store 16-bit value to memory."""
-    memory.write(vx & 0xFFFFFFFF, int(registers[ra] % (2**16)).to_bytes(2, "little"))
+    memory.write(vx, int(registers[ra] % (2**16)).to_bytes(2, "little"))
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t store_u32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC61: Store 32-bit value to memory."""
-    memory.write(vx & 0xFFFFFFFF, int(registers[ra] % (2**32)).to_bytes(4, "little"))
+    memory.write(vx, int(registers[ra] % (2**32)).to_bytes(4, "little"))
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t store_u64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC62: Store 64-bit value to memory."""
-    memory.write(vx & 0xFFFFFFFF, registers[ra].to_bytes(8, "little"))
+    memory.write(vx, registers[ra].to_bytes(8, "little"))
     return <uint32_t>0xFFFFFFFF
 
 cdef class CyInstructionsWArgs1Reg1Imm(CyTable):

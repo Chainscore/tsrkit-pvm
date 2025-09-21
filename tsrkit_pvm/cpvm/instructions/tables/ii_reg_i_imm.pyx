@@ -3,8 +3,7 @@
 # cython: profile=False, linetrace=False
 # cython: language_level=3, infer_types=True, optimize.unpack_method_calls=True
 
-from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t, uint16_t
-from ...cy_status cimport CONTINUE
+from libc.stdint cimport uint32_t, int64_t, uint64_t, uint8_t, uint16_t, int32_t, int8_t, int16_t
 from ...cy_utils cimport b, b_inv, chi, z, z_inv, clamp_12, clamp_4, clamp_4_max0
 from ...cy_utils cimport uint64_to_bytes_le, uint32_to_bytes_le, uint16_to_bytes_le, uint8_to_bytes_le
 from ...cy_utils cimport bytes_to_uint64_le, bytes_to_uint32_le, bytes_to_uint16_le, bytes_to_uint8_le
@@ -46,7 +45,7 @@ cdef inline uint32_t  load_ind_i8(CyProgram program, uint64_t *registers, CyMemo
     cdef bytes data = memory.read(registers[rb] + vx, 1)
     cdef uint8_t value = bytes_to_uint8_le(data)
     # Sign extend from 8-bit to 64-bit
-    registers[ra] = z_inv(z(value, 1), 8)
+    registers[ra] = <uint64_t>(<int8_t>value)
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t  load_ind_u16(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
@@ -60,7 +59,7 @@ cdef inline uint32_t  load_ind_i16(CyProgram program, uint64_t *registers, CyMem
     cdef bytes data = memory.read(registers[rb] + vx, 2)
     cdef uint16_t value = bytes_to_uint16_le(data)
     # Sign extend from 16-bit to 64-bit
-    registers[ra] = z_inv(z(value, 2), 8)
+    registers[ra] = <uint64_t>(<int16_t>value)
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t  load_ind_u32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
@@ -73,8 +72,7 @@ cdef inline uint32_t  load_ind_i32(CyProgram program, uint64_t *registers, CyMem
     """OPC129: Load i32 from address (rb + vx) to register ra."""
     cdef bytes data = memory.read(registers[rb] + vx, 4)
     cdef uint32_t value = bytes_to_uint32_le(data)
-    # Sign extend from 32-bit to 64-bit
-    registers[ra] = z_inv(z(value, 4), 8)
+    registers[ra] = <uint64_t>(<int32_t>value)
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t  load_ind_u64(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
@@ -86,7 +84,7 @@ cdef inline uint32_t  load_ind_u64(CyProgram program, uint64_t *registers, CyMem
 # Arithmetic and logic operations with immediate values
 cdef inline uint32_t  add_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC131: Add immediate value to register (32-bit)."""
-    cdef uint32_t value = <uint32_t>((registers[rb] + vx) & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(registers[rb] + vx)
     registers[ra] = chi(value, 4)
     return <uint32_t>0xFFFFFFFF
 # Bitwise operations
@@ -107,7 +105,7 @@ cdef inline uint32_t  or_op(CyProgram program, uint64_t *registers, CyMemory mem
 
 cdef inline uint32_t  mul_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC135: Multiply with immediate value (32-bit)."""
-    cdef uint64_t value = (registers[rb] * vx) % 2**32
+    cdef uint32_t value = <uint32_t>(registers[rb] * vx)
     registers[ra] = chi(value, 4)
     return <uint32_t>0xFFFFFFFF
 
@@ -134,8 +132,8 @@ cdef inline uint32_t  set_lt_u_imm(CyProgram program, uint64_t *registers, CyMem
 
 cdef inline uint32_t  set_lt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC137: Set if less than (signed) immediate."""
-    cdef int64_t a = z(registers[rb], 8)
-    cdef int64_t b = z(vx, 8)
+    cdef int64_t a = <int64_t>(registers[rb])
+    cdef int64_t b = <int64_t>(vx)
     registers[ra] = 1 if a < b else 0
     return <uint32_t>0xFFFFFFFF
 
@@ -149,7 +147,7 @@ cdef inline uint32_t  shlo_l_imm_32(CyProgram program, uint64_t *registers, CyMe
 
 cdef inline uint32_t  shlo_r_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC139: Shift right logical immediate (32-bit)."""
-    cdef uint32_t value = <uint32_t>(registers[rb] & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(registers[rb])
     cdef uint32_t shift = <uint32_t>(vx % 32)
     cdef uint32_t result = value >> shift
     registers[ra] = chi(result, 4)
@@ -157,7 +155,7 @@ cdef inline uint32_t  shlo_r_imm_32(CyProgram program, uint64_t *registers, CyMe
 
 cdef inline uint32_t  shar_r_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC140: Shift right arithmetic immediate (32-bit)."""
-    cdef int64_t signed_value = z(registers[rb] & 0xFFFFFFFF, 4)
+    cdef int64_t signed_value = z(registers[rb], 4)
     cdef uint32_t shift = <uint32_t>(vx % 32)
     cdef int64_t result = signed_value >> shift
     registers[ra] = z_inv(result, 8)
@@ -165,7 +163,7 @@ cdef inline uint32_t  shar_r_imm_32(CyProgram program, uint64_t *registers, CyMe
 
 cdef inline uint32_t  neg_add_imm_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC141: Negate and add immediate (32-bit)."""
-    cdef uint32_t result = <uint32_t>((vx - registers[rb]) & 0xFFFFFFFF)
+    cdef uint32_t result = <uint32_t>((vx - registers[rb]))
     registers[ra] = chi(result, 4)
     return <uint32_t>0xFFFFFFFF
 
@@ -183,7 +181,7 @@ cdef inline uint32_t  set_gt_s_imm(CyProgram program, uint64_t *registers, CyMem
 
 cdef inline uint32_t  shlo_l_imm_alt_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC144: Shift left immediate alternate (32-bit) - operands swapped."""
-    cdef uint32_t value = <uint32_t>(vx & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(vx)
     cdef uint32_t shift = <uint32_t>(registers[rb] % 32)
     cdef uint32_t result = value << shift
     registers[ra] = chi(result, 4)
@@ -191,7 +189,7 @@ cdef inline uint32_t  shlo_l_imm_alt_32(CyProgram program, uint64_t *registers, 
 
 cdef inline uint32_t  shlo_r_imm_alt_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC145: Shift right logical immediate alternate (32-bit) - operands swapped."""
-    cdef uint32_t value = <uint32_t>(vx & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(vx)
     cdef uint32_t shift = <uint32_t>(registers[rb] % 32)
     cdef uint32_t result = value >> shift
     registers[ra] = chi(result, 4)
@@ -199,7 +197,7 @@ cdef inline uint32_t  shlo_r_imm_alt_32(CyProgram program, uint64_t *registers, 
 
 cdef inline uint32_t  shar_r_imm_alt_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC146: Shift right arithmetic immediate alternate (32-bit) - operands swapped."""
-    cdef int64_t signed_value = z(vx & 0xFFFFFFFF, 4)
+    cdef int64_t signed_value = z(vx, 4)
     cdef uint32_t shift = <uint32_t>(registers[rb] % 32)
     cdef int64_t result = signed_value >> shift
     registers[ra] = z_inv(result, 8)
@@ -294,7 +292,7 @@ cdef inline uint32_t  rot_r_64_imm_alt(CyProgram program, uint64_t *registers, C
 
 cdef inline uint32_t  rot_r_32_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC160: Rotate right 32-bit immediate."""
-    cdef uint32_t value = <uint32_t>(registers[rb] & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(registers[rb])
     cdef uint32_t shift = <uint32_t>(vx % 32)
     cdef uint32_t result = (value >> shift) | (value << (32 - shift))
     registers[ra] = chi(result, 4)
@@ -302,7 +300,7 @@ cdef inline uint32_t  rot_r_32_imm(CyProgram program, uint64_t *registers, CyMem
 
 cdef inline uint32_t  rot_r_32_imm_alt(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC161: Rotate right 32-bit immediate alternate - operands swapped."""
-    cdef uint32_t value = <uint32_t>(vx & 0xFFFFFFFF)
+    cdef uint32_t value = <uint32_t>(vx)
     cdef uint32_t shift = <uint32_t>(registers[rb] % 32)
     cdef uint32_t result = (value >> shift) | (value << (32 - shift))
     registers[ra] = chi(result, 4)

@@ -6,6 +6,7 @@ from .cy_memory  cimport CyMemory
 from .cy_program cimport CyProgram
 from .cy_block   cimport CyBlockInfo, CyCompiledInstruction
 from .instructions.cy_table cimport CyTable, CyTableEntry, InstructionProps
+from .cy_status cimport PVM_OUT_OF_GAS, PvmExit
 
 # --- move all cimports to module level --------------------
 from .instructions.tables.wo_args cimport InstructionsWoArgs as T0
@@ -62,7 +63,7 @@ cdef class CyInstMapper:
         return 0 if entry_ptr is None else entry_ptr.gas_cost
     
     cdef tuple process_instruction(self, CyProgram program, int32_t program_counter, 
-                                   uint64_t *registers, CyMemory memory):
+                                     uint64_t *registers, CyMemory memory):
         """
         Execute an instruction using the optimized dispatch table.
         """
@@ -71,9 +72,10 @@ cdef class CyInstMapper:
     
     cdef CyBlockInfo get_block(self, CyProgram program, int32_t start_pc):
         """Get compiled block from cache or compile new one."""
-        if start_pc in program._exec_blocks:
-            return program._exec_blocks[start_pc]
-        
+        block = program._exec_blocks.get(start_pc)
+        if block:
+            return block
+
         # Compile block and cache it
         block = self._compile_block(program, start_pc)
         program._exec_blocks[start_pc] = block
@@ -94,9 +96,6 @@ cdef class CyInstMapper:
         while True:
             opcode = program.zeta[current_pc]
             table_instance = <CyTable>self._dispatch_table[opcode]
-            
-            if self._dispatch_table[opcode] == <void*>0:
-                raise ValueError(f"Invalid opcode: {opcode} at PC {current_pc}")
             
             entry = <CyTableEntry>self._dispatch_opdata[opcode]
             

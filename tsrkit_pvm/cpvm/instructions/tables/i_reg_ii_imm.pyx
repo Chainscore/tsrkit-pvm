@@ -16,25 +16,25 @@ from ...cy_program cimport CyProgram
 cdef inline uint32_t store_imm_ind_u8_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC70: Store immediate vy as u8 at address (ra + vx)."""
     value = int(vy % (2**8))
-    memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(1, "little"))
+    memory.write((registers[ra] + vx), value.to_bytes(1, "little"))
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t store_imm_ind_u16_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC71: Store immediate vy as u16 at address (ra + vx)."""
     value = int(vy % (2**16))
-    memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(2, "little"))
+    memory.write((registers[ra] + vx), value.to_bytes(2, "little"))
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t store_imm_ind_u32_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC72: Store immediate vy as u32 at address (ra + vx)."""
     value = int(vy % (2**32))
-    memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(4, "little"))
+    memory.write((registers[ra] + vx), value.to_bytes(4, "little"))
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t store_imm_ind_u64_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC73: Store immediate vy as u64 at address (ra + vx)."""
     value = int(vy % (2**64))
-    memory.write((registers[ra] + vx) & 0xFFFFFFFF, value.to_bytes(8, "little"))
+    memory.write((registers[ra] + vx), value.to_bytes(8, "little"))
     return <uint32_t>0xFFFFFFFF
 
 cdef class CyInstructionsWArgs1Reg2Imm(CyTable):
