@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "mypy", "mypyc"]
+requires = ["setuptools>=61.0", "wheel", "mypy"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -17,7 +17,6 @@ dependencies = [
     "tsrkit-types", # Remove version constraint for workspace
     "bitarray>=3.7.1,<4.0.0",
     "setuptools>=80.9.0",
-    "mypyc>=0.0.1",
     "mypy>=1.18.1",
     "cython>=3.1.4",
 ]
@@ -27,7 +26,6 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0", 
     "mypy>=1.0.0",
-    "mypyc>=0.0.1",
 ]
 
 # Keep existing build configuration for MyPyC
