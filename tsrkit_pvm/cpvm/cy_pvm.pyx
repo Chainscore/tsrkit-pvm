@@ -63,7 +63,7 @@ cdef class CyInterpreter:
 
         status, pc, remaining_gas = _execute_internal(program, pc, remaining_gas, reg_arr, memory)
         if logger:
-            logger.info(
+            logger.debug(
                 "PVM result",
                 final_pc=pc,
                 gas_remaining=remaining_gas,
