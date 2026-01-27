@@ -64,10 +64,8 @@ jobs:
           CIBW_ARCHS: ${{ matrix.cibw_arch }}
           CIBW_BUILD_VERBOSITY: 1
           CIBW_ENVIRONMENT: "PVM_BUILD_MODE=cython"
-          # Skip testing in wheel build (tested separately)
-          CIBW_TEST_COMMAND: ""
-          # Install build dependencies
           CIBW_BEFORE_BUILD: pip install cython setuptools wheel
+          CIBW_TEST_SKIP: "*"
 
       - uses: actions/upload-artifact@v4
         with:
