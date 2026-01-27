@@ -127,7 +127,8 @@ jobs:
         shell: bash
         run: |
           # Install from the dist directory, pip will pick the right wheel
-          pip install --no-index --find-links=dist/ tsrkit-pvm
+          # Allow pip to fetch dependencies from PyPI
+          pip install --find-links=dist/ tsrkit-pvm
 
       - name: Test Interpreter Mode (Cython)
         shell: bash
