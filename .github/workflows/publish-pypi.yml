@@ -1,0 +1,116 @@
+name: Build and Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }} for ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          # Linux x86_64 - with recompiler
+          - os: linux
+            arch: x86_64
+            runner: ubuntu-22.04
+            cibw_arch: x86_64
+
+          # Linux ARM64 - without recompiler
+          - os: linux
+            arch: aarch64
+            runner: ubuntu-22.04
+            cibw_arch: aarch64
+
+          # macOS Intel - without recompiler
+          - os: macos
+            arch: x86_64
+            runner: macos-13
+            cibw_arch: x86_64
+
+          # macOS Apple Silicon - without recompiler
+          - os: macos
+            arch: arm64
+            runner: macos-14
+            cibw_arch: arm64
+
+          # Windows x86_64 - without recompiler
+          - os: windows
+            arch: x86_64
+            runner: windows-2022
+            cibw_arch: AMD64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up QEMU (for ARM on x86)
+        if: matrix.arch == 'aarch64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.16.0
+        env:
+          CIBW_BUILD: cp312-*
+          CIBW_ARCHS: ${{ matrix.cibw_arch }}
+          CIBW_BUILD_VERBOSITY: 1
+          CIBW_ENVIRONMENT: "PVM_BUILD_MODE=cython"
+          # Skip testing in wheel build (tested separately)
+          CIBW_TEST_COMMAND: ""
+          # Install build dependencies
+          CIBW_BEFORE_BUILD: pip install cython setuptools wheel
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.arch }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build sdist
+        run: pipx run build --sdist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    name: Publish to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      id-token: write  # Required for trusted publishing
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
