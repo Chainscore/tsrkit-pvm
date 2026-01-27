@@ -14,7 +14,11 @@ if __name__ == "__main__":
     PVM_BUILD_MODE = os.environ.get("PVM_BUILD_MODE", "plain").lower()
     print(f"Building with PVM_BUILD_MODE={PVM_BUILD_MODE}")
     print(f"Platform: {sys.platform}, Architecture: {platform.machine()}")
-    print(f"Recompiler support: {'Yes' if should_build_recompiler() else 'No (requires Linux x86_64)'}")
+
+    if should_build_recompiler():
+        print(f"[+] Runtime modes available: PVM_MODE=interpreter (Cython) or PVM_MODE=recompiler")
+    else:
+        print(f"[+] Runtime modes available: PVM_MODE=interpreter (Cython only, recompiler requires Linux x86_64)")
 
     ext_modules = []  # Default to no compiled extensions
 
@@ -69,13 +73,16 @@ if __name__ == "__main__":
                 "tsrkit_pvm/cpvm/mapper.pyx",
                 "tsrkit_pvm/cpvm/cy_pvm.pyx",
             ]
-            ext_modules = cythonize(
+            cython_extensions = cythonize(
                 cython_files,
                 compiler_directives=compiler_directives,
                 annotate=os.environ.get("CYTHON_ANNOTATE", "false").lower() == "true",
                 language_level=3,
             )
+            ext_modules.extend(cython_extensions)
             print(f"[+] Successfully compiled {len(cython_files)} Cython files")
+            if should_build_recompiler():
+                print(f"[+] Total extensions: {len(ext_modules)} (Cython interpreter + recompiler segwrap)")
         except ImportError as e:
             print(f"❌ Cython not available: {e}, falling back to MyPyC")
             PVM_BUILD_MODE = "mypyc"
@@ -111,7 +118,7 @@ if __name__ == "__main__":
 
         try:
             # Compile each file individually to avoid a top-level hashed __mypyc support module
-            ext_modules = []
+            mypyc_modules = []
             compiled_count = 0
             failed_count = 0
             for py_file in target_files:
@@ -119,7 +126,7 @@ if __name__ == "__main__":
                     print(f"Compiling {py_file}...")
                     mods = mypycify([py_file], opt_level="3")
                     if mods:
-                        ext_modules.extend(mods)
+                        mypyc_modules.extend(mods)
                         compiled_count += 1
                         print(f"[+] Successfully compiled {py_file}")
                     else:
@@ -128,10 +135,12 @@ if __name__ == "__main__":
                 except Exception as ce:
                     failed_count += 1
                     print(f"[!] Error compiling {py_file}: {ce}")
+            ext_modules.extend(mypyc_modules)
             print(f"\nMyPyC compilation summary: {compiled_count} succeeded, {failed_count} failed")
+            if should_build_recompiler():
+                print(f"[+] Total extensions: {len(ext_modules)} (MyPyC + recompiler segwrap)")
         except Exception as e:
             print(f"[!] Failed to configure MyPyC: {e}")
-            ext_modules = []
     
     setup(
         name="tsrkit_pvm",

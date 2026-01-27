@@ -27,6 +27,7 @@ classifiers = [
 
 dependencies = [
     "tsrkit-types>=1.0.0,<2.0.0",
+    "tsrkit-asm>=0.1.0",
     "bitarray>=3.7.1,<4.0.0",
     "setuptools>=80.9.0",
     "mypy>=1.18.1",
