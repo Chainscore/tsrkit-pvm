@@ -72,6 +72,115 @@ jobs:
           name: wheels-${{ matrix.os }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
 
+  test_wheels:
+    name: Test wheels on ${{ matrix.os }} for ${{ matrix.arch }}
+    needs: [build_wheels]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          # Linux x86_64 - test both modes
+          - os: linux
+            arch: x86_64
+            runner: ubuntu-22.04
+            test_recompiler: true
+
+          # Linux ARM64 - test interpreter only
+          - os: linux
+            arch: aarch64
+            runner: ubuntu-22.04
+            test_recompiler: false
+
+          # macOS Intel - test interpreter only
+          - os: macos
+            arch: x86_64
+            runner: macos-13
+            test_recompiler: false
+
+          # macOS Apple Silicon - test interpreter only
+          - os: macos
+            arch: arm64
+            runner: macos-14
+            test_recompiler: false
+
+          # Windows x86_64 - test interpreter only
+          - os: windows
+            arch: x86_64
+            runner: windows-2022
+            test_recompiler: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
+
+      - name: Install wheel
+        shell: bash
+        run: |
+          pip install dist/*.whl
+
+      - name: Test Interpreter Mode (Cython)
+        shell: bash
+        run: |
+          echo "Testing PVM_MODE=interpreter..."
+          PVM_MODE=interpreter python -c "
+          from tsrkit_pvm.cpvm.cy_pvm import CyPVM
+          from tsrkit_pvm.common.program import Program
+          print('[+] Successfully imported CyPVM')
+          # Create a simple program (just a trap instruction)
+          program = Program(code=bytes([0x00]))
+          pvm = CyPVM(program)
+          print('[+] Successfully created CyPVM instance')
+          print('[+] Interpreter mode test: PASSED')
+          "
+
+      - name: Test Recompiler Mode (Linux x86_64 only)
+        if: matrix.test_recompiler == true
+        shell: bash
+        continue-on-error: true
+        run: |
+          echo "Testing PVM_MODE=recompiler..."
+          PVM_MODE=recompiler python -c "
+          try:
+              from tsrkit_pvm.recompiler.pvm import Recompiler
+              from tsrkit_pvm.common.program import Program
+              print('[+] Successfully imported Recompiler')
+              # Create a simple program
+              program = Program(code=bytes([0x00]))
+              pvm = Recompiler(program)
+              print('[+] Successfully created Recompiler instance')
+              print('[+] Recompiler mode test: PASSED')
+          except ImportError as e:
+              print('[!] Recompiler mode test: FAILED (expected - tsrkit-asm not yet on PyPI)')
+              print(f'[!] Import error: {e}')
+              exit(1)
+          except Exception as e:
+              print(f'[!] Recompiler mode test: FAILED with error: {e}')
+              exit(1)
+          "
+
+      - name: Summary
+        shell: bash
+        run: |
+          if [ "${{ matrix.test_recompiler }}" = "true" ]; then
+            echo "Platform: ${{ matrix.os }} ${{ matrix.arch }}"
+            echo "✓ Interpreter mode: Available"
+            echo "⚠ Recompiler mode: Expected to fail until tsrkit-asm is published to PyPI"
+          else
+            echo "Platform: ${{ matrix.os }} ${{ matrix.arch }}"
+            echo "✓ Interpreter mode: Available"
+            echo "- Recompiler mode: Not supported on this platform"
+          fi
+
   build_sdist:
     name: Build source distribution
     runs-on: ubuntu-22.04
@@ -100,7 +209,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: [build_wheels, build_sdist]
+    needs: [build_wheels, test_wheels, build_sdist]
     runs-on: ubuntu-22.04
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
