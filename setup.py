@@ -1,12 +1,34 @@
 import os
-from setuptools import setup, find_packages
+import platform
+import sys
+from setuptools import setup, find_packages, Extension
+
+def should_build_recompiler():
+    """Determine if recompiler should be built on this platform."""
+    is_linux = sys.platform.startswith('linux')
+    is_x86_64 = platform.machine() in ('x86_64', 'AMD64')
+    return is_linux and is_x86_64
 
 if __name__ == "__main__":
     # Check if Cython mode is requested
     PVM_BUILD_MODE = os.environ.get("PVM_BUILD_MODE", "plain").lower()
     print(f"Building with PVM_BUILD_MODE={PVM_BUILD_MODE}")
-    
+    print(f"Platform: {sys.platform}, Architecture: {platform.machine()}")
+    print(f"Recompiler support: {'Yes' if should_build_recompiler() else 'No (requires Linux x86_64)'}")
+
     ext_modules = []  # Default to no compiled extensions
+
+    # Build recompiler's segwrap C extension only on Linux x86_64
+    if should_build_recompiler():
+        segwrap_ext = Extension(
+            'tsrkit_pvm.recompiler.segwrap._segwrap',
+            sources=['tsrkit_pvm/recompiler/segwrap/segwrap.c'],
+            extra_compile_args=['-O3', '-Wall'],
+        )
+        ext_modules.append(segwrap_ext)
+        print("✓ Building recompiler segwrap extension")
+    else:
+        print("⊗ Skipping recompiler segwrap extension (Linux x86_64 only)")
 
     if PVM_BUILD_MODE == "cython":
         # Use Cython compilation

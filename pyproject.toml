@@ -4,22 +4,40 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tsrkit-pvm"
-version = "0.1.0"
+version = "0.2.0"
 description = "Polkadot Virtual Machine (PVM) implementation with interpreter and recompiler as specified in GP"
 readme = "README.md"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.12,<3.13"
 license = "MIT"
 authors = [
     {name = "Chainscore Labs", email = "hello@chainscore.finance"},
 ]
+keywords = ["polkadot", "pvm", "virtual-machine", "blockchain", "jam", "recompiler", "interpreter"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Cython",
+    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+]
 
 dependencies = [
-    "tsrkit-types", # Remove version constraint for workspace
+    "tsrkit-types>=1.0.0,<2.0.0",
     "bitarray>=3.7.1,<4.0.0",
     "setuptools>=80.9.0",
     "mypy>=1.18.1",
     "cython>=3.1.4",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Chainscore/tsrkit-pvm"
+Repository = "https://github.com/Chainscore/tsrkit-pvm"
+Issues = "https://github.com/Chainscore/tsrkit-pvm/issues"
 
 [project.optional-dependencies]
 dev = [
