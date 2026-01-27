@@ -6,11 +6,4 @@ through just-in-time compilation and other optimization techniques.
 This module is currently under development.
 """
 
-# Placeholder for future recompiler implementation
-__all__ = []
-
-# TODO: Implement recompiler components
-# - JIT compiler
-# - Optimization passes
-# - Code generation
-# - Performance profiling
+__all__: list[str] = []

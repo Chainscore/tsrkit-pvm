@@ -1,20 +1,33 @@
 from math import floor
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 from tsrkit_pvm.core.program_base import Program
 from ..common.constants import PVM_ADDR_ALIGNMENT
 from ..common.status import CONTINUE, HALT, PANIC, ExecutionStatus, PvmError
-from .instructions.inst_map import inst_map
+from .instructions.inst_map import BlockInfo, inst_map
 
 
 class INT_Program(Program):
     """This is the program blob which the PVM will execute."""
-
-    _skip_cache: list[int]
-    _basic_blocks_set: set[int]
-
-    def __post_init__(self):
+    
+    def __post_init__(self) -> None:
         super().__post_init__()
-        self._precompute_skip_values()
+        # Initialize instance attributes
+        self._skip_cache: list[int] = []
+        self._basic_blocks_set: set[int] = set()
+        self._exec_blocks: Dict[int, BlockInfo] = {}
+        
+        # Pre-compute skip values for all positions to eliminate runtime overhead.
+        bitmask_len = len(self.offset_bitmask)
+        self._skip_cache = [0] * bitmask_len
+        
+        for i in range(bitmask_len):
+            skip_value = bitmask_len
+            for j in range(i + 1, bitmask_len + 1):
+                if self._extended_bitmask[j]:
+                    skip_value = j - i - 1
+                    break
+            self._skip_cache[i] = min(24, skip_value)
+            
         basic_blocks = [0]
         for n in range(len(self.instruction_set)):
             if (
@@ -27,22 +40,10 @@ class INT_Program(Program):
         
         self.basic_blocks = basic_blocks
         self._basic_blocks_set = set(self.basic_blocks)
-
-    def _precompute_skip_values(self):
-        """Pre-compute skip values for all positions to eliminate runtime overhead."""
-        # Use list instead of dict for faster indexed access
-        bitmask_len = len(self.offset_bitmask)
-        self._skip_cache = [0] * bitmask_len
+        self.jump_table_len = len(self.jump_table)
         
-        for i in range(bitmask_len):
-            skip_value = bitmask_len
-            for j in range(i + 1, bitmask_len + 1):
-                if self._extended_bitmask[j]:
-                    skip_value = j - i - 1
-                    break
-            self._skip_cache[i] = min(24, skip_value)
 
-    def skip(self, pc) -> int:
+    def skip(self, pc: int) -> int:
         """
         Skip the instructions until the next opcode is found.
         Args:
@@ -51,7 +52,10 @@ class INT_Program(Program):
             Distance to the next opcode.
         """
         # Direct list access is faster than dict.get()
-        return self._skip_cache[pc] if pc < len(self._skip_cache) else 0
+        try: 
+            return self._skip_cache[pc]
+        except IndexError:
+            return 0
 
     def branch(
         self, counter: int, branch: int, condition: bool
@@ -68,7 +72,7 @@ class INT_Program(Program):
         index = floor(a // PVM_ADDR_ALIGNMENT) - 1
         if (
             a == 0
-            or index > len(self.jump_table)
+            or index >= self.jump_table_len
             or a % PVM_ADDR_ALIGNMENT != 0
             or self.jump_table[index] not in self._basic_blocks_set
         ):

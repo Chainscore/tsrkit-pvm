@@ -1,14 +1,20 @@
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 from ...memory import Memory
 from ....common.status import CONTINUE, PANIC, PvmError
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
-
 class InstructionsWoArgs(InstructionTable):
-    def get_props(self):
-        return ()
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+    def get_props(self) -> list[int]:
+        return []
     
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -19,13 +25,13 @@ class InstructionsWoArgs(InstructionTable):
             ),
         }
 
-    def trap(self, registers: list, memory: Memory) -> OpReturn:
+    def trap(self, registers: list[int], memory: Memory) -> OpReturn:
         """
         OPC0: Trap the execution.
         """
         raise PvmError(PANIC)
 
-    def fallthrough(self, registers: list, memory: Memory) -> OpReturn:
+    def fallthrough(self, registers: list[int], memory: Memory) -> OpReturn:
         """
         OPC1: Fall through to the next instruction.
         """

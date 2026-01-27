@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Tuple
+from logging import Logger
+from typing import Any, List, Tuple, Union
 from tsrkit_pvm.core.ipvm import PVM
 from .instructions.inst_map import inst_map
 from .memory import INT_Memory
@@ -18,7 +19,7 @@ class Interpreter(PVM):
         gas: int,
         registers: List[int],
         memory: INT_Memory,
-        logger=None,
+        logger: Union[Any, None] = None,
     ) -> Tuple[ExecutionStatus, int, int, list, INT_Memory]:
         """
         Execute the program blob `p` as per Psi specification.
@@ -122,7 +123,3 @@ class Interpreter(PVM):
             )
 
         return status, program_counter, remaining_gas, registers, memory
-
-
-# Export Interpreter as PVM for backward compatibility
-PVM = Interpreter

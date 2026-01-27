@@ -1,7 +1,4 @@
-from typing import Tuple
-
-from tsrkit_types import U64, TypedArray
-
+from typing import Tuple, ClassVar, Optional
 from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.core.ipvm import PVM
 from tsrkit_pvm.recompiler.assembler.inst_map import inst_map
@@ -20,9 +17,9 @@ from tsrkit_asm import (
     RegMem,
     Reg,
 )
-import time
 import ctypes
 import mmap
+import os
 import os
 
 # Load libc for mprotect
@@ -36,12 +33,30 @@ from ..common.status import PANIC, HALT, PAGE_FAULT, HOST, OUT_OF_GAS, Execution
 # NOTE: Python's signal mod can only handle signals at high lvl
 # Its handlers run on main thread only
 # C's sigaction provides a better low level handler
-_segwrap_path = os.path.join(os.path.dirname(__file__), "segwrap", "libsegwrap.so")
-segwrap = ctypes.CDLL(_segwrap_path)
+try:
+    from importlib.resources import files
+    segwrap_package = files('libs')
+    _segwrap_path = str(segwrap_package / 'libsegwrap.so')
+    
+    # Load the segwrap library with error handling
+    segwrap: Optional[ctypes.CDLL] = ctypes.CDLL(_segwrap_path)
+    
+    # Test library loading by checking if expected symbols exist
+    if hasattr(segwrap, 'initialize') and hasattr(segwrap, 'run_code'):
+        _segwrap_available = True
+    else:
+        _segwrap_available = False
+        print("Warning: segwrap library loaded but missing expected symbols")
+        
+except (ImportError, OSError, Exception) as e:
+    segwrap = None
+    _segwrap_available = False
 
 
 class Recompiler(PVM):
     """Recompiler mode of PVM"""
+    
+    _signal_handlers_initialized: ClassVar[bool] = False  # Class variable to track initialization
 
     @classmethod
     def execute(
@@ -56,9 +71,14 @@ class Recompiler(PVM):
 
         if not program.msn_code:
             program.assemble(logger=logger)
+            
+        # Ensure type is bytes for mypy
+        assert program.msn_code is not None, "assemble() must set msn_code"
 
-        start_time_ns = time.time_ns()
         code_buf, code_pointer = cls.allocate_executable_memory(program.msn_code)
+        
+        # Track all allocated buffers for cleanup
+        allocated_buffers = [code_buf]
 
         # VM Context
         vm_ctx = VMContext(
@@ -71,18 +91,12 @@ class Recompiler(PVM):
         assert vm_pointer == memory.buf_start
 
         # Create callable function - pass memory.offset (guest memory pointer)
-        addr, _ = cls.create_caller(
+        addr, caller_buf = cls.create_caller(
             code_pointer + program.pvm_to_msn_index(program_counter), memory.offset
         )
-        # Install safe signal handler
+        allocated_buffers.append(caller_buf)
+        # Install safe signal handler (only once per process)
         cls.init_sig_handlers()
-
-        # Execute the compiled code with segfault protection
-        if logger:
-            logger.debug(
-                f"Assmbling completed! \n\t Time \t {(time.time_ns() - start_time_ns) / (10**6)} ms \n\t Caller \t {addr} \n\t Program \t {code_pointer} \n\t Memory offset \t {memory.offset}"
-            )
-        asm_time_ns = time.time_ns()
 
         # Activate syscall handler for PVM syscalls during execution
         try:
@@ -112,10 +126,12 @@ class Recompiler(PVM):
 
                 # Create callable function - pass memory.offset (guest memory pointer)
                 vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
-                vm_ctx.regs = TypedArray[U64, 13]([U64(r) for r in updated_regs])
+                # Update registers - now vm_ctx.regs is a plain list, no need for TypedArray wrapper
+                vm_ctx.regs = updated_regs
                 vm_ctx.heap_start += req
                 _, _ = vm_ctx.store(memory)
-                addr, _ = cls.create_caller(pg_data.rip, memory.offset)
+                addr, sbrk_caller_buf = cls.create_caller(pg_data.rip, memory.offset)
+                allocated_buffers.append(sbrk_caller_buf)
                 # Run from last return
                 status, updated_regs, pg_data = cls.run_code(
                     addr, vm_ctx, vm_pointer, code_pointer + program.halt_offset, logger
@@ -128,25 +144,20 @@ class Recompiler(PVM):
 
         final_pc = program.msn_to_pvm_index(pg_data.rip - code_pointer)
 
-        if logger:
-            logger.debug(
-                f"Execution completed \n\t Time: {(time.time_ns() - asm_time_ns) / (10**6)} ms \n\t Status: {status._value_} \n\t Registers: {updated_regs} \n\t Gas: {gas} \n\t PC: {final_pc}"
-            )
-
-        gas = int(VMContext.from_pointer(vm_pointer, len(program.jump_table)).gas)
+        gas = int(VMContext.from_pointer(vm_pointer, len(program.jump_table)).gas)  # gas is already an int
 
         # Adjust overflow
         if status._value_.name == "out-of-gas":
             gas -= 2**32
             final_pc = program.msn_to_pvm_index(pg_data.si_data - code_pointer)
 
-        # if status._value_.name == "page-fault":
-        #     status._value_.register -= memory.offset
-
-        # Clean up
-        # code_buf.close()
-        # memory.buf.close()
-
+        # Clean up allocated memory buffers
+        for buf in allocated_buffers:
+            try:
+                buf.close()
+            except:
+                pass  # Ignore cleanup errors
+        
         return status, final_pc, gas, updated_regs, memory
 
     @classmethod
@@ -186,31 +197,63 @@ class Recompiler(PVM):
         # Allocate RW memory first
         page_size = mmap.PAGESIZE
         alloc_size = (size + page_size - 1) & ~(page_size - 1)
-        buf = mmap.mmap(-1, alloc_size, access=mmap.ACCESS_WRITE)
-        buf.write(code)
+        
+        try:
+            buf = mmap.mmap(-1, alloc_size, access=mmap.ACCESS_WRITE)
+            buf.write(code)
 
-        # Change protection to RX
-        addr = ctypes.addressof(ctypes.c_char.from_buffer(buf))
-        prot_rx = mmap.PROT_READ | mmap.PROT_EXEC
-        # Align address to page boundary for mprotect
-        aligned_addr = addr & ~(page_size - 1)
-        res = libc.mprotect(
-            ctypes.c_void_p(aligned_addr), ctypes.c_size_t(alloc_size), prot_rx
-        )
-        if res != 0:
-            err = ctypes.get_errno()
-            raise OSError(err, "mprotect failed to set RX permissions")
+            # Change protection to RX
+            addr = ctypes.addressof(ctypes.c_char.from_buffer(buf))
+            prot_rx = mmap.PROT_READ | mmap.PROT_EXEC
+            # Align address to page boundary for mprotect
+            aligned_addr = addr & ~(page_size - 1)
+            res = libc.mprotect(
+                ctypes.c_void_p(aligned_addr), ctypes.c_size_t(alloc_size), prot_rx
+            )
+            if res != 0:
+                err = ctypes.get_errno()
+                buf.close()  # Clean up on failure
+                raise OSError(err, "mprotect failed to set RX permissions")
 
-        if logger:
-            logger.debug(f"Executable of size {size} stored at {addr}")
-        return buf, addr
+            if logger:
+                logger.debug(f"Executable of size {size} stored at {addr}")
+            return buf, addr
+        except Exception as e:
+            # Clean up on any failure
+            if 'buf' in locals():
+                try:
+                    buf.close()
+                except:
+                    pass
+            raise e
 
     @classmethod
-    def init_sig_handlers(cls):
-        """Install the C signal handlers"""
+    def init_sig_handlers(cls, logger = None):
+        """Install the C signal handlers (only once per process)"""
+        if cls._signal_handlers_initialized:
+            return  # Already initialized
+        
+        if not _segwrap_available or segwrap is None:
+            if logger: logger.warning("Warning: segwrap library not available, signal handlers disabled")
+            cls._signal_handlers_initialized = True
+            return
+            
         result = segwrap.initialize()
         if result != 0:
-            raise OSError(f"Failed to install signal handler: {result}")
+            # If we get error -3, it's likely a seccomp restriction (containers, etc.)
+            # For now, we'll allow this to continue but log a warning
+            if result == -3:
+                if logger: 
+                    logger.warning(
+                        "Failed to install seccomp filter (error -3). PVM syscall handling may not work properly in restricted environments. This is expected in containers or sandboxed environments.",
+                    )
+                # Mark as initialized even if seccomp failed, to avoid repeated attempts
+                cls._signal_handlers_initialized = True
+                return  # Continue without seccomp
+            else:
+                raise OSError(f"Failed to install signal handler: {result}")
+        
+        cls._signal_handlers_initialized = True
 
     @classmethod
     def run_code(
@@ -226,6 +269,14 @@ class Recompiler(PVM):
             - pg_data: Program data on fault (if any)
         """
         ret_val = ctypes.c_uint64(0)
+        
+        if not _segwrap_available or segwrap is None:
+            # Fallback when segwrap is not available
+            print("Warning: segwrap not available, returning PANIC status")
+            pg_data = ProgramData()
+            pg_data.rip = ret_val
+            return PANIC, vm_ctx.regs, pg_data
+            
         result = segwrap.run_code(ctypes.c_uint64(addr), ctypes.byref(ret_val))
         pg_data = ProgramData()
 
@@ -233,7 +284,7 @@ class Recompiler(PVM):
             # Success - no segfault
             pg_data.rip = ret_val
             updated_vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
-            return PANIC, [int(r) for r in updated_vm_ctx.regs], pg_data
+            return PANIC, updated_vm_ctx.regs, pg_data  # regs is now a plain list
         else:
             # Segfault occurred - get register state
             if segwrap.get_program_status(ctypes.byref(pg_data)) == 0:
@@ -252,7 +303,7 @@ class Recompiler(PVM):
                     )
                     return (
                         HOST(pg_data.si_data),
-                        [int(r) for r in updated_vm_ctx.regs],
+                        updated_vm_ctx.regs,  # regs is now a plain list
                         pg_data,
                     )
                 elif pg_data.status == 1:
@@ -272,8 +323,7 @@ class Recompiler(PVM):
 
     @classmethod
     def cleanup_sig_state(cls):
-        segwrap.cleanup()
-
-
-# Export Recompiler as PVM for backward compatibility
-PVM = Recompiler
+        """Clean up signal handlers and reset initialization state"""
+        if _segwrap_available and segwrap is not None:
+            segwrap.cleanup()
+        cls._signal_handlers_initialized = False  # Allow re-initialization

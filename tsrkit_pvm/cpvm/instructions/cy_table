@@ -1,0 +1,5 @@
+cdef class CyTable:
+    cdef tuple[uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rc] get_props(uint32_t program_counter, CyProgram: program):
+        ...
+
+    table: dict[int -> (instr_fn_t, gas, is_terminating)]

@@ -1,4 +1,7 @@
-from typing import Any, Callable, Dict
+from typing import Any, TYPE_CHECKING, Callable, Dict
+
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 
 from ...memory import Memory
 from ....common.status import CONTINUE
@@ -6,9 +9,13 @@ from ....common.utils import chi, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
-
 class InstructionsWArgs2Imm(InstructionTable):
-    def get_props(self):
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+    def get_props(self) -> list[int]:
         lx = clamp_4(self.program.zeta[self.counter + 1])
         ly = clamp_4_max0(self.skip_index - int(lx) - 1)
         
@@ -25,8 +32,8 @@ class InstructionsWArgs2Imm(InstructionTable):
             int.from_bytes(self.program.zeta[start:end], "little"),
             ly,
         )
-        
-        return (lx, ly, vx, vy)
+
+        return [lx, ly, vx, vy]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -46,7 +53,7 @@ class InstructionsWArgs2Imm(InstructionTable):
         }
 
     @staticmethod
-    def store_imm(bit_size: int) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
+    def store_imm(bit_size: int) -> Callable[..., OpReturn]:
         """Store an immediate value into memory. Implements the store_imm_u8, store_imm_u16, store_imm_u32, and store_imm_u64 instructions.
 
         Args:
@@ -56,7 +63,7 @@ class InstructionsWArgs2Imm(InstructionTable):
             Callable[[Registers, Memory], Tuple[ExecutionStatus, Registers, Memory]]: The function to store the immediate value into memory.
         """
 
-        def store_imm_impl(self, registers: list, memory: Memory, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
+        def store_imm_impl(self: "InstructionsWArgs2Imm", registers: list[int], memory: Memory, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
             memory.write(
                 vx, int(vy % 2**bit_size).to_bytes(bit_size // 8, "little")
             )

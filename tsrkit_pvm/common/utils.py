@@ -1,9 +1,8 @@
 """Common utilities shared across PVM implementations."""
 
+import operator
 from .constants import PVM_INIT_ZONE_SIZE, PVM_MEMORY_PAGE_SIZE
-from math import ceil
-import math
-from typing import List, Union
+from typing import List, Union, Any
 
 _PVM_MEMORY_PAGE_SHIFT = 12  # log2(PVM_MEMORY_PAGE_SIZE) = log2(4096) = 12
 _PVM_INIT_ZONE_SHIFT = 16   # log2(PVM_INIT_ZONE_SIZE) = log2(65536) = 16
@@ -59,7 +58,6 @@ def chi(value: int, n: int) -> int:
     
     # Optimized: pre-calculate bit shifts and avoid repeated power calculations
     bit_pos = (n << 3) - 1  # 8 * n - 1
-    threshold = 1 << bit_pos  # 2 ** (8 * n - 1)
     multiplier = (1 << 64) - (1 << (n << 3))  # 2**64 - 2 ** (8 * n)
     return value + ((value >> bit_pos) * multiplier)
 
@@ -90,20 +88,33 @@ def z_inv(x: int, n: int) -> int:
     return (modulus + x) & (modulus - 1)  # equivalent to % 2**(8*n)
 
 
-def b(value: int, byte_size: int, is_reversed=False) -> List[int]:
+BYTE_TO_BITS = [tuple(((b >> i) & 1) for i in range(8)) for b in range(256)]
+BYTES_TO_BYTE = {bytes(bits): b for b, bits in enumerate(BYTE_TO_BITS)}
+
+def b(value: int, byte_size: int, is_reversed: bool = False) -> List[int]:
     """Convert integer to list of bits."""
-    # Handle edge case where byte_size is 0
     if byte_size <= 0:
         return []
-    
-    bit_count = byte_size << 3  # 8 * byte_size
-    result = [(value >> i) & 1 for i in range(bit_count)]
-    if is_reversed:
-        result.reverse()
-    return result
 
+    bit_count = byte_size << 3
+    out = [0] * bit_count  # preallocate list of correct size
 
-def b_inv(value: List[int], is_reversed=False) -> int:
+    if not is_reversed:
+        for byte_index in range(byte_size):
+            byte = (value >> (byte_index * 8)) & 0xFF
+            bits = BYTE_TO_BITS[byte]
+            base = byte_index * 8
+            out[base:base+8] = bits
+    else:
+        for byte_index in range(byte_size):
+            byte = (value >> (byte_index * 8)) & 0xFF
+            bits = BYTE_TO_BITS[byte][::-1]
+            base = bit_count - (byte_index+1)*8
+            out[base:base+8] = bits
+
+    return out
+
+def b_inv(value: List[int], is_reversed: bool = False) -> int:
     """Convert list of bits to integer."""
     # avoid repeated list operations and use enumerate
     if is_reversed:
@@ -120,18 +131,18 @@ def b_inv(value: List[int], is_reversed=False) -> int:
 
 # Pre-computed comparison operations lookup table for performance
 _COMPARISON_OPS = {
-    'eq': lambda a, b: a == b,
-    'ne': lambda a, b: a != b, 
-    'lt': lambda a, b: a < b,
-    'le': lambda a, b: a <= b,
-    'gt': lambda a, b: a > b,
-    'ge': lambda a, b: a >= b,
-    'and': lambda a, b: a & b,
-    'or': lambda a, b: a | b,
-    'xor': lambda a, b: a ^ b,
+    'eq' : operator.eq,
+    'ne' : operator.ne,
+    'lt' : operator.lt,
+    'le' : operator.le,
+    'gt' : operator.gt,
+    'ge' : operator.ge,
+    'and': operator.and_,
+    'or' : operator.or_,
+    'xor': operator.xor,
 }
 
-def compare(a: Union[int, bool], b: Union[int, bool], op: str) -> bool:
+def compare(a: Union[int, bool], b: Union[int, bool], op: str) -> Any:
     """Compare two values using the specified operation."""
     # Use lookup table for common operations (much faster than getattr)
     if op in _COMPARISON_OPS:
@@ -140,8 +151,7 @@ def compare(a: Union[int, bool], b: Union[int, bool], op: str) -> bool:
     # Fallback to dynamic lookup for less common operations
     return getattr(a, f"__{op}__")(b)
 
-
-def compare_bits_vectorized(bits_a: List[int], bits_b: List[int], op: str) -> List[int]:
+def compare_bits_vectorized(bits_a: List[Union[int, bool]], bits_b: List[int], op: str) -> List[int]:
     """Vectorized bit comparison for 64-bit operations - much faster than loop."""
     if op == 'and':
         return [a & b for a, b in zip(bits_a, bits_b)]

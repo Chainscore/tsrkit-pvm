@@ -11,8 +11,10 @@ from ..common.constants import (
     PVM_MEMORY_PAGE_SIZE,
     REGISTER_COUNT,
 )
+import os
 from .memory import INT_Memory as Memory
 from .program import INT_Program as Program
+
 from .pvm import Interpreter as PVM
 from ..common.status import (
     CONTINUE,

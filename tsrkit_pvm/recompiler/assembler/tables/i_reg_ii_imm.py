@@ -4,6 +4,11 @@ from tsrkit_pvm.common.utils import chi, z
 
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode
+from ....core.program_base import Program
+
+if TYPE_CHECKING:
+    from ...program import REC_Program
+
 from ...vm_context import r_map, TEMP_REG, rindex_map
 
 from tsrkit_asm import (
@@ -21,6 +26,11 @@ from tsrkit_asm import (
 
 
 class InstructionsWArgs1Reg2Imm(InstructionTable):
+    def __init__(self, counter: int, program: Program, skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
     def get_props(self):
         ra = min(12, self.program.zeta[self.counter + 1] % 16)
         lx = min(4, (self.program.zeta[self.counter + 1] // 16) % 8)
@@ -47,7 +57,7 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
 
     @staticmethod
     def store_imm_ind(size: Size):
-        def store_imm_ind(self, asm: PyAssembler):
+        def store_imm_ind(self, asm: PyAssembler, ra: int, lx: int, ly: int, vx: int, vy: int):
             """u<size>[ra + vx] = vy"""
             asm.mov_imm64(TEMP_REG, vy)
             # Store immediate value to calculated address

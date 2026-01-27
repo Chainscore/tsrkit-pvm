@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 
 from tsrkit_asm import Reg
 
@@ -6,9 +6,18 @@ from tsrkit_pvm.recompiler.assembler.utils import pop_all_regs, save_all_regs
 
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode
+from ....core.program_base import Program
+
+if TYPE_CHECKING:
+    from ...program import REC_Program
 
 
 class InstructionsWArgs1Imm(InstructionTable):
+    def __init__(self, counter: int, program: Program, skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
     def get_props(self):
         lx = min(4, self.skip_index)
         start = self.counter + 1

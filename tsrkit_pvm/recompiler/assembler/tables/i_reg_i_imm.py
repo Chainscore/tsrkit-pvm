@@ -5,6 +5,11 @@ from tsrkit_pvm.common.utils import chi, z, z_inv
 
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode
+from ....core.program_base import Program
+
+if TYPE_CHECKING:
+    from ...program import REC_Program
+
 from ...vm_context import VMContext, r_map, TEMP_REG
 
 from tsrkit_asm import (
@@ -24,6 +29,12 @@ from tsrkit_asm import (
 
 
 class InstructionsWArgs1Reg1Imm(InstructionTable):
+    def __init__(self, counter: int, program: Program, skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+
     def get_props(self):
         ra = min(12, int(self.program.zeta[self.counter + 1]) % 16)
         lx = min(4, max(0, self.skip_index - 1))

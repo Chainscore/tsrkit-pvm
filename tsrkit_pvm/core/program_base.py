@@ -1,10 +1,10 @@
-from dataclasses import field
 from typing import List, Union, Tuple
-from tsrkit_types import Bits, Uint, structure
+from dataclasses import dataclass, field
+from tsrkit_types import Bits, Uint
 from tsrkit_pvm.common.extended import ExtendedList
 
 
-@structure
+@dataclass
 class Program:
     """
     Abstract base class for Program implementations.
@@ -20,8 +20,9 @@ class Program:
     jump_table: List
     instruction_set: bytes
     offset_bitmask: List
+    basic_blocks: List[int] = field(default_factory=list, init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Pre-compute and cache frequently accessed values
         self._extended_bitmask = self.offset_bitmask + [True] * 1000 # ExtendedList(self.offset_bitmask, default=True)
         self.zeta = self.instruction_set + bytes([0] * 1000) # ExtendedList(self.instruction_set, default=0)
@@ -44,7 +45,7 @@ class Program:
             total_size += Uint[self.z * 8](jump).encode_size()
         total_size += len(self.instruction_set)
         total_size += Bits[len(self.instruction_set)](self.offset_bitmask).encode_size()
-        return total_size
+        return int(total_size)
 
     def encode_into(self, buffer: bytearray, offset: int = 0) -> int:
         """Encode the program bytecode into a buffer.
@@ -54,7 +55,7 @@ class Program:
             offset: Offset of the buffer to start encoding from
         """
         total_size = self.encode_size()
-        self._check_buffer_size(buffer, total_size, offset)
+        # self._check_buffer_size(buffer, total_size, offset)  # TODO: Implement if needed
         current_offset = offset
         size = Uint[8](len(self.jump_table)).encode_into(buffer, current_offset)
         current_offset += size
@@ -62,8 +63,9 @@ class Program:
         current_offset += size
         size = Uint(len(self.instruction_set)).encode_into(buffer, current_offset)
         current_offset += size
+        JumpInt = Uint[self.z * 8]
         for jump in self.jump_table:
-            size = Uint[self.z * 8](jump).encode_into(buffer, current_offset)
+            size = JumpInt(jump).encode_into(buffer, current_offset)
             current_offset += size
 
         buffer[current_offset : current_offset + len(self.instruction_set)] = (
@@ -74,7 +76,7 @@ class Program:
             buffer, current_offset
         )
         current_offset += size
-        return current_offset - offset
+        return int(current_offset - offset)
 
     @classmethod
     def decode_from(
@@ -98,27 +100,57 @@ class Program:
         bytes_read += size
         current_offset += size
 
-        z, size = Uint[8].decode_from(buffer, current_offset)
+        z, size = int.from_bytes(buffer[current_offset : current_offset + 1], "little"), 1
         bytes_read += size
         current_offset += size
-
+        
         c_len, size = Uint.decode_from(buffer, current_offset)
         bytes_read += size
         current_offset += size
-
+        
         j: List = []
         for _ in range(j_len):
-            val, size = Uint[z * 8].decode_from(buffer, current_offset)
-            bytes_read += size
-            current_offset += size
+            val = int.from_bytes(buffer[current_offset : current_offset + z], "little")
+            bytes_read += z
+            current_offset += z
             j.append(int(val))
 
-        c = buffer[current_offset : current_offset + c_len]
+        c = bytes(buffer[current_offset : current_offset + c_len])
         current_offset += c_len
 
-        offset_bitmask, size = Bits[c_len, "lsb"].decode_from(buffer, current_offset)
-        bytes_read += size
-        current_offset += size
+        # Optimized bit decoding with minimal operations
+        bit_bytes_needed = (c_len + 7) // 8
+        bit_data = buffer[current_offset : current_offset + bit_bytes_needed]
+        
+        # Pre-allocate list with exact size for better performance
+        offset_bitmask = [False] * c_len
+        
+        # Process bits 8 at a time when possible
+        full_bytes = c_len // 8
+        for byte_idx in range(full_bytes):
+            byte_val = bit_data[byte_idx] if byte_idx < len(bit_data) else 0
+            base_idx = byte_idx << 3  # Equivalent to byte_idx * 8, but faster
+            
+            # Unrolled bit extraction for maximum speed
+            offset_bitmask[base_idx] = bool(byte_val & 1)
+            offset_bitmask[base_idx + 1] = bool(byte_val & 2)
+            offset_bitmask[base_idx + 2] = bool(byte_val & 4)
+            offset_bitmask[base_idx + 3] = bool(byte_val & 8)
+            offset_bitmask[base_idx + 4] = bool(byte_val & 16)
+            offset_bitmask[base_idx + 5] = bool(byte_val & 32)
+            offset_bitmask[base_idx + 6] = bool(byte_val & 64)
+            offset_bitmask[base_idx + 7] = bool(byte_val & 128)
+        
+        # Handle remaining bits
+        remaining_bits = c_len & 7  # Equivalent to c_len % 8, but faster
+        if remaining_bits and full_bytes < len(bit_data):
+            byte_val = bit_data[full_bytes]
+            base_idx = full_bytes << 3
+            for bit_idx in range(remaining_bits):
+                offset_bitmask[base_idx + bit_idx] = bool(byte_val & (1 << bit_idx))
+        
+        bytes_read += bit_bytes_needed
+        current_offset += bit_bytes_needed
 
         return cls(int(z), j, c, list(offset_bitmask)), bytes_read
 
@@ -135,10 +167,12 @@ class Program:
         value, _ = Program.decode_from(data)
         return value
 
-    def __repr__(self):
-        return f"Program(z={self.z}, jump_table={self.jump_table}, instruction_set={self.instruction_set}, offset_bitmask={self.offset_bitmask})"
+    def __repr__(self) -> str:
+        return f"Program(z={self.z}, jump_table={self.jump_table}, instruction_set={self.instruction_set!r}, offset_bitmask={self.offset_bitmask})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Program):
+            return NotImplemented
         return (
             self.z == other.z
             and self.jump_table == other.jump_table

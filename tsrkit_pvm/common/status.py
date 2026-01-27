@@ -1,9 +1,9 @@
-from typing import Optional
-from tsrkit_types.enum import Enum
-from tsrkit_types.struct import structure
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Optional
 
 
-@structure
+@dataclass
 class ExecValue:
     name: str
     code: int
@@ -34,37 +34,34 @@ class HostStatus(Enum):
 
 # Constructured statuses to use directly
 # Panic
-PANIC = ExecutionStatus.PANIC
+PANIC: ExecutionStatus = ExecutionStatus(ExecutionStatus.PANIC)
 
 
 # Page fault with a register value
 def PAGE_FAULT(register: int) -> ExecutionStatus:
-    result = ExecutionStatus.PAGE_FAULT
+    result: Any = ExecutionStatus.PAGE_FAULT
     result.value.register = register
-    return result
+    return ExecutionStatus(result)
 
 
 # Halt
-HALT = ExecutionStatus.HALT
-
+HALT: ExecutionStatus = ExecutionStatus(ExecutionStatus.HALT)
 
 # Host call with a register value
 def HOST(register: int) -> ExecutionStatus:
-    result = ExecutionStatus.HOST
+    result: Any = ExecutionStatus.HOST
     result.value.register = register
-    return result
-
+    return ExecutionStatus(result)
 
 # Out of gas
-OUT_OF_GAS = ExecutionStatus.OUT_OF_GAS
+OUT_OF_GAS: ExecutionStatus = ExecutionStatus(ExecutionStatus.OUT_OF_GAS)
 # Continue
-CONTINUE = ExecutionStatus.CONTINUE
-
+CONTINUE: ExecutionStatus = ExecutionStatus(ExecutionStatus.CONTINUE)
 
 class PvmError(Exception):
-    def __init__(self, code: ExecutionStatus, message: str = ""):
+    def __init__(self, code: ExecutionStatus, message: str = "") -> None:
         self.code = code
         self.message = message
 
-    def __str__(self):
-        return f"{self.code.value.name}: {self.message}"
+    def __str__(self) -> str:
+        return f"{self.code.name}: {self.message}"

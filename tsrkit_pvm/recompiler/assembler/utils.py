@@ -1,8 +1,8 @@
-from tsrkit_asm import LoadKind, MemOp, Reg, RegSize, Size
+from tsrkit_asm import LoadKind, MemOp, Reg, RegSize, Size, PyAssembler
 from ..vm_context import r_map, regs_offset
 
 
-def save_all_regs(asm):
+def save_all_regs(asm: PyAssembler) -> None:
     for i, reg in enumerate(r_map):
         asm.store(
             size=Size.U64,
@@ -13,7 +13,7 @@ def save_all_regs(asm):
         )
 
 
-def load_all_regs(asm):
+def load_all_regs(asm: PyAssembler) -> None:
     for i, reg in enumerate(r_map):
         # Load value from offset+i_bytes -> mapped register
         asm.load(
@@ -28,11 +28,11 @@ def load_all_regs(asm):
         )
 
 
-def push_all_regs(asm):
+def push_all_regs(asm: PyAssembler) -> None:
     for i in r_map:
         asm.push(i)
 
 
-def pop_all_regs(asm):
+def pop_all_regs(asm: PyAssembler) -> None:
     for i in reversed(r_map):
         asm.pop(i)

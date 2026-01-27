@@ -24,6 +24,16 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+/tsrkit_pvm/interpreter/**/*.so
+/tsrkit_pvm/recompiler/**/*.so
+/tsrkit_pvm/core/**/*.so
+/tsrkit_pvm/common/**/*.so
+/tsrkit_pvm/cpvm/**/*.c
+/tsrkit_pvm/cpvm/**/*.so
+/tsrkit_pvm/cpvm/**/*.html
+/tsrkit_pvm/cpvm/**/*.h
+*.so
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -144,4 +154,14 @@ Thumbs.db
 # Project specific
 *.log
 .coverage
-htmlcov/ 
+htmlcov/
+
+# Compiled extensions scattered in source tree (keep organized ones in _compiled/)
+tsrkit_pvm/**/*.so
+tsrkit_pvm/**/*.pyd
+!tsrkit_pvm/_compiled/*.so
+!tsrkit_pvm/_compiled/*.pyd
+
+# Generated C files from Cython
+tsrkit_pvm/**/*.c
+!tsrkit_pvm/recompiler/segwrap/segwrap.c 

@@ -1,14 +1,21 @@
 from math import floor
-from typing import Dict
+from typing import Dict, TYPE_CHECKING, Tuple
+
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 
 from ...memory import Memory
 from ....common.utils import chi, compare, z, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
 
-
 class InstructionsWArgs2Reg2Imm(InstructionTable):
-    def get_props(self):
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+    def get_props(self) -> list[int]:
         # Slice zeta once for better performance with large arrays
         zeta_slice = self.program.zeta[self.counter + 1:self.counter + 10]
         
@@ -34,7 +41,7 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
         else:
             vy = 0
         
-        return (ra, rb, lx, ly, vx, vy)
+        return [ra, rb, lx, ly, vx, vy]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -47,8 +54,8 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
             ),
         }
 
-    def load_imm_jump_ind(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
+    def load_imm_jump_ind(self, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, ly: int, vx: int, vy: int) -> OpReturn:
         wb = registers[rb]
         registers[ra] = vx
-        status, counter = self.program.djump(self.counter, floor(wb + vy) % 2**32)
+        status, counter = self.program.djump(self.counter, floor(wb + vy) % 2**32) 
         return status, counter, registers, memory

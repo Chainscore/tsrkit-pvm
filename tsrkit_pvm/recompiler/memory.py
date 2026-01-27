@@ -1,6 +1,7 @@
 import ctypes
 import mmap
 import os
+from bitarray import bitarray
 from tsrkit_pvm.common.types import Accessibility
 from tsrkit_pvm.common.utils import get_pages, total_page_size, total_zone_size
 from tsrkit_pvm.common.constants import (
@@ -22,8 +23,10 @@ class REC_Memory:
     buf_start = 0
     offset = -1
     heap_start = 0
-    _r_pages: set[int]  # Track readable pages
-    _w_pages: set[int]  # Track writable pages
+    _r_pages: bitarray  # Track readable pages as bits
+    _w_pages: bitarray  # Track writable pages as bits
+    _closed = False  # Track if memory has been closed
+    MAX_PAGES = 1 << 20  # 1M pages for 4GB address space
 
     def __init__(self, vm_size: int, heap_start=0):
         """
@@ -38,8 +41,24 @@ class REC_Memory:
         self.buf_start = ctypes.addressof(ctypes.c_char.from_buffer(self.buf))
         self.offset = self.buf_start + vm_size
         self.heap_start = heap_start
-        self._r_pages = set()
-        self._w_pages = set()
+        self._r_pages = bitarray(self.MAX_PAGES)
+        self._r_pages.setall(0)
+        self._w_pages = bitarray(self.MAX_PAGES)
+        self._w_pages.setall(0)
+        self._closed = False
+
+    def close(self):
+        """Close the memory mapping and clean up resources"""
+        if not self._closed and hasattr(self, 'buf'):
+            try:
+                self.buf.close()
+                self._closed = True
+            except:
+                pass  # Ignore errors during cleanup
+
+    def __del__(self):
+        """Ensure cleanup on garbage collection"""
+        self.close()
 
     @classmethod
     def from_initial(cls, initial_page_map: list, initial_data: list, vm_size: int):
@@ -87,35 +106,58 @@ class REC_Memory:
     def alter_accessibility(self, start: int, len_: int, access: Accessibility):
  
         if access == Accessibility.WRITE:
-            prot = mmap.PROT_WRITE
+            target_prot = mmap.PROT_READ | mmap.PROT_WRITE
         elif access == Accessibility.READ:
-            prot = mmap.PROT_READ
+            target_prot = mmap.PROT_READ
         else:
-            prot = mmap.MAP_PRIVATE
+            target_prot = 0  # PROT_NONE
 
         PAGE_SIZE = PVM_MEMORY_PAGE_SIZE
 
         pages = get_pages(start, len_)
 
         for pg in pages:
+            if pg >= self.MAX_PAGES:
+                continue  # Skip out-of-bounds pages
+
+            # Determine current protection
+            current_prot = 0
+            if self._w_pages[pg]:
+                current_prot = mmap.PROT_READ | mmap.PROT_WRITE
+            elif self._r_pages[pg]:
+                current_prot = mmap.PROT_READ
+
+            if current_prot == target_prot:
+                # Update bits to reflect the access
+                if access == Accessibility.WRITE:
+                    self._w_pages[pg] = 1
+                    self._r_pages[pg] = 0
+                elif access == Accessibility.READ:
+                    self._r_pages[pg] = 1
+                    self._w_pages[pg] = 0
+                else:
+                    self._r_pages[pg] = 0
+                    self._w_pages[pg] = 0
+                continue
+
+            # Update bits
             if access == Accessibility.WRITE:
-                self._w_pages.add(pg)
-                self._r_pages.discard(pg)
+                self._w_pages[pg] = 1
+                self._r_pages[pg] = 0
             elif access == Accessibility.READ:
-                self._r_pages.add(pg)
-                self._w_pages.discard(pg)
+                self._r_pages[pg] = 1
+                self._w_pages[pg] = 0
             else:
-                self._r_pages.discard(pg)
-                self._w_pages.discard(pg)
+                self._r_pages[pg] = 0
+                self._w_pages[pg] = 0
 
             start_addr = self.offset + pg * PAGE_SIZE
             aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
 
-            res = libc.mprotect(ctypes.c_void_p(aligned_addr), PAGE_SIZE, prot)
+            res = libc.mprotect(ctypes.c_void_p(aligned_addr), PAGE_SIZE, target_prot)
             if res != 0:
                 error = ctypes.get_errno()
-                print(f"Warning: mprotect failed for write page {pg}: {error}")
-
+                print(f"Warning: mprotect failed for page {pg} to {access}: {error}")
 
     @classmethod
     def from_pc(
@@ -166,36 +208,35 @@ class REC_Memory:
         # Set up memory protections for read pages (and make them executable)
         # Only set protection on pages that actually contain data or are explicitly needed
         for pg in read_pages:
-            start_addr = mem.offset + pg * PAGE_SIZE
-            # Page should already be aligned, but ensure it is
-            aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
+            if pg < mem.MAX_PAGES:
+                start_addr = mem.offset + pg * PAGE_SIZE
+                # Page should already be aligned, but ensure it is
+                aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
 
-            res = libc.mprotect(
-                ctypes.c_void_p(aligned_addr), PAGE_SIZE, mmap.PROT_READ
-            )
-            if res != 0:
-                error = ctypes.get_errno()
-                print(f"Warning: mprotect failed for read page {pg}: {error}")
+                res = libc.mprotect(
+                    ctypes.c_void_p(aligned_addr), PAGE_SIZE, mmap.PROT_READ
+                )
+                if res != 0:
+                    error = ctypes.get_errno()
+                    print(f"Warning: mprotect failed for read page {pg}: {error}")
+                mem._r_pages[pg] = 1
 
         # Set up memory protections for write pages
         for pg in write_pages:
-            start_addr = mem.offset + pg * PAGE_SIZE
-            aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
+            if pg < mem.MAX_PAGES:
+                start_addr = mem.offset + pg * PAGE_SIZE
+                aligned_addr = (start_addr // PAGE_SIZE) * PAGE_SIZE
 
-            res = libc.mprotect(
-                ctypes.c_void_p(aligned_addr),
-                PAGE_SIZE,
-                mmap.PROT_READ | mmap.PROT_WRITE,
-            )
-            if res != 0:
-                error = ctypes.get_errno()
-                print(f"Warning: mprotect failed for write page {pg}: {error}")
+                res = libc.mprotect(
+                    ctypes.c_void_p(aligned_addr),
+                    PAGE_SIZE,
+                    mmap.PROT_READ | mmap.PROT_WRITE,
+                )
+                if res != 0:
+                    error = ctypes.get_errno()
+                    print(f"Warning: mprotect failed for write page {pg}: {error}")
+                mem._w_pages[pg] = 1
 
-        # Track accessible pages for compatibility
-        mem._r_pages.update(read_pages)
-        mem._w_pages.update(write_pages)
-
-        print("r", mem._r_pages, "w", mem._w_pages)
         return mem
 
     def is_accessible(self, address: int, length: int, access: Accessibility = Accessibility.READ) -> bool:
@@ -204,11 +245,10 @@ class REC_Memory:
             return True
         pages = get_pages(address, length)
         if access == Accessibility.WRITE:
-            return all(pg in self._w_pages for pg in pages)
+            return all(self._w_pages[pg] for pg in pages if pg < self.MAX_PAGES)
         elif access == Accessibility.READ:
-            return all(pg in self._r_pages or pg in self._w_pages for pg in pages)
+            return all((self._r_pages[pg] or self._w_pages[pg]) for pg in pages if pg < self.MAX_PAGES)
         return True
-
 
     def read(self, address: int, length: int) -> bytes:
         """Read data from guest memory"""
@@ -245,7 +285,3 @@ class REC_Memory:
             raise IndexError(
                 f"Memory write out of bounds: address={address}, length={length}"
             ) from e
-
-
-# Alias for compatibility
-GuestMemory = REC_Memory

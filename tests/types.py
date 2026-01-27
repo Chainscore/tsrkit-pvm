@@ -12,7 +12,7 @@ from tsrkit_types import (
 )
 
 from tsrkit_pvm.interpreter.memory import INT_Memory
-
+from tsrkit_pvm.cpvm.cy_memory import CyMemory
 Gas = U64
 Register = U64
 
@@ -52,6 +52,23 @@ class MemoryChunk(TypedVector[MemoryData]):
                 allowed_read_pages.append(page.address // 2**12)
 
         memory = INT_Memory(memory_data, allowed_read_pages, allowed_write_pages)
+        return memory
+    
+    def to_cymemory(self, page_map: PageMap) -> CyMemory:
+        memory_data = {}
+        allowed_read_pages = []
+        allowed_write_pages = []
+        for memory_entry in self:
+            for i, byte in enumerate(memory_entry.contents):
+                memory_data[int(memory_entry.address + i)] = int(byte)
+        for page in page_map:
+            if page.is_writable:
+                allowed_write_pages.append(page.address // 2**12)
+                allowed_read_pages.append(page.address // 2**12)
+            else:
+                allowed_read_pages.append(page.address // 2**12)
+
+        memory = CyMemory(memory_data, allowed_read_pages, allowed_write_pages)
         return memory
 
 

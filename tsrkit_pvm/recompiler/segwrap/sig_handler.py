@@ -1,4 +1,5 @@
 import ctypes
+import _ctypes  # type: ignore
 
 
 class ProgramData(ctypes.Structure):

@@ -1,4 +1,7 @@
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....interpreter.program import INT_Program
 
 from ...memory import Memory
 from ....common.status import CONTINUE
@@ -8,7 +11,12 @@ from ....core.opcode import OpCode, OpReturn
 
 
 class InstructionsWArgs2Reg1Imm(InstructionTable):
-    def get_props(self):
+    def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
+        self.counter = counter
+        self.program = program
+        self.skip_index = skip_index
+
+    def get_props(self) -> list[int]:
         # Slice zeta once for better performance with large arrays
         # Most instructions need at most 6-8 bytes, so slice a reasonable window
         zeta_slice = self.program.zeta[self.counter + 1:self.counter + 8]
@@ -25,7 +33,7 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
             vx = chi(int.from_bytes(imm_slice, "little"), lx)
         else:
             vx = 0
-        return (ra, rb, lx, vx)
+        return [ra, rb, lx, vx]
 
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
@@ -198,8 +206,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         }
 
     @staticmethod
-    def op_imm(op: str) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def op_imm_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def op_imm(op: str) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def op_imm_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             wb_bits = b(registers[rb], 8)
             vx_bits = b(vx, 8)
             # Use vectorized comparison for massive performance boost
@@ -210,17 +218,17 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
         return op_imm_impl
 
-    def set_lt_u_imm(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def set_lt_u_imm(self, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
         registers[ra] = int(registers[rb] < vx)
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def set_lt_s_imm(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def set_lt_s_imm(self, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
         registers[ra] = int(z(registers[rb], 8) < z(vx, 8))
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
-    def shlo_l_imm(bitsize: int, alt=False) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def shlo_l_imm_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def shlo_l_imm(bitsize: int, alt: bool = False) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def shlo_l_imm_impl(self: InstructionsWArgs2Reg1Imm, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             a = int(registers[rb]) if not alt else vx
             b = vx if not alt else int(registers[rb])
 
@@ -232,8 +240,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         return shlo_l_imm_impl
 
     @staticmethod
-    def shlo_r_imm(bitsize: int, alt=False) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def shlo_r_imm_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def shlo_r_imm(bitsize: int, alt: bool = False) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def shlo_r_imm_impl(self: InstructionsWArgs2Reg1Imm, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             a = int(registers[rb]) if not alt else vx
             b = vx if not alt else int(registers[rb])
 
@@ -246,8 +254,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         return shlo_r_imm_impl
 
     @staticmethod
-    def shar_r_imm(bitsize: int, alt=False) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def shar_r_imm_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def shar_r_imm(bitsize: int, alt: bool = False) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def shar_r_imm_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             a = int(registers[rb]) if not alt else vx
             b = vx if not alt else int(registers[rb])
 
@@ -259,8 +267,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         return shar_r_imm_impl
 
     @staticmethod
-    def neg_add_imm(bitsize: int) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def neg_add_imm_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def neg_add_imm(bitsize: int) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def neg_add_imm_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             value = (vx + 2**bitsize - int(registers[rb])) % 2**bitsize
             if bitsize < 64:
                 value = chi(value, 4)
@@ -270,9 +278,9 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         return neg_add_imm_impl
 
     @staticmethod
-    def add_imm(bitsize: int) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def add_imm_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
-            value = (int(registers[rb]) + vx) % 2 ** (bitsize)
+    def add_imm(bitsize: int) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def add_imm_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+            value = (registers[rb] + vx) % 2 ** (bitsize)
             if bitsize < 64:
                 value = chi(value, bitsize // 8)
             registers[ra] = value
@@ -281,8 +289,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         return add_imm_impl
 
     @staticmethod
-    def mul_imm(bitsize: int) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def mul_imm_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def mul_imm(bitsize: int) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def mul_imm_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             value = (registers[rb] * vx) % 2 ** (bitsize)
             if bitsize < 64:
                 value = chi(value, 4)
@@ -292,8 +300,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         return mul_imm_impl
 
     @staticmethod
-    def rot_imm(bitsize: int, alt=False) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def rot_imm_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def rot_imm(bitsize: int, alt: bool = False) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def rot_imm_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             a_val = int(registers[rb] if not alt else vx) % 2 ** (bitsize)
             b_val = int(vx if not alt else registers[rb]) % 2 ** (bitsize)
 
@@ -308,27 +316,27 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
 
         return rot_imm_impl
 
-    def set_gt_u_imm(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def set_gt_u_imm(self, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
         registers[ra] = int(registers[rb] > vx)
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def set_gt_s_imm(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def set_gt_s_imm(self, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
         registers[ra] = int(z(registers[rb], 8) > z(vx, 8))
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def cmov_iz_imm(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def cmov_iz_imm(self, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
         if registers[rb] == 0:
             registers[ra] = vx
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
-    def cmov_nz_imm(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def cmov_nz_imm(self, registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
         if registers[rb] != 0:
             registers[ra] = vx
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
-    def store_ind(bitsize: int) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def store_ind_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def store_ind(bitsize: int) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def store_ind_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             memory.write(
                 registers[rb] + vx,
                 int(registers[ra] % 2**bitsize).to_bytes(bitsize // 8, "little"),
@@ -338,8 +346,8 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
         return store_ind_impl
 
     @staticmethod
-    def load_ind(bitsize: int, signed=False) -> Callable[[Any, list, Memory, int, int, int, int], OpReturn]:
-        def load_ind_impl(self, registers: list, memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
+    def load_ind(bitsize: int, signed: bool = False) -> Callable[["InstructionsWArgs2Reg1Imm", list[int], Memory, int, int, int, int], OpReturn]:
+        def load_ind_impl(self: "InstructionsWArgs2Reg1Imm", registers: list[int], memory: Memory, ra: int, rb: int, lx: int, vx: int) -> OpReturn:
             value = int.from_bytes(
                 memory.read(registers[rb] + vx, bitsize // 8), "little"
             )
