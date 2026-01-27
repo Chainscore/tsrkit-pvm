@@ -13,6 +13,7 @@ jobs:
   build_wheels:
     name: Build wheels on ${{ matrix.os }} for ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
+    if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
     strategy:
       matrix:
         include:
@@ -22,11 +23,12 @@ jobs:
             runner: ubuntu-22.04
             cibw_arch: x86_64
 
-          # Linux ARM64 - without recompiler
+          # Linux ARM64 - without recompiler (skip on PRs to save time)
           - os: linux
             arch: aarch64
             runner: ubuntu-22.04
             cibw_arch: aarch64
+            skip_on_pr: true
 
           # macOS Intel - without recompiler
           - os: macos
@@ -76,6 +78,7 @@ jobs:
     name: Test wheels on ${{ matrix.os }} for ${{ matrix.arch }}
     needs: [build_wheels]
     runs-on: ${{ matrix.runner }}
+    if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
     strategy:
       matrix:
         include:
@@ -85,11 +88,12 @@ jobs:
             runner: ubuntu-22.04
             test_recompiler: true
 
-          # Linux ARM64 - test interpreter only
+          # Linux ARM64 - test interpreter only (skip on PRs)
           - os: linux
             arch: aarch64
             runner: ubuntu-22.04
             test_recompiler: false
+            skip_on_pr: true
 
           # macOS Intel - test interpreter only
           - os: macos
