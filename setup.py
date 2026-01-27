@@ -26,9 +26,9 @@ if __name__ == "__main__":
             extra_compile_args=['-O3', '-Wall'],
         )
         ext_modules.append(segwrap_ext)
-        print("✓ Building recompiler segwrap extension")
+        print("[+] Building recompiler segwrap extension")
     else:
-        print("⊗ Skipping recompiler segwrap extension (Linux x86_64 only)")
+        print("[-] Skipping recompiler segwrap extension (Linux x86_64 only)")
 
     if PVM_BUILD_MODE == "cython":
         # Use Cython compilation
@@ -75,7 +75,7 @@ if __name__ == "__main__":
                 annotate=os.environ.get("CYTHON_ANNOTATE", "false").lower() == "true",
                 language_level=3,
             )
-            print(f"✓ Successfully compiled {len(cython_files)} Cython files")
+            print(f"[+] Successfully compiled {len(cython_files)} Cython files")
         except ImportError as e:
             print(f"❌ Cython not available: {e}, falling back to MyPyC")
             PVM_BUILD_MODE = "mypyc"
@@ -121,16 +121,16 @@ if __name__ == "__main__":
                     if mods:
                         ext_modules.extend(mods)
                         compiled_count += 1
-                        print(f"✓ Successfully compiled {py_file}")
+                        print(f"[+] Successfully compiled {py_file}")
                     else:
                         failed_count += 1
-                        print(f"✗ Failed to compile {py_file}")
+                        print(f"[!] Failed to compile {py_file}")
                 except Exception as ce:
                     failed_count += 1
-                    print(f"✗ Error compiling {py_file}: {ce}")
+                    print(f"[!] Error compiling {py_file}: {ce}")
             print(f"\nMyPyC compilation summary: {compiled_count} succeeded, {failed_count} failed")
         except Exception as e:
-            print(f"✗ Failed to configure MyPyC: {e}")
+            print(f"[!] Failed to configure MyPyC: {e}")
             ext_modules = []
     
     setup(
