@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "Polkadot Virtual Machine (PVM) implementation with interpreter and recompiler as specified in GP"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-license = "MIT"
+license = {text = "MIT"}
 authors = [
     {name = "Chainscore Labs", email = "hello@chainscore.finance"},
 ]
