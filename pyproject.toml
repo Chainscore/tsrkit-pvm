@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "mypy"]
+requires = ["setuptools>=61.0", "wheel", "cython>=3.1.4"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -16,7 +16,6 @@ keywords = ["polkadot", "pvm", "virtual-machine", "blockchain", "jam", "recompil
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Cython",
