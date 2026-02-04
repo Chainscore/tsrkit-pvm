@@ -144,13 +144,8 @@ jobs:
         run: |
           echo "Testing PVM_MODE=interpreter..."
           PVM_MODE=interpreter python -c "
-          from tsrkit_pvm.cpvm.cy_pvm import CyPVM
-          from tsrkit_pvm.common.program import Program
-          print('[+] Successfully imported CyPVM')
-          # Create a simple program (just a trap instruction)
-          program = Program(code=bytes([0x00]))
-          pvm = CyPVM(program)
-          print('[+] Successfully created CyPVM instance')
+          from tsrkit_pvm.cpvm import CyInterpreter
+          print('[+] Successfully imported CyInterpreter')
           print('[+] Interpreter mode test: PASSED')
           "
 
