@@ -47,8 +47,9 @@ dev = [
 ]
 
 # Keep existing build configuration for MyPyC
-[tool.setuptools]
-packages = ["tsrkit_pvm"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tsrkit_pvm*"]
 
 # Custom build command support
 [tool.setuptools.cmdclass]
