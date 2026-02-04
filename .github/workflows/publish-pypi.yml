@@ -143,11 +143,16 @@ jobs:
         shell: bash
         run: |
           echo "Testing PVM_MODE=interpreter..."
-          PVM_MODE=interpreter python -c "
+          PVM_MODE=interpreter python - <<'PY'
+          import os
+          import sys
+          # Ensure we import the installed wheel, not the source checkout.
+          cwd = os.path.abspath(os.getcwd())
+          sys.path = [p for p in sys.path if p and os.path.abspath(p) != cwd]
           from tsrkit_pvm.cpvm import CyInterpreter
           print('[+] Successfully imported CyInterpreter')
           print('[+] Interpreter mode test: PASSED')
-          "
+          PY
 
       - name: Test Recompiler Mode (Linux x86_64 only)
         if: matrix.test_recompiler == true && (matrix.skip_on_pr != true || github.event_name != 'pull_request')
