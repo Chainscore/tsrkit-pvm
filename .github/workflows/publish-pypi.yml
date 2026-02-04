@@ -41,11 +41,6 @@ jobs:
             runner: macos-14
             cibw_arch: arm64
 
-          # Windows x86_64 - without recompiler
-          - os: windows
-            arch: x86_64
-            runner: windows-2022
-            cibw_arch: AMD64
 
     steps:
       - uses: actions/checkout@v4
@@ -107,11 +102,6 @@ jobs:
             runner: macos-14
             test_recompiler: false
 
-          # Windows x86_64 - test interpreter only
-          - os: windows
-            arch: x86_64
-            runner: windows-2022
-            test_recompiler: false
 
     steps:
       - uses: actions/checkout@v4
