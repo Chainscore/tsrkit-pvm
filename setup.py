@@ -10,8 +10,12 @@ def should_build_recompiler():
     return is_linux and is_x86_64
 
 if __name__ == "__main__":
-    # Check if Cython mode is requested
-    PVM_BUILD_MODE = os.environ.get("PVM_BUILD_MODE", "plain").lower()
+    # Check if Cython mode is requested.
+    # Default to Cython when building via cibuildwheel, otherwise keep a "plain" default.
+    PVM_BUILD_MODE = os.environ.get("PVM_BUILD_MODE")
+    if not PVM_BUILD_MODE:
+        PVM_BUILD_MODE = "cython" if os.environ.get("CIBUILDWHEEL") else "plain"
+    PVM_BUILD_MODE = PVM_BUILD_MODE.lower()
     print(f"Building with PVM_BUILD_MODE={PVM_BUILD_MODE}")
     print(f"Platform: {sys.platform}, Architecture: {platform.machine()}")
 
