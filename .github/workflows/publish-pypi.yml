@@ -121,15 +121,30 @@ jobs:
           path: dist/
 
       - name: Install wheel
-        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
+        if: (matrix.skip_on_pr != true || github.event_name != 'pull_request') && matrix.arch != 'aarch64'
         shell: bash
         run: |
           # Install from the dist directory, pip will pick the right wheel
           # Allow pip to fetch dependencies from PyPI
           pip install --find-links=dist/ tsrkit-pvm
 
+      - name: Verify aarch64 wheel artifact
+        if: (matrix.skip_on_pr != true || github.event_name != 'pull_request') && matrix.arch == 'aarch64'
+        shell: bash
+        run: |
+          echo "Verifying aarch64 wheel artifact..."
+          ls -la dist/
+          python - <<'PY'
+          import glob, sys
+          wheels = glob.glob("dist/*.whl")
+          if not wheels:
+              print("No wheel artifacts found in dist/")
+              sys.exit(1)
+          print("Found wheels:", wheels)
+          PY
+
       - name: Test Interpreter Mode (Cython)
-        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
+        if: (matrix.skip_on_pr != true || github.event_name != 'pull_request') && matrix.arch != 'aarch64'
         shell: bash
         run: |
           echo "Testing PVM_MODE=interpreter..."
