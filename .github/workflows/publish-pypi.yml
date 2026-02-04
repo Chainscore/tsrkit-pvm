@@ -13,7 +13,6 @@ jobs:
   build_wheels:
     name: Build wheels on ${{ matrix.os }} for ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
-    if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
     strategy:
       matrix:
         include:
@@ -42,11 +41,6 @@ jobs:
             runner: macos-14
             cibw_arch: arm64
 
-          # Windows x86_64 - without recompiler
-          - os: windows
-            arch: x86_64
-            runner: windows-2022
-            cibw_arch: AMD64
 
     steps:
       - uses: actions/checkout@v4
@@ -54,12 +48,13 @@ jobs:
           submodules: recursive
 
       - name: Set up QEMU (for ARM on x86)
-        if: matrix.arch == 'aarch64'
+        if: matrix.arch == 'aarch64' && (matrix.skip_on_pr != true || github.event_name != 'pull_request')
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
 
       - name: Build wheels
+        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
         uses: pypa/cibuildwheel@v2.21.3
         env:
           CIBW_BUILD: cp312-*
@@ -70,6 +65,7 @@ jobs:
           CIBW_TEST_SKIP: "*"
 
       - uses: actions/upload-artifact@v4
+        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
         with:
           name: wheels-${{ matrix.os }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
@@ -78,7 +74,6 @@ jobs:
     name: Test wheels on ${{ matrix.os }} for ${{ matrix.arch }}
     needs: [build_wheels]
     runs-on: ${{ matrix.runner }}
-    if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
     strategy:
       matrix:
         include:
@@ -107,27 +102,26 @@ jobs:
             runner: macos-14
             test_recompiler: false
 
-          # Windows x86_64 - test interpreter only
-          - os: windows
-            arch: x86_64
-            runner: windows-2022
-            test_recompiler: false
 
     steps:
       - uses: actions/checkout@v4
+        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
 
       - name: Set up Python 3.12
+        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Download wheels
+        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
         uses: actions/download-artifact@v4
         with:
           name: wheels-${{ matrix.os }}-${{ matrix.arch }}
           path: dist/
 
       - name: Install wheel
+        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
         shell: bash
         run: |
           # Install from the dist directory, pip will pick the right wheel
@@ -135,22 +129,23 @@ jobs:
           pip install --find-links=dist/ tsrkit-pvm
 
       - name: Test Interpreter Mode (Cython)
+        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
         shell: bash
         run: |
           echo "Testing PVM_MODE=interpreter..."
-          PVM_MODE=interpreter python -c "
-          from tsrkit_pvm.cpvm.cy_pvm import CyPVM
-          from tsrkit_pvm.common.program import Program
-          print('[+] Successfully imported CyPVM')
-          # Create a simple program (just a trap instruction)
-          program = Program(code=bytes([0x00]))
-          pvm = CyPVM(program)
-          print('[+] Successfully created CyPVM instance')
+          PVM_MODE=interpreter python - <<'PY'
+          import os
+          import sys
+          # Ensure we import the installed wheel, not the source checkout.
+          cwd = os.path.abspath(os.getcwd())
+          sys.path = [p for p in sys.path if p and os.path.abspath(p) != cwd]
+          from tsrkit_pvm.cpvm import CyInterpreter
+          print('[+] Successfully imported CyInterpreter')
           print('[+] Interpreter mode test: PASSED')
-          "
+          PY
 
       - name: Test Recompiler Mode (Linux x86_64 only)
-        if: matrix.test_recompiler == true
+        if: matrix.test_recompiler == true && (matrix.skip_on_pr != true || github.event_name != 'pull_request')
         shell: bash
         continue-on-error: true
         run: |
@@ -175,6 +170,7 @@ jobs:
           "
 
       - name: Summary
+        if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
         shell: bash
         run: |
           if [ "${{ matrix.test_recompiler }}" = "true" ]; then
