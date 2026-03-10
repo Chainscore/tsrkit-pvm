@@ -20,7 +20,7 @@ cdef class CyMemory:
     cdef public set _w_pages                   # writable pages (keeping for compatibility)
     cdef uint64_t _r_bitset[16384]            # C-level read permission bitset (1M bits / 64 = 16384)
     cdef uint64_t _w_bitset[16384]            # C-level write permission bitset
-    cdef public int heap_break
+    cdef public uint32_t heap_break
 
     # Low-level page management
     cdef unsigned char* _get_cpage(self, uint32_t page_idx, bint create=*)

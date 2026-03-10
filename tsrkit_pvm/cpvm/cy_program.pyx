@@ -125,6 +125,10 @@ cdef class CyProgram:
             return 0
         return self._skip_cache[pc]
 
+    def py_skip(self, int pc):
+        """Python-callable skip for use outside Cython (e.g. HOST(12) invoke)."""
+        return self.skip(pc)
+
     @cython.cfunc
     @cython.inline
     cdef uint32_t branch(self, int32_t counter, int32_t branch, bint cond):

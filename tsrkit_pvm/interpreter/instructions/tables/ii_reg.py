@@ -92,12 +92,12 @@ class InstructionsWArgs2Reg(InstructionTable):
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     def sbrk(self, registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
-        req = registers[ra]  # bytes requested
-        memory.alter_accessibility(memory.heap_break, req, Accessibility.WRITE)
-        memory.heap_break = memory.heap_break + req
-
-        # out of address space
-        registers[rd] = memory.heap_break
+        # TODO: Review
+        # PVM addresses are 32-bit; mask to prevent get_pages from building trillion-entry lists
+        req = registers[ra] & 0xFFFFFFFF
+        memory.alter_accessibility(memory.heap_break & 0xFFFFFFFF, req, Accessibility.WRITE)
+        registers[rd] = memory.heap_break & 0xFFFFFFFF
+        memory.heap_break = (memory.heap_break + req) & 0xFFFFFFFF
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod
