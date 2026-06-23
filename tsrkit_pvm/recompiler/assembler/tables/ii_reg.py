@@ -1,7 +1,5 @@
 from typing import Any, Callable, Dict, TYPE_CHECKING
 
-from tsrkit_pvm.recompiler.assembler.utils import pop_all_regs, save_all_regs
-
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode
 from ....core.program_base import Program
@@ -29,61 +27,52 @@ class InstructionsWArgs2Reg(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            100: OpCode(name="move_reg", fn=cls.move_reg, gas=1, is_terminating=False),
-            101: OpCode(name="sbrk", fn=cls.sbrk, gas=1, is_terminating=False),
-            102: OpCode(
+            100: OpCode(name="move_reg", fn=cls.move_reg, is_terminating=False),
+            101: OpCode(
                 name="count_set_bits_64",
                 fn=cls.count_set_bits_64,
-                gas=1,
+                is_terminating=False,
+            ),
+            102: OpCode(
+                name="count_set_bits_32",
+                fn=cls.count_set_bits_32,
                 is_terminating=False,
             ),
             103: OpCode(
-                name="count_set_bits_32",
-                fn=cls.count_set_bits_32,
-                gas=1,
+                name="leading_zero_bits_64",
+                fn=cls.leading_zero_bits_64,
                 is_terminating=False,
             ),
             104: OpCode(
-                name="leading_zero_bits_64",
-                fn=cls.leading_zero_bits_64,
-                gas=1,
+                name="leading_zero_bits_32",
+                fn=cls.leading_zero_bits_32,
                 is_terminating=False,
             ),
             105: OpCode(
-                name="leading_zero_bits_32",
-                fn=cls.leading_zero_bits_32,
-                gas=1,
+                name="trailing_zero_bits_64",
+                fn=cls.trailing_zero_bits_64,
                 is_terminating=False,
             ),
             106: OpCode(
-                name="trailing_zero_bits_64",
-                fn=cls.trailing_zero_bits_64,
-                gas=1,
+                name="trailing_zero_bits_32",
+                fn=cls.trailing_zero_bits_32,
                 is_terminating=False,
             ),
             107: OpCode(
-                name="trailing_zero_bits_32",
-                fn=cls.trailing_zero_bits_32,
-                gas=1,
-                is_terminating=False,
+                name="sign_extend_8", fn=cls.sign_extend_8, is_terminating=False
             ),
             108: OpCode(
-                name="sign_extend_8", fn=cls.sign_extend_8, gas=1, is_terminating=False
-            ),
-            109: OpCode(
                 name="sign_extend_16",
                 fn=cls.sign_extend_16,
-                gas=1,
+                is_terminating=False,
+            ),
+            109: OpCode(
+                name="zero_extend_16",
+                fn=cls.zero_extend_16,
                 is_terminating=False,
             ),
             110: OpCode(
-                name="zero_extend_16",
-                fn=cls.zero_extend_16,
-                gas=1,
-                is_terminating=False,
-            ),
-            111: OpCode(
-                name="reverse_bytes", fn=cls.reverse_bytes, gas=1, is_terminating=False
+                name="reverse_bytes", fn=cls.reverse_bytes, is_terminating=False
             ),
         }
 
@@ -91,16 +80,6 @@ class InstructionsWArgs2Reg(InstructionTable):
         """rd = ra (register move)"""
         if ra != rd:
             asm.mov(RegSize.R64, r_map[rd], r_map[ra])
-
-    def sbrk(self, asm, rd: int, ra: int):
-        """rd = old_heap_break; heap_break += ra (PVM sbrk syscall)"""
-        PVM_SYS_SBRK = 999
-        # Save all regs before exiting
-        save_all_regs(asm)
-        pop_all_regs(asm)  # This is safe to do so, not doing this also works
-        # Load rax in rcx
-        asm.mov_imm64(Reg.rax, PVM_SYS_SBRK)
-        asm.syscall()
 
     def count_set_bits_64(self, asm, rd: int, ra: int):
         """rd = popcount(ra) (count number of 1 bits in 64-bit value)"""

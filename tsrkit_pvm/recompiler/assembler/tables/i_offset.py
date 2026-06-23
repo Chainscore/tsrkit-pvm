@@ -28,18 +28,17 @@ class WArgsOneOffset(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            40: OpCode(name="jump", fn=cls.jump, gas=1, is_terminating=False),
+            40: OpCode(name="jump", fn=cls.jump, is_terminating=True),
         }
 
     def jump(self, asm, lx: int, vx: int):
         """Jump to vx"""
         # asm.ud2()
         target_addr = vx
+        if target_addr == self.counter:
+            return
         if target_addr in asm.labels:
             target_label = asm.labels[target_addr]
             asm.jmp_label32(target_label)
         else:
-            # For now, return from function if target not found
-            # This handles cases where the jump target is outside the current compilation unit
-            print(f"Warning: Jump target {target_addr} not found in labels, returning")
-            asm.ret()
+            asm.panic()

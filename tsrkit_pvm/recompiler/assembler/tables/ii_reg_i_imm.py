@@ -45,153 +45,143 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             120: OpCode(
-                name="store_ind_u8", fn=cls.store_ind_u8, gas=1, is_terminating=False
+                name="store_ind_u8", fn=cls.store_ind_u8, is_terminating=False
             ),
             121: OpCode(
-                name="store_ind_u16", fn=cls.store_ind_u16, gas=1, is_terminating=False
+                name="store_ind_u16", fn=cls.store_ind_u16, is_terminating=False
             ),
             122: OpCode(
-                name="store_ind_u32", fn=cls.store_ind_u32, gas=1, is_terminating=False
+                name="store_ind_u32", fn=cls.store_ind_u32, is_terminating=False
             ),
             123: OpCode(
-                name="store_ind_u64", fn=cls.store_ind_u64, gas=1, is_terminating=False
+                name="store_ind_u64", fn=cls.store_ind_u64, is_terminating=False
             ),
             124: OpCode(
-                name="load_ind_u8", fn=cls.load_ind_u8, gas=1, is_terminating=False
+                name="load_ind_u8", fn=cls.load_ind_u8, is_terminating=False
             ),
             125: OpCode(
-                name="load_ind_i8", fn=cls.load_ind_i8, gas=1, is_terminating=False
+                name="load_ind_i8", fn=cls.load_ind_i8, is_terminating=False
             ),
             126: OpCode(
-                name="load_ind_u16", fn=cls.load_ind_u16, gas=1, is_terminating=False
+                name="load_ind_u16", fn=cls.load_ind_u16, is_terminating=False
             ),
             127: OpCode(
-                name="load_ind_i16", fn=cls.load_ind_i16, gas=1, is_terminating=False
+                name="load_ind_i16", fn=cls.load_ind_i16, is_terminating=False
             ),
             128: OpCode(
-                name="load_ind_u32", fn=cls.load_ind_u32, gas=1, is_terminating=False
+                name="load_ind_u32", fn=cls.load_ind_u32, is_terminating=False
             ),
             129: OpCode(
-                name="load_ind_i32", fn=cls.load_ind_i32, gas=1, is_terminating=False
+                name="load_ind_i32", fn=cls.load_ind_i32, is_terminating=False
             ),
             130: OpCode(
-                name="load_ind_u64", fn=cls.load_ind_u64, gas=1, is_terminating=False
+                name="load_ind_u64", fn=cls.load_ind_u64, is_terminating=False
             ),
             131: OpCode(
-                name="add_imm_32", fn=cls.add_imm_32, gas=1, is_terminating=False
+                name="add_imm_32", fn=cls.add_imm_32, is_terminating=False
             ),
-            132: OpCode(name="and_imm", fn=cls.and_imm, gas=1, is_terminating=False),
-            133: OpCode(name="xor_imm", fn=cls.xor_imm, gas=1, is_terminating=False),
-            134: OpCode(name="or_imm", fn=cls.or_imm, gas=1, is_terminating=False),
+            132: OpCode(name="and_imm", fn=cls.and_imm, is_terminating=False),
+            133: OpCode(name="xor_imm", fn=cls.xor_imm, is_terminating=False),
+            134: OpCode(name="or_imm", fn=cls.or_imm, is_terminating=False),
             135: OpCode(
-                name="mul_imm_32", fn=cls.mul_imm_32, gas=1, is_terminating=False
+                name="mul_imm_32", fn=cls.mul_imm_32, is_terminating=False
             ),
             136: OpCode(
-                name="set_lt_u_imm", fn=cls.set_lt_u_imm, gas=1, is_terminating=False
+                name="set_lt_u_imm", fn=cls.set_lt_u_imm, is_terminating=False
             ),
             137: OpCode(
-                name="set_lt_s_imm", fn=cls.set_lt_s_imm, gas=1, is_terminating=False
+                name="set_lt_s_imm", fn=cls.set_lt_s_imm, is_terminating=False
             ),
             138: OpCode(
-                name="shlo_l_imm_32", fn=cls.shlo_l_imm_32, gas=1, is_terminating=False
+                name="shlo_l_imm_32", fn=cls.shlo_l_imm_32, is_terminating=False
             ),
             139: OpCode(
-                name="shlo_r_imm_32", fn=cls.shlo_r_imm_32, gas=1, is_terminating=False
+                name="shlo_r_imm_32", fn=cls.shlo_r_imm_32, is_terminating=False
             ),
             140: OpCode(
-                name="shar_r_imm_32", fn=cls.shar_r_imm_32, gas=1, is_terminating=False
+                name="shar_r_imm_32", fn=cls.shar_r_imm_32, is_terminating=False
             ),
             141: OpCode(
                 name="neg_add_imm_32",
                 fn=cls.neg_add_imm_32,
-                gas=1,
                 is_terminating=False,
             ),
             142: OpCode(
-                name="set_gt_u_imm", fn=cls.set_gt_u_imm, gas=1, is_terminating=False
+                name="set_gt_u_imm", fn=cls.set_gt_u_imm, is_terminating=False
             ),
             143: OpCode(
-                name="set_gt_s_imm", fn=cls.set_gt_s_imm, gas=1, is_terminating=False
+                name="set_gt_s_imm", fn=cls.set_gt_s_imm, is_terminating=False
             ),
             144: OpCode(
                 name="shlo_l_imm_alt_32",
                 fn=cls.shlo_l_imm_alt_32,
-                gas=1,
                 is_terminating=False,
             ),
             145: OpCode(
                 name="shlo_r_imm_alt_32",
                 fn=cls.shlo_r_imm_alt_32,
-                gas=1,
                 is_terminating=False,
             ),
             146: OpCode(
                 name="shar_r_imm_alt_32",
                 fn=cls.shar_r_imm_alt_32,
-                gas=1,
                 is_terminating=False,
             ),
             147: OpCode(
-                name="cmov_iz_imm", fn=cls.cmov_iz_imm, gas=1, is_terminating=False
+                name="cmov_iz_imm", fn=cls.cmov_iz_imm, is_terminating=False
             ),
             148: OpCode(
-                name="cmov_nz_imm", fn=cls.cmov_nz_imm, gas=1, is_terminating=False
+                name="cmov_nz_imm", fn=cls.cmov_nz_imm, is_terminating=False
             ),
             149: OpCode(
-                name="add_imm_64", fn=cls.add_imm_64, gas=1, is_terminating=False
+                name="add_imm_64", fn=cls.add_imm_64, is_terminating=False
             ),
             150: OpCode(
-                name="mul_imm_64", fn=cls.mul_imm_64, gas=1, is_terminating=False
+                name="mul_imm_64", fn=cls.mul_imm_64, is_terminating=False
             ),
             151: OpCode(
-                name="shlo_l_imm_64", fn=cls.shlo_l_imm_64, gas=1, is_terminating=False
+                name="shlo_l_imm_64", fn=cls.shlo_l_imm_64, is_terminating=False
             ),
             152: OpCode(
-                name="shlo_r_imm_64", fn=cls.shlo_r_imm_64, gas=1, is_terminating=False
+                name="shlo_r_imm_64", fn=cls.shlo_r_imm_64, is_terminating=False
             ),
             153: OpCode(
-                name="shar_r_imm_64", fn=cls.shar_r_imm_64, gas=1, is_terminating=False
+                name="shar_r_imm_64", fn=cls.shar_r_imm_64, is_terminating=False
             ),
             154: OpCode(
                 name="neg_add_imm_64",
                 fn=cls.neg_add_imm_64,
-                gas=1,
                 is_terminating=False,
             ),
             155: OpCode(
                 name="shlo_l_imm_alt_64",
                 fn=cls.shlo_l_imm_alt_64,
-                gas=1,
                 is_terminating=False,
             ),
             156: OpCode(
                 name="shlo_r_imm_alt_64",
                 fn=cls.shlo_r_imm_alt_64,
-                gas=1,
                 is_terminating=False,
             ),
             157: OpCode(
                 name="shar_r_imm_alt_64",
                 fn=cls.shar_r_imm_alt_64,
-                gas=1,
                 is_terminating=False,
             ),
             158: OpCode(
-                name="rot_r_64_imm", fn=cls.rot_r_64_imm, gas=1, is_terminating=False
+                name="rot_r_64_imm", fn=cls.rot_r_64_imm, is_terminating=False
             ),
             159: OpCode(
                 name="rot_r_64_imm_alt",
                 fn=cls.rot_r_64_imm_alt,
-                gas=1,
                 is_terminating=False,
             ),
             160: OpCode(
-                name="rot_r_32_imm", fn=cls.rot_r_32_imm, gas=1, is_terminating=False
+                name="rot_r_32_imm", fn=cls.rot_r_32_imm, is_terminating=False
             ),
             161: OpCode(
                 name="rot_r_32_imm_alt",
                 fn=cls.rot_r_32_imm_alt,
-                gas=1,
                 is_terminating=False,
             ),
         }

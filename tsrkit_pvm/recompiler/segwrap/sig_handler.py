@@ -53,4 +53,4 @@ class ProgramData(ctypes.Structure):
 
     def vm_fault_addr(self):
         """si_addr - r15"""
-        return self.si_data - self.r15
+        return ((self.si_data - self.r15) // 4096) * 4096

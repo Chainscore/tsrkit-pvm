@@ -34,22 +34,22 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             170: OpCode(
-                name="branch_eq", fn=cls.branch_eq, gas=1, is_terminating=False
+                name="branch_eq", fn=cls.branch_eq, is_terminating=False
             ),
             171: OpCode(
-                name="branch_ne", fn=cls.branch_ne, gas=1, is_terminating=False
+                name="branch_ne", fn=cls.branch_ne, is_terminating=False
             ),
             172: OpCode(
-                name="branch_lt_u", fn=cls.branch_lt_u, gas=1, is_terminating=False
+                name="branch_lt_u", fn=cls.branch_lt_u, is_terminating=False
             ),
             173: OpCode(
-                name="branch_lt_s", fn=cls.branch_lt_s, gas=1, is_terminating=False
+                name="branch_lt_s", fn=cls.branch_lt_s, is_terminating=False
             ),
             174: OpCode(
-                name="branch_ge_u", fn=cls.branch_ge_u, gas=1, is_terminating=False
+                name="branch_ge_u", fn=cls.branch_ge_u, is_terminating=False
             ),
             175: OpCode(
-                name="branch_ge_s", fn=cls.branch_ge_s, gas=1, is_terminating=False
+                name="branch_ge_s", fn=cls.branch_ge_s, is_terminating=False
             ),
         }
 
@@ -67,10 +67,7 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Equal, target_label)  # je target_label
         else:
-            # Branch target not found - fall through (no jump)
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.Equal)
 
     def branch_ne(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if not equal"""
@@ -86,10 +83,7 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.NotEqual, target_label)  # jne target_label
         else:
-            # Branch target not found - fall through (no jump)
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.NotEqual)
 
     def branch_lt_u(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if ra < rb (unsigned)"""
@@ -107,10 +101,7 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 Condition.Below, target_label
             )  # jb target_label (unsigned less than)
         else:
-            # Branch target not found - fall through (no jump)
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.Below)
 
     def branch_lt_s(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if ra < rb (signed)"""
@@ -128,10 +119,7 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 Condition.Less, target_label
             )  # jl target_label (signed less than)
         else:
-            # Branch target not found - fall through (no jump)
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.Less)
 
     def branch_ge_u(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if ra >= rb (unsigned)"""
@@ -149,10 +137,7 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 Condition.AboveOrEqual, target_label
             )  # jae target_label (unsigned greater or equal)
         else:
-            # Branch target not found - fall through (no jump)
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.AboveOrEqual)
 
     def branch_ge_s(self, asm, ra: int, rb: int, lx: int, vx: int):
         """Compare registers and branch if ra >= rb (signed)"""
@@ -170,7 +155,4 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
                 Condition.GreaterOrEqual, target_label
             )  # jge target_label (signed greater or equal)
         else:
-            # Branch target not found - fall through (no jump)
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.GreaterOrEqual)

@@ -28,7 +28,7 @@ class InstructionsWArgs1Imm1EwImm(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             20: OpCode(
-                name="load_imm_64", fn=cls.load_imm_64, gas=1, is_terminating=False
+                name="load_imm_64", fn=cls.load_imm_64, is_terminating=False
             )
         }
 
