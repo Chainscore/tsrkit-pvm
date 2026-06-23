@@ -8,6 +8,7 @@ from ....common.status import CONTINUE
 from ....common.utils import chi, compare, z, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 
 class InstructionsWArgs1Reg2Imm(InstructionTable):
@@ -39,26 +40,26 @@ class InstructionsWArgs1Reg2Imm(InstructionTable):
             70: OpCode(
                 name="store_imm_ind_u8",
                 fn=cls.store_imm_ind_u(8),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS),
             ),
             71: OpCode(
                 name="store_imm_ind_u16",
                 fn=cls.store_imm_ind_u(16),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS),
             ),
             72: OpCode(
                 name="store_imm_ind_u32",
                 fn=cls.store_imm_ind_u(32),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS),
             ),
             73: OpCode(
                 name="store_imm_ind_u64",
                 fn=cls.store_imm_ind_u(64),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS),
             ),
         }
 

@@ -38,6 +38,29 @@ class Interpreter(PVM):
             Registers: Final registers
             Memory: Final memory
         """
+        status, program_counter, remaining_gas, _, registers, memory = cls.execute_ext(
+            program,
+            program_counter,
+            gas,
+            registers,
+            memory,
+            block_gas_charged=False,
+            logger=logger,
+        )
+        return status, program_counter, remaining_gas, registers, memory
+
+    @classmethod
+    def execute_ext(
+        cls,
+        program: INT_Program,
+        program_counter: int,
+        gas: int,
+        registers: List[int],
+        memory: INT_Memory,
+        block_gas_charged: bool = False,
+        logger: Union[Any, None] = None,
+    ) -> Tuple[ExecutionStatus, int, int, bool, list, INT_Memory]:
+        """Execute while preserving GP v0.8.0 block gas charge state."""
         remaining_gas = gas
 
         if logger:
@@ -52,22 +75,30 @@ class Interpreter(PVM):
 
         while True:
             try:
-                (status, program_counter, registers, memory), gas_cost = (
-                    inst_map.process_instruction(
-                        program, program_counter, registers, memory
-                    )
-                )
-                remaining_gas -= gas_cost
+                block_start = program.containing_basic_block_start(program_counter)
+                block = inst_map.get_block(program, block_start)
 
-                if remaining_gas < 0:
-                    if logger:
-                        logger.warning(
-                            "PVM - OUT_OF_GAS",
-                            final_pc=program_counter,
-                            gas_deficit=abs(remaining_gas),
-                        )
-                    status = OUT_OF_GAS
-                    break
+                if not block_gas_charged:
+                    if remaining_gas < block.total_gas:
+                        if logger:
+                            logger.warning(
+                                "PVM - OUT_OF_GAS",
+                                final_pc=program_counter,
+                                gas_required=block.total_gas,
+                                gas_remaining=remaining_gas,
+                            )
+                        status = OUT_OF_GAS
+                        block_gas_charged = False
+                        break
+                    remaining_gas -= block.total_gas
+                    block_gas_charged = True
+
+                (status, program_counter, registers, memory), executed_terminator = (
+                    block.execute(program, program_counter, registers, memory)
+                )
+
+                if executed_terminator and status in (ExecutionStatus.CONTINUE, ExecutionStatus.HOST):
+                    block_gas_charged = False
 
                 if status == ExecutionStatus.HALT:
                     if logger:
@@ -87,6 +118,7 @@ class Interpreter(PVM):
                     break
 
             except PvmError as e:
+                program_counter = getattr(e, "instruction_counter", program_counter)
                 if logger:
                     logger.error(
                         "PVM execution error",
@@ -122,4 +154,4 @@ class Interpreter(PVM):
                 memory=memory,
             )
 
-        return status, program_counter, remaining_gas, registers, memory
+        return status, program_counter, remaining_gas, block_gas_charged, registers, memory

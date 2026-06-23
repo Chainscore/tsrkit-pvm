@@ -1,3 +1,4 @@
+from bisect import bisect_right
 from math import floor
 from typing import Any, Dict, Tuple
 from tsrkit_pvm.core.program_base import Program
@@ -36,9 +37,17 @@ class INT_Program(Program):
                     self.instruction_set[n] < 256 and
                     inst_map._dispatch_table[self.instruction_set[n]] != None
             ):
-                basic_blocks.append(n + 1 + self.skip(n))
+                next_block = n + 1 + self.skip(n)
+                # Check for next block, if its valid start or not.
+                if (
+                    next_block < len(self.instruction_set)
+                    and self.offset_bitmask[next_block]
+                    and self.instruction_set[next_block] < 256
+                    and inst_map._dispatch_table[self.instruction_set[next_block]] is not None
+                ):
+                    basic_blocks.append(next_block)
         
-        self.basic_blocks = basic_blocks
+        self.basic_blocks = sorted(set(basic_blocks))
         self._basic_blocks_set = set(self.basic_blocks)
         self.jump_table_len = len(self.jump_table)
         
@@ -58,10 +67,16 @@ class INT_Program(Program):
             return 0
 
     def branch(
-        self, counter: int, branch: int, condition: bool
+        self, counter: int, branch: int, condition: bool, validate_fallthrough: bool = False
     ) -> Tuple[ExecutionStatus, int]:
+        fallthrough = counter + 1 + self.skip(counter)
+        if validate_fallthrough and (
+            branch not in self._basic_blocks_set
+            or fallthrough not in self._basic_blocks_set
+        ):
+            raise PvmError(PANIC)
         if not condition:
-            return CONTINUE, counter
+            return CONTINUE, fallthrough
         elif branch not in self._basic_blocks_set:
             raise PvmError(PANIC)
         return CONTINUE, branch
@@ -78,3 +93,9 @@ class INT_Program(Program):
         ):
             raise PvmError(PANIC)
         return CONTINUE, self.jump_table[index]
+
+    def containing_basic_block_start(self, pc: int) -> int:
+        index = bisect_right(self.basic_blocks, pc) - 1
+        if index < 0:
+            return 0
+        return self.basic_blocks[index]

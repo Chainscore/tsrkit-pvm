@@ -8,6 +8,7 @@ from ...memory import Memory
 from ....common.utils import chi, compare, z, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 class InstructionsWArgs2Reg2Imm(InstructionTable):
     def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
@@ -49,8 +50,8 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
             180: OpCode(
                 name="load_imm_jump_ind",
                 fn=cls.load_imm_jump_ind,
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile(22, 1, NO_UNITS),
             ),
         }
 

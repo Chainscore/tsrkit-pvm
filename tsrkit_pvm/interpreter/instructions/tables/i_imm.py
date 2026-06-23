@@ -8,6 +8,7 @@ from ....common.status import HOST
 from ....common.utils import chi, clamp_4
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 class InstructionsWArgs1Imm(InstructionTable):
     def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
@@ -30,11 +31,16 @@ class InstructionsWArgs1Imm(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            10: OpCode(name="ecalli", fn=cls.ecalli, gas=1, is_terminating=False),
+            10: OpCode(
+                name="ecalli",
+                fn=cls.ecalli,
+                is_terminating=False,
+                gas_profile=profile(100, 4, ALU)
+            ),
         }
 
     def ecalli(self, registers: list[int], memory: Memory, lx: int, vx: int) -> OpReturn:
         """
         OPC10: Ecalli.
         """
-        return HOST(vx), self.counter + self.skip_index + 1, registers, memory
+        return HOST(vx), self.counter, registers, memory

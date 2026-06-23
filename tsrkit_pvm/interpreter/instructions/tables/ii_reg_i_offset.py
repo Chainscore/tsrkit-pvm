@@ -8,6 +8,7 @@ from ....common.status import CONTINUE
 from ....common.utils import b, b_inv, chi, compare, z, z_inv, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 
 class InstructionsWArgs2Reg1Offset(InstructionTable):
@@ -38,28 +39,32 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             170: OpCode(
-                name="branch_eq", fn=cls.branch("eq"), gas=1, is_terminating=True
+                name="branch_eq", fn=cls.branch("eq"), is_terminating=True,
+                gas_profile=profile("branch", 1, ALU)
             ),
             171: OpCode(
-                name="branch_ne", fn=cls.branch("ne"), gas=1, is_terminating=True
+                name="branch_ne", fn=cls.branch("ne"), is_terminating=True,
+                gas_profile=profile("branch", 1, ALU)
             ),
             172: OpCode(
-                name="branch_lt_u", fn=cls.branch("lt"), gas=1, is_terminating=True
+                name="branch_lt_u", fn=cls.branch("lt"), is_terminating=True,
+                gas_profile=profile("branch", 1, ALU)
             ),
             173: OpCode(
                 name="branch_lt_s",
                 fn=cls.branch("lt", True),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             174: OpCode(
-                name="branch_ge_u", fn=cls.branch("ge"), gas=1, is_terminating=True
+                name="branch_ge_u", fn=cls.branch("ge"), is_terminating=True,
+                gas_profile=profile("branch", 1, ALU)
             ),
             175: OpCode(
                 name="branch_ge_s",
                 fn=cls.branch("ge", True),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
         }
 
@@ -70,7 +75,7 @@ class InstructionsWArgs2Reg1Offset(InstructionTable):
             a = z(registers[ra], 8) if signed else registers[ra]
             b = z(registers[rb], 8) if signed else registers[rb]
             status, counter = self.program.branch(
-                self.counter, vx, compare(a, b, op)
+                self.counter, vx, compare(a, b, op), validate_fallthrough=True
             )
             if status == CONTINUE and counter != self.counter:
                 return status, counter, registers, memory

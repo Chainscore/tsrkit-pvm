@@ -8,6 +8,7 @@ from ....common.status import CONTINUE
 from ....common.utils import b, b_inv, chi, compare, compare_bits_vectorized, z, z_inv, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 
 class InstructionsWArgs2Reg1Imm(InstructionTable):
@@ -39,169 +40,198 @@ class InstructionsWArgs2Reg1Imm(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             120: OpCode(
-                name="store_ind_u8", fn=cls.store_ind(8), gas=1, is_terminating=False
+                name="store_ind_u8", fn=cls.store_ind(8), is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS)
             ),
             121: OpCode(
-                name="store_ind_u16", fn=cls.store_ind(16), gas=1, is_terminating=False
+                name="store_ind_u16", fn=cls.store_ind(16), is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS)
             ),
             122: OpCode(
-                name="store_ind_u32", fn=cls.store_ind(32), gas=1, is_terminating=False
+                name="store_ind_u32", fn=cls.store_ind(32), is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS)
             ),
             123: OpCode(
-                name="store_ind_u64", fn=cls.store_ind(64), gas=1, is_terminating=False
+                name="store_ind_u64", fn=cls.store_ind(64), is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS)
             ),
             124: OpCode(
-                name="load_ind_u8", fn=cls.load_ind(8), gas=1, is_terminating=False
+                name="load_ind_u8", fn=cls.load_ind(8), is_terminating=False,
+                gas_profile=profile("memory", 1, LOAD_UNITS)
             ),
             125: OpCode(
                 name="load_ind_i8",
                 fn=cls.load_ind(8, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile("memory", 1, LOAD_UNITS),
             ),
             126: OpCode(
-                name="load_ind_u16", fn=cls.load_ind(16), gas=1, is_terminating=False
+                name="load_ind_u16", fn=cls.load_ind(16), is_terminating=False,
+                gas_profile=profile("memory", 1, LOAD_UNITS)
             ),
             127: OpCode(
                 name="load_ind_i16",
                 fn=cls.load_ind(16, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile("memory", 1, LOAD_UNITS),
             ),
             128: OpCode(
-                name="load_ind_u32", fn=cls.load_ind(32), gas=1, is_terminating=False
+                name="load_ind_u32", fn=cls.load_ind(32), is_terminating=False,
+                gas_profile=profile("memory", 1, LOAD_UNITS)
             ),
             129: OpCode(
                 name="load_ind_i32",
                 fn=cls.load_ind(32, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile("memory", 1, LOAD_UNITS),
             ),
             130: OpCode(
-                name="load_ind_u64", fn=cls.load_ind(64), gas=1, is_terminating=False
+                name="load_ind_u64", fn=cls.load_ind(64), is_terminating=False,
+                gas_profile=profile("memory", 1, LOAD_UNITS)
             ),
             131: OpCode(
-                name="add_imm_32", fn=cls.add_imm(32), gas=1, is_terminating=False
+                name="add_imm_32", fn=cls.add_imm(32), is_terminating=False,
+                gas_profile=profile(2, ("P", 2, 3), ALU)
             ),
             132: OpCode(
-                name="and_imm", fn=cls.op_imm("and"), gas=1, is_terminating=False
+                name="and_imm", fn=cls.op_imm("and"), is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
             133: OpCode(
-                name="xor_imm", fn=cls.op_imm("xor"), gas=1, is_terminating=False
+                name="xor_imm", fn=cls.op_imm("xor"), is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
             134: OpCode(
-                name="or_imm", fn=cls.op_imm("or"), gas=1, is_terminating=False
+                name="or_imm", fn=cls.op_imm("or"), is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
             135: OpCode(
-                name="mul_imm_32", fn=cls.mul_imm(32), gas=1, is_terminating=False
+                name="mul_imm_32", fn=cls.mul_imm(32), is_terminating=False,
+                gas_profile=profile(4, ("P", 2, 3), MUL_UNITS)
             ),
             136: OpCode(
-                name="set_lt_u_imm", fn=cls.set_lt_u_imm, gas=1, is_terminating=False
+                name="set_lt_u_imm", fn=cls.set_lt_u_imm, is_terminating=False,
+                gas_profile=profile(3, 3, ALU)
             ),
             137: OpCode(
-                name="set_lt_s_imm", fn=cls.set_lt_s_imm, gas=1, is_terminating=False
+                name="set_lt_s_imm", fn=cls.set_lt_s_imm, is_terminating=False,
+                gas_profile=profile(3, 3, ALU)
             ),
             138: OpCode(
-                name="shlo_l_imm_32", fn=cls.shlo_l_imm(32), gas=1, is_terminating=False
+                name="shlo_l_imm_32", fn=cls.shlo_l_imm(32), is_terminating=False,
+                gas_profile=profile(2, ("P", 2, 3), ALU)
             ),
             139: OpCode(
-                name="shlo_r_imm_32", fn=cls.shlo_r_imm(32), gas=1, is_terminating=False
+                name="shlo_r_imm_32", fn=cls.shlo_r_imm(32), is_terminating=False,
+                gas_profile=profile(2, ("P", 2, 3), ALU)
             ),
             140: OpCode(
-                name="shar_r_imm_32", fn=cls.shar_r_imm(32), gas=1, is_terminating=False
+                name="shar_r_imm_32", fn=cls.shar_r_imm(32), is_terminating=False,
+                gas_profile=profile(2, ("P", 2, 3), ALU)
             ),
             141: OpCode(
                 name="neg_add_imm_32",
                 fn=cls.neg_add_imm(32),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(3, 4, ALU),
             ),
             142: OpCode(
-                name="set_gt_u_imm", fn=cls.set_gt_u_imm, gas=1, is_terminating=False
+                name="set_gt_u_imm", fn=cls.set_gt_u_imm, is_terminating=False,
+                gas_profile=profile(3, 3, ALU)
             ),
             143: OpCode(
-                name="set_gt_s_imm", fn=cls.set_gt_s_imm, gas=1, is_terminating=False
+                name="set_gt_s_imm", fn=cls.set_gt_s_imm, is_terminating=False,
+                gas_profile=profile(3, 3, ALU)
             ),
             144: OpCode(
                 name="shlo_l_imm_alt_32",
                 fn=cls.shlo_l_imm(32, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(2, 4, ALU),
             ),
             145: OpCode(
                 name="shlo_r_imm_alt_32",
                 fn=cls.shlo_r_imm(32, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(2, 4, ALU),
             ),
             146: OpCode(
                 name="shar_r_imm_alt_32",
                 fn=cls.shar_r_imm(32, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(2, 4, ALU),
             ),
             147: OpCode(
-                name="cmov_iz_imm", fn=cls.cmov_iz_imm, gas=1, is_terminating=False
+                name="cmov_iz_imm", fn=cls.cmov_iz_imm, is_terminating=False,
+                gas_profile=profile(2, 3, ALU)
             ),
             148: OpCode(
-                name="cmov_nz_imm", fn=cls.cmov_nz_imm, gas=1, is_terminating=False
+                name="cmov_nz_imm", fn=cls.cmov_nz_imm, is_terminating=False,
+                gas_profile=profile(2, 3, ALU)
             ),
             149: OpCode(
-                name="add_imm_64", fn=cls.add_imm(64), gas=1, is_terminating=False
+                name="add_imm_64", fn=cls.add_imm(64), is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
             150: OpCode(
-                name="mul_imm_64", fn=cls.mul_imm(64), gas=1, is_terminating=False
+                name="mul_imm_64", fn=cls.mul_imm(64), is_terminating=False,
+                gas_profile=profile(3, ("P", 1, 2), MUL_UNITS)
             ),
             151: OpCode(
-                name="shlo_l_imm_64", fn=cls.shlo_l_imm(64), gas=1, is_terminating=False
+                name="shlo_l_imm_64", fn=cls.shlo_l_imm(64), is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
             152: OpCode(
-                name="shlo_r_imm_64", fn=cls.shlo_r_imm(64), gas=1, is_terminating=False
+                name="shlo_r_imm_64", fn=cls.shlo_r_imm(64), is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
             153: OpCode(
-                name="shar_r_imm_64", fn=cls.shar_r_imm(64), gas=1, is_terminating=False
+                name="shar_r_imm_64", fn=cls.shar_r_imm(64), is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
             154: OpCode(
                 name="neg_add_imm_64",
                 fn=cls.neg_add_imm(64),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(2, 3, ALU),
             ),
             155: OpCode(
                 name="shlo_l_imm_alt_64",
                 fn=cls.shlo_l_imm(64, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 3, ALU),
             ),
             156: OpCode(
                 name="shlo_r_imm_alt_64",
                 fn=cls.shlo_r_imm(64, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 3, ALU),
             ),
             157: OpCode(
                 name="shar_r_imm_alt_64",
                 fn=cls.shar_r_imm(64, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 3, ALU),
             ),
             158: OpCode(
-                name="rot_r_64_imm", fn=cls.rot_imm(64), gas=1, is_terminating=False
+                name="rot_r_64_imm", fn=cls.rot_imm(64), is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
             159: OpCode(
                 name="rot_r_64_imm_alt",
                 fn=cls.rot_imm(64, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 3, ALU),
             ),
             160: OpCode(
-                name="rot_r_32_imm", fn=cls.rot_imm(32), gas=1, is_terminating=False
+                name="rot_r_32_imm", fn=cls.rot_imm(32), is_terminating=False,
+                gas_profile=profile(2, ("P", 2, 3), ALU)
             ),
             161: OpCode(
                 name="rot_r_32_imm_alt",
                 fn=cls.rot_imm(32, True),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(2, 4, ALU),
             ),
         }
 
