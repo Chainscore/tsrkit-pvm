@@ -106,6 +106,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
+        with:
+          submodules: recursive
 
       - name: Set up Python 3.12
         if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
@@ -148,6 +150,7 @@ jobs:
         if: (matrix.skip_on_pr != true || github.event_name != 'pull_request') && matrix.arch != 'aarch64'
         shell: bash
         run: |
+          test -f tests/ext/pvm/programs/gas_basic_consume_all.json
           test_root="$(mktemp -d)"
           cp -R tests "$test_root/tests"
           echo "TEST_ROOT=$test_root" >> "$GITHUB_ENV"
