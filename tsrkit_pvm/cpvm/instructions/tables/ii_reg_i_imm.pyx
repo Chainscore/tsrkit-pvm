@@ -352,51 +352,51 @@ cdef dict TABLE = {}
 cdef CyTableEntry _e
 
 # Store instructions (120-123)
-_e = CyTableEntry(); _e.fn = store_ind_u8; _e.gas_cost = 1; _e.is_terminating = False; TABLE[120] = _e
-_e = CyTableEntry(); _e.fn = store_ind_u16; _e.gas_cost = 1; _e.is_terminating = False; TABLE[121] = _e
-_e = CyTableEntry(); _e.fn = store_ind_u32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[122] = _e
-_e = CyTableEntry(); _e.fn = store_ind_u64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[123] = _e
+_e = CyTableEntry(); _e.fn = store_ind_u8; _e.is_terminating = False; TABLE[120] = _e
+_e = CyTableEntry(); _e.fn = store_ind_u16; _e.is_terminating = False; TABLE[121] = _e
+_e = CyTableEntry(); _e.fn = store_ind_u32; _e.is_terminating = False; TABLE[122] = _e
+_e = CyTableEntry(); _e.fn = store_ind_u64; _e.is_terminating = False; TABLE[123] = _e
 
 # Load instructions (124-130) 
-_e = CyTableEntry(); _e.fn = load_ind_u8; _e.gas_cost = 1; _e.is_terminating = False; TABLE[124] = _e
-_e = CyTableEntry(); _e.fn = load_ind_i8; _e.gas_cost = 1; _e.is_terminating = False; TABLE[125] = _e
-_e = CyTableEntry(); _e.fn = load_ind_u16; _e.gas_cost = 1; _e.is_terminating = False; TABLE[126] = _e
-_e = CyTableEntry(); _e.fn = load_ind_i16; _e.gas_cost = 1; _e.is_terminating = False; TABLE[127] = _e
-_e = CyTableEntry(); _e.fn = load_ind_u32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[128] = _e
-_e = CyTableEntry(); _e.fn = load_ind_i32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[129] = _e
-_e = CyTableEntry(); _e.fn = load_ind_u64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[130] = _e
+_e = CyTableEntry(); _e.fn = load_ind_u8; _e.is_terminating = False; TABLE[124] = _e
+_e = CyTableEntry(); _e.fn = load_ind_i8; _e.is_terminating = False; TABLE[125] = _e
+_e = CyTableEntry(); _e.fn = load_ind_u16; _e.is_terminating = False; TABLE[126] = _e
+_e = CyTableEntry(); _e.fn = load_ind_i16; _e.is_terminating = False; TABLE[127] = _e
+_e = CyTableEntry(); _e.fn = load_ind_u32; _e.is_terminating = False; TABLE[128] = _e
+_e = CyTableEntry(); _e.fn = load_ind_i32; _e.is_terminating = False; TABLE[129] = _e
+_e = CyTableEntry(); _e.fn = load_ind_u64; _e.is_terminating = False; TABLE[130] = _e
 
 # Arithmetic and logic instructions (131-159)
-_e = CyTableEntry(); _e.fn = add_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[131] = _e
-_e = CyTableEntry(); _e.fn = and_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[132] = _e
-_e = CyTableEntry(); _e.fn = xor_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[133] = _e
-_e = CyTableEntry(); _e.fn = or_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[134] = _e
-_e = CyTableEntry(); _e.fn = mul_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[135] = _e
-_e = CyTableEntry(); _e.fn = set_lt_u_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[136] = _e
-_e = CyTableEntry(); _e.fn = set_lt_s_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[137] = _e
-_e = CyTableEntry(); _e.fn = shlo_l_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[138] = _e
-_e = CyTableEntry(); _e.fn = shlo_r_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[139] = _e
-_e = CyTableEntry(); _e.fn = shar_r_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[140] = _e
-_e = CyTableEntry(); _e.fn = neg_add_imm_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[141] = _e
-_e = CyTableEntry(); _e.fn = set_gt_u_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[142] = _e
-_e = CyTableEntry(); _e.fn = set_gt_s_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[143] = _e
-_e = CyTableEntry(); _e.fn = shlo_l_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[144] = _e
-_e = CyTableEntry(); _e.fn = shlo_r_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[145] = _e
-_e = CyTableEntry(); _e.fn = shar_r_imm_alt_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[146] = _e
-_e = CyTableEntry(); _e.fn = cmov_iz_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[147] = _e
-_e = CyTableEntry(); _e.fn = cmov_nz_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[148] = _e
+_e = CyTableEntry(); _e.fn = add_imm_32; _e.is_terminating = False; TABLE[131] = _e
+_e = CyTableEntry(); _e.fn = and_imm; _e.is_terminating = False; TABLE[132] = _e
+_e = CyTableEntry(); _e.fn = xor_imm; _e.is_terminating = False; TABLE[133] = _e
+_e = CyTableEntry(); _e.fn = or_imm; _e.is_terminating = False; TABLE[134] = _e
+_e = CyTableEntry(); _e.fn = mul_imm_32; _e.is_terminating = False; TABLE[135] = _e
+_e = CyTableEntry(); _e.fn = set_lt_u_imm; _e.is_terminating = False; TABLE[136] = _e
+_e = CyTableEntry(); _e.fn = set_lt_s_imm; _e.is_terminating = False; TABLE[137] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_32; _e.is_terminating = False; TABLE[138] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_32; _e.is_terminating = False; TABLE[139] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_32; _e.is_terminating = False; TABLE[140] = _e
+_e = CyTableEntry(); _e.fn = neg_add_imm_32; _e.is_terminating = False; TABLE[141] = _e
+_e = CyTableEntry(); _e.fn = set_gt_u_imm; _e.is_terminating = False; TABLE[142] = _e
+_e = CyTableEntry(); _e.fn = set_gt_s_imm; _e.is_terminating = False; TABLE[143] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_alt_32; _e.is_terminating = False; TABLE[144] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_alt_32; _e.is_terminating = False; TABLE[145] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_alt_32; _e.is_terminating = False; TABLE[146] = _e
+_e = CyTableEntry(); _e.fn = cmov_iz_imm; _e.is_terminating = False; TABLE[147] = _e
+_e = CyTableEntry(); _e.fn = cmov_nz_imm; _e.is_terminating = False; TABLE[148] = _e
 
 # 64-bit operations (149-161)
-_e = CyTableEntry(); _e.fn = add_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[149] = _e
-_e = CyTableEntry(); _e.fn = mul_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[150] = _e
-_e = CyTableEntry(); _e.fn = shlo_l_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[151] = _e
-_e = CyTableEntry(); _e.fn = shlo_r_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[152] = _e
-_e = CyTableEntry(); _e.fn = shar_r_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[153] = _e
-_e = CyTableEntry(); _e.fn = neg_add_imm_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[154] = _e
-_e = CyTableEntry(); _e.fn = shlo_l_imm_alt_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[155] = _e
-_e = CyTableEntry(); _e.fn = shlo_r_imm_alt_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[156] = _e
-_e = CyTableEntry(); _e.fn = shar_r_imm_alt_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[157] = _e
-_e = CyTableEntry(); _e.fn = rot_r_64_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[158] = _e
-_e = CyTableEntry(); _e.fn = rot_r_64_imm_alt; _e.gas_cost = 1; _e.is_terminating = False; TABLE[159] = _e
-_e = CyTableEntry(); _e.fn = rot_r_32_imm; _e.gas_cost = 1; _e.is_terminating = False; TABLE[160] = _e
-_e = CyTableEntry(); _e.fn = rot_r_32_imm_alt; _e.gas_cost = 1; _e.is_terminating = False; TABLE[161] = _e
+_e = CyTableEntry(); _e.fn = add_imm_64; _e.is_terminating = False; TABLE[149] = _e
+_e = CyTableEntry(); _e.fn = mul_imm_64; _e.is_terminating = False; TABLE[150] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_64; _e.is_terminating = False; TABLE[151] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_64; _e.is_terminating = False; TABLE[152] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_64; _e.is_terminating = False; TABLE[153] = _e
+_e = CyTableEntry(); _e.fn = neg_add_imm_64; _e.is_terminating = False; TABLE[154] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_imm_alt_64; _e.is_terminating = False; TABLE[155] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_imm_alt_64; _e.is_terminating = False; TABLE[156] = _e
+_e = CyTableEntry(); _e.fn = shar_r_imm_alt_64; _e.is_terminating = False; TABLE[157] = _e
+_e = CyTableEntry(); _e.fn = rot_r_64_imm; _e.is_terminating = False; TABLE[158] = _e
+_e = CyTableEntry(); _e.fn = rot_r_64_imm_alt; _e.is_terminating = False; TABLE[159] = _e
+_e = CyTableEntry(); _e.fn = rot_r_32_imm; _e.is_terminating = False; TABLE[160] = _e
+_e = CyTableEntry(); _e.fn = rot_r_32_imm_alt; _e.is_terminating = False; TABLE[161] = _e

@@ -21,7 +21,8 @@ from .instructions.cy_table cimport CyTableEntry
 
 cdef class CyCompiledInstruction:
     """Pre-compiled instruction with decoded operands and cached function pointers."""
-    def __init__(self, opcode: int, next_pc: int, handler: CyTableEntry, vx: uint64_t, vy: uint64_t, ra: uint8_t, rb: uint8_t, rd: uint8_t):
+    def __init__(self, pc: int, opcode: int, next_pc: int, handler: CyTableEntry, vx: uint64_t, vy: uint64_t, ra: uint8_t, rb: uint8_t, rd: uint8_t):
+        self.pc = pc
         self.opcode = opcode
         self.next_pc = next_pc
         self.handler = handler
@@ -33,26 +34,29 @@ cdef class CyCompiledInstruction:
 
 cdef class CyBlockInfo:
     """Compiled basic block with pre-decoded instructions."""
-    def __init__(self, total_gas: uint32_t, instructions: List):
+    def __init__(self, start_pc: uint32_t, total_gas: uint32_t, instructions: List):
+        self.start_pc = start_pc
         self.total_gas = total_gas
         self.instructions = instructions
+        self.index_by_pc = {instruction.pc: index for index, instruction in enumerate(instructions)}
     
     cdef tuple execute(self, CyProgram program, uint32_t start_pc, uint64_t *reg_arr, CyMemory memory):
         """Execute block with optimized loop - minimal Python object creation."""
         cdef uint32_t current_pc = start_pc
         cdef uint32_t i
         cdef uint32_t next_pc
+        cdef uint32_t start_index
         cdef CyCompiledInstruction compiled_inst
         cdef CyTableEntry handler
-        cdef tuple result
+        cdef CyStatus status
         
         # Pre-cache the list and size to avoid repeated attribute lookups
         cdef list instructions = self.instructions
         cdef uint32_t instructions_size = len(instructions)
-        cdef uint32_t total_gas = self.total_gas
+        start_index = self.index_by_pc[start_pc]
         
         # Execute instructions with minimal overhead
-        for i in range(instructions_size):
+        for i in range(start_index, instructions_size):
             compiled_inst = instructions[i]
             handler = compiled_inst.handler
             
@@ -66,9 +70,10 @@ cdef class CyBlockInfo:
                     compiled_inst.ra, compiled_inst.rb, compiled_inst.rd
                 )
             except PvmExit as e:
-                e.next_pc = compiled_inst.next_pc
-                e.gas_cost = i + 1
-                raise e
+                status = CyStatus()
+                status.code = e.code
+                status.register = e.register
+                return status, compiled_inst.pc, handler.is_terminating
 
             if next_pc == 0xFFFF_FFFF:
                 next_pc = compiled_inst.next_pc
@@ -78,11 +83,11 @@ cdef class CyBlockInfo:
             # Use pre-cached termination flag
             if handler.is_terminating:
                 # print("🏁 Block terminated at PC:", current_pc, "with opcode:", compiled_inst.opcode)
-                return next_pc, total_gas
+                return CONTINUE, next_pc, True
 
             # For non-terminating instructions, advance PC normally
             current_pc = next_pc
                 
         # Block completed normally (shouldn't happen as blocks end with terminating instructions)
         print("⚠️ Block ended without termination instruction")
-        return current_pc, total_gas
+        return CONTINUE, current_pc, False

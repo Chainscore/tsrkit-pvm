@@ -74,6 +74,6 @@ cdef class CyInstructionsWArgs2Reg2Imm(CyTable):
 # Prebuilt table (opcode -> CyTableEntry)
 cdef dict TABLE = {}
 cdef CyTableEntry _e
-_e = CyTableEntry(); _e.fn = load_imm_jump_ind_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[180] = _e
+_e = CyTableEntry(); _e.fn = load_imm_jump_ind_fn; _e.is_terminating = True; TABLE[180] = _e
 
 

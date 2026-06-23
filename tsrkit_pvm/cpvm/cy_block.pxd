@@ -16,6 +16,7 @@ cdef class CyCompiledInstruction:
     """Pre-compiled instruction with decoded operands and cached function pointers."""
     
     # Public attributes
+    cdef public uint32_t        pc
     cdef public int             opcode
     cdef public uint32_t        next_pc
     cdef public CyTableEntry    handler
@@ -30,8 +31,10 @@ cdef class CyBlockInfo:
     """Compiled basic block with pre-decoded instructions."""
     
     # Public attributes
+    cdef public uint32_t      start_pc
     cdef public uint32_t      total_gas
     cdef public list          instructions
+    cdef public dict          index_by_pc
     
     # Methods
     cdef tuple execute(self, CyProgram program, uint32_t start_pc, uint64_t *reg_arr, CyMemory memory)

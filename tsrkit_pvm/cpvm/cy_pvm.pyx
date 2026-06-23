@@ -22,6 +22,7 @@ from .cy_status cimport OUT_OF_GAS, PAGE_FAULT, PVM_HALT, PVM_PANIC, PVM_PAGE_FA
 from .cy_status cimport PvmExit
 from ..common.status import ExecutionStatus, HALT, PANIC, OUT_OF_GAS as EXEC_OUT_OF_GAS, CONTINUE as EXEC_CONTINUE, HOST, PAGE_FAULT as EXEC_PAGE_FAULT
 from .mapper cimport inst_map
+from .cy_block cimport CyBlockInfo
 
 cdef class CyInterpreter:
     """
@@ -39,6 +40,28 @@ cdef class CyInterpreter:
         gas: int,
         registers: List[int],
         memory: CyMemory,
+        logger: Union[Any, None] = None,
+    ):
+        status, pc, remaining_gas, _, py_registers, memory = cls.execute_ext(
+            program,
+            program_counter,
+            gas,
+            registers,
+            memory,
+            block_gas_charged=False,
+            logger=logger,
+        )
+        return status, pc, remaining_gas, py_registers, memory
+
+    @classmethod
+    def execute_ext(
+        cls,
+        program: CyProgram,
+        program_counter: int,
+        gas: int,
+        registers: List[int],
+        memory: CyMemory,
+        block_gas_charged: bool = False,
         logger: Union[Any, None] = None,
     ):
         cdef int64_t remaining_gas = gas
@@ -61,7 +84,14 @@ cdef class CyInterpreter:
                 program_size=program.zeta_len,
             )
 
-        status, pc, remaining_gas = _execute_internal(program, pc, remaining_gas, reg_arr, memory)
+        status, pc, remaining_gas, block_gas_charged = _execute_internal(
+            program,
+            pc,
+            remaining_gas,
+            block_gas_charged,
+            reg_arr,
+            memory,
+        )
         if logger:
             logger.debug(
                 "PVM result",
@@ -97,13 +127,14 @@ cdef class CyInterpreter:
             # Default to HALT for unknown status codes
             execution_status = HALT
         
-        return execution_status, int(pc), int(remaining_gas), py_registers, memory
+        return execution_status, int(pc), int(remaining_gas), bool(block_gas_charged), py_registers, memory
 
 
 cdef tuple _execute_internal(
     CyProgram program,
     int32_t program_counter,
     int64_t gas,
+    bint block_gas_charged,
     uint64_t *registers,
     CyMemory memory,
 ):
@@ -113,32 +144,31 @@ cdef tuple _execute_internal(
     """
     cdef int64_t remaining_gas = gas
     cdef int32_t pc = program_counter
-    cdef int32_t gas_cost
     cdef bint should_break = False
     cdef tuple result
     cdef CyStatus status = CONTINUE
-    cdef int status_code = 0
+    cdef CyBlockInfo block
+    cdef int32_t block_start
+    cdef bint executed_terminator
     
     while not should_break:
-        try:
-            # Execute instruction using optimized mapper (this will handle nogil internally)
-            pc, gas_cost = inst_map.process_instruction(program, pc, registers, memory)
-            remaining_gas -= gas_cost
+        block_start = program.containing_basic_block_start(pc)
+        block = inst_map.get_block(program, block_start)
 
-            if remaining_gas < 0:
+        if not block_gas_charged:
+            if remaining_gas < block.total_gas:
                 status = OUT_OF_GAS
                 should_break = True
                 continue
+            remaining_gas -= block.total_gas
+            block_gas_charged = True
 
-        except PvmExit as e:
-            if e.code < 5:
-                should_break = True
-                status.code = e.code 
-                status.register = e.register
-                remaining_gas -= e.gas_cost
-                pc = e.next_pc
-            else:
-                raise e
+        status, pc, executed_terminator = block.execute(program, pc, registers, memory)
 
-    return status, pc, remaining_gas
+        if executed_terminator and (status.code == PVM_CONTINUE or status.code == PVM_HOST):
+            block_gas_charged = False
 
+        if status.code != PVM_CONTINUE:
+            should_break = True
+
+    return status, pc, remaining_gas, block_gas_charged

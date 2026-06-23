@@ -176,7 +176,7 @@ cdef class CyMemory:
         cdef uint32_t i
         for i in range(num_pages):
             if not self._has_access_c(start_page + i, mode):
-                raise PvmExit(2, fault_addr)
+                raise PvmExit(2, (start_page + i) << 12)
 
     cdef void _alter_accessibility_c(self, uint32_t start_addr, uint32_t length, uint8_t access):
         """Ultra-fast C-level accessibility alteration."""

@@ -31,5 +31,4 @@ cdef class PvmExit(Exception):
     cdef public uint32_t code
     cdef public uint32_t register
     cdef public uint32_t next_pc
-    cdef public uint32_t gas_cost
     cdef public str message

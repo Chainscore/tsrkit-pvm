@@ -17,52 +17,52 @@ cdef inline uint32_t load_imm_jump_fn(CyProgram program, uint64_t *registers, Cy
 cdef inline uint32_t branch_eq_imm_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC81: Branch if register equals immediate."""
     cdef bint condition = registers[ra] == vx
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_ne_imm_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC82: Branch if register not equals immediate."""
     cdef bint condition = registers[ra] != vx
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_lt_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC83: Branch if register less than immediate (unsigned)."""
     cdef bint condition = registers[ra] < vx
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_le_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC84: Branch if register less than or equal immediate (unsigned)."""
     cdef bint condition = registers[ra] <= vx
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_ge_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC85: Branch if register greater than or equal immediate (unsigned)."""
     cdef bint condition = registers[ra] >= vx
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_gt_u_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC86: Branch if register greater than immediate (unsigned)."""
     cdef bint condition = registers[ra] > vx
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_lt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC87: Branch if register less than immediate (signed)."""
     cdef bint condition = z(<uint64_t>registers[ra], <uint8_t>8) < z(<uint64_t>vx, <uint8_t>8)
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_le_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC88: Branch if register less than or equal immediate (signed)."""
     cdef bint condition = z(<uint64_t>registers[ra], <uint8_t>8) <= z(<uint64_t>vx, <uint8_t>8)
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_ge_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC89: Branch if register greater than or equal immediate (signed)."""
     cdef bint condition = z(<uint64_t>registers[ra], <uint8_t>8) >= z(<uint64_t>vx, <uint8_t>8)
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 cdef inline uint32_t branch_gt_s_imm(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC90: Branch if register greater than immediate (signed)."""
     cdef bint condition = z(<uint64_t>registers[ra], <uint8_t>8) > z(<uint64_t>vx, <uint8_t>8)
-    return program.branch(counter, vy, condition)
+    return program.conditional_branch(counter, vy, condition)
 
 
 cdef class InstructionsWArgs1Reg1Imm1Offset(CyTable):
@@ -118,14 +118,14 @@ cdef class InstructionsWArgs1Reg1Imm1Offset(CyTable):
 # Prebuilt table (opcode -> CyTableEntry)
 cdef dict TABLE = {}
 cdef CyTableEntry _e
-_e = CyTableEntry(); _e.fn = load_imm_jump_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[80] = _e
-_e = CyTableEntry(); _e.fn = branch_eq_imm_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[81] = _e
-_e = CyTableEntry(); _e.fn = branch_ne_imm_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[82] = _e
-_e = CyTableEntry(); _e.fn = branch_lt_u_imm; _e.gas_cost = 1; _e.is_terminating = True; TABLE[83] = _e
-_e = CyTableEntry(); _e.fn = branch_le_u_imm; _e.gas_cost = 1; _e.is_terminating = True; TABLE[84] = _e
-_e = CyTableEntry(); _e.fn = branch_ge_u_imm; _e.gas_cost = 1; _e.is_terminating = True; TABLE[85] = _e
-_e = CyTableEntry(); _e.fn = branch_gt_u_imm; _e.gas_cost = 1; _e.is_terminating = True; TABLE[86] = _e
-_e = CyTableEntry(); _e.fn = branch_lt_s_imm; _e.gas_cost = 1; _e.is_terminating = True; TABLE[87] = _e
-_e = CyTableEntry(); _e.fn = branch_le_s_imm; _e.gas_cost = 1; _e.is_terminating = True; TABLE[88] = _e
-_e = CyTableEntry(); _e.fn = branch_ge_s_imm; _e.gas_cost = 1; _e.is_terminating = True; TABLE[89] = _e
-_e = CyTableEntry(); _e.fn = branch_gt_s_imm; _e.gas_cost = 1; _e.is_terminating = True; TABLE[90] = _e
+_e = CyTableEntry(); _e.fn = load_imm_jump_fn; _e.is_terminating = True; TABLE[80] = _e
+_e = CyTableEntry(); _e.fn = branch_eq_imm_fn; _e.is_terminating = True; TABLE[81] = _e
+_e = CyTableEntry(); _e.fn = branch_ne_imm_fn; _e.is_terminating = True; TABLE[82] = _e
+_e = CyTableEntry(); _e.fn = branch_lt_u_imm; _e.is_terminating = True; TABLE[83] = _e
+_e = CyTableEntry(); _e.fn = branch_le_u_imm; _e.is_terminating = True; TABLE[84] = _e
+_e = CyTableEntry(); _e.fn = branch_ge_u_imm; _e.is_terminating = True; TABLE[85] = _e
+_e = CyTableEntry(); _e.fn = branch_gt_u_imm; _e.is_terminating = True; TABLE[86] = _e
+_e = CyTableEntry(); _e.fn = branch_lt_s_imm; _e.is_terminating = True; TABLE[87] = _e
+_e = CyTableEntry(); _e.fn = branch_le_s_imm; _e.is_terminating = True; TABLE[88] = _e
+_e = CyTableEntry(); _e.fn = branch_ge_s_imm; _e.is_terminating = True; TABLE[89] = _e
+_e = CyTableEntry(); _e.fn = branch_gt_s_imm; _e.is_terminating = True; TABLE[90] = _e

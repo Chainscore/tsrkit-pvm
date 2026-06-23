@@ -63,5 +63,5 @@ cdef class CyWArgsOneOffset(CyTable):
 # Prebuilt table (opcode -> CyTableEntry)
 cdef dict TABLE = {}
 cdef CyTableEntry _e
-_e = CyTableEntry(); _e.fn = jump_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[40] = _e
+_e = CyTableEntry(); _e.fn = jump_fn; _e.is_terminating = True; TABLE[40] = _e
 

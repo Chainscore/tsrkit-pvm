@@ -26,6 +26,10 @@ cdef inline uint32_t fallthrough_fn(CyProgram program, uint64_t *registers, CyMe
     """
     return <uint32_t>0xFFFFFFFF
 
+cdef inline uint32_t unlikely_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
+    """OPC2: Unlikely - branch gas hint; execution-level no-op."""
+    return <uint32_t>0xFFFFFFFF
+
 cdef class InstructionsWoArgs(CyTable):
     """
     Cython optimized instruction table for instructions without arguments.
@@ -50,7 +54,7 @@ cdef class InstructionsWoArgs(CyTable):
 
 cdef dict TABLE = {}
 cdef CyTableEntry _e
-_e = CyTableEntry(); _e.fn = trap_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[0] = _e
-_e = CyTableEntry(); _e.fn = fallthrough_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[1] = _e
-
+_e = CyTableEntry(); _e.fn = trap_fn; _e.is_terminating = True; TABLE[0] = _e
+_e = CyTableEntry(); _e.fn = fallthrough_fn; _e.is_terminating = True; TABLE[1] = _e
+_e = CyTableEntry(); _e.fn = unlikely_fn; _e.is_terminating = False; TABLE[2] = _e
 

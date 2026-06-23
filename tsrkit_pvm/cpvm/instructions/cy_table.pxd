@@ -34,7 +34,6 @@ ctypedef uint32_t (*instr_fn_t)(
 # can be stored in Python dicts and carried around easily.
 cdef class CyTableEntry:
     cdef instr_fn_t fn
-    cdef public uint32_t gas_cost
     cdef public bint is_terminating
 
 cdef class CyTable:

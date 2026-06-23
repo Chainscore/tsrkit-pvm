@@ -12,27 +12,27 @@ from ...cy_program cimport CyProgram
 
 cdef inline uint32_t branch_eq_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC170: Branch if ra == rb to offset vx."""
-    return program.branch(counter, vx, registers[ra] == registers[rb])
+    return program.conditional_branch(counter, vx, registers[ra] == registers[rb])
 
 cdef inline uint32_t branch_ne_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC171: Branch if ra != rb to offset vx."""
-    return program.branch(counter, vx, registers[ra] != registers[rb])
+    return program.conditional_branch(counter, vx, registers[ra] != registers[rb])
 
 cdef inline uint32_t branch_lt_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC172: Branch if ra < rb (unsigned) to offset vx."""
-    return program.branch(counter, vx, registers[ra] < registers[rb])
+    return program.conditional_branch(counter, vx, registers[ra] < registers[rb])
 
 cdef inline uint32_t branch_lt_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC173: Branch if ra < rb (signed) to offset vx."""
-    return program.branch(counter, vx, <int64_t>registers[ra] < <int64_t>registers[rb])
+    return program.conditional_branch(counter, vx, <int64_t>registers[ra] < <int64_t>registers[rb])
 
 cdef inline uint32_t branch_ge_u_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC174: Branch if ra >= rb (unsigned) to offset vx."""
-    return program.branch(counter, vx, registers[ra] >= registers[rb])
+    return program.conditional_branch(counter, vx, registers[ra] >= registers[rb])
 
 cdef inline uint32_t branch_ge_s_fn(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC175: Branch if ra >= rb (signed) to offset vx."""
-    return program.branch(counter, vx, <int64_t>registers[ra] >= <int64_t>registers[rb])
+    return program.conditional_branch(counter, vx, <int64_t>registers[ra] >= <int64_t>registers[rb])
 
 cdef class CyInstructionsWArgs2Reg1Offset(CyTable):
     """
@@ -81,9 +81,9 @@ cdef class CyInstructionsWArgs2Reg1Offset(CyTable):
 # Prebuilt table (opcode -> CyTableEntry)
 cdef dict TABLE = {}
 cdef CyTableEntry _e
-_e = CyTableEntry(); _e.fn = branch_eq_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[170] = _e
-_e = CyTableEntry(); _e.fn = branch_ne_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[171] = _e
-_e = CyTableEntry(); _e.fn = branch_lt_u_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[172] = _e
-_e = CyTableEntry(); _e.fn = branch_lt_s_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[173] = _e
-_e = CyTableEntry(); _e.fn = branch_ge_u_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[174] = _e
-_e = CyTableEntry(); _e.fn = branch_ge_s_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[175] = _e
+_e = CyTableEntry(); _e.fn = branch_eq_fn; _e.is_terminating = True; TABLE[170] = _e
+_e = CyTableEntry(); _e.fn = branch_ne_fn; _e.is_terminating = True; TABLE[171] = _e
+_e = CyTableEntry(); _e.fn = branch_lt_u_fn; _e.is_terminating = True; TABLE[172] = _e
+_e = CyTableEntry(); _e.fn = branch_lt_s_fn; _e.is_terminating = True; TABLE[173] = _e
+_e = CyTableEntry(); _e.fn = branch_ge_u_fn; _e.is_terminating = True; TABLE[174] = _e
+_e = CyTableEntry(); _e.fn = branch_ge_s_fn; _e.is_terminating = True; TABLE[175] = _e
