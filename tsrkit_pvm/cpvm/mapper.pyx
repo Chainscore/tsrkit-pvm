@@ -24,6 +24,88 @@ from .instructions.tables.ii_reg_ii_imm cimport CyInstructionsWArgs2Reg2Imm as T
 from .instructions.tables.iii_reg cimport CyInstructionsWArgs3Reg as TC
 # ----------------------------------------------------------
 
+from tsrkit_pvm.gas.props import (
+    MEMORY_ACCESS_CYCLES,
+    TRAP_OPCODE,
+    UNLIKELY_OPCODE,
+    get_destination_registers,
+    get_source_registers,
+)
+from tsrkit_pvm.gas.simulator import compute_basic_block_gas
+from tsrkit_pvm.interpreter.instructions.inst_map import inst_map as py_inst_map
+
+
+cdef list _gas_args_from_props(uint8_t opcode, InstructionProps props):
+    if opcode == 20:
+        return [props.rd]
+    if 50 <= opcode <= 62:
+        return [props.ra]
+    if 70 <= opcode <= 73:
+        return [props.ra]
+    if 80 <= opcode <= 90:
+        return [props.ra, 0, 0, props.vx, props.vy]
+    if 100 <= opcode <= 110:
+        return [props.rd, props.ra]
+    if 120 <= opcode <= 161:
+        return [props.ra, props.rb]
+    if 170 <= opcode <= 175:
+        return [props.ra, props.rb, 0, props.vx]
+    if opcode == 180:
+        return [props.ra, props.rb]
+    if 190 <= opcode <= 230:
+        return [props.ra, props.rb, props.rd]
+    return []
+
+
+cdef object _resolve_cython_gas_profile(CyProgram program, int32_t pc, uint8_t opcode, list args):
+    cdef uint32_t fallthrough
+    cdef uint32_t target
+    handler = py_inst_map._dispatch_table[opcode]
+    if handler is None:
+        raise ValueError(f"Invalid opcode {opcode} at PC {pc}")
+
+    profile = handler.op_data.gas_profile
+    source_registers = get_source_registers(opcode, args)
+    destination_registers = get_destination_registers(opcode, args)
+
+    execution_cycles = profile.execution_cycles
+    if execution_cycles == "memory":
+        execution_cycles = MEMORY_ACCESS_CYCLES
+    elif execution_cycles == "branch":
+        fallthrough = <uint32_t>(pc + 1 + program.skip(pc))
+        if 81 <= opcode <= 90:
+            target = <uint32_t>args[4]
+        elif 170 <= opcode <= 175:
+            target = <uint32_t>args[3]
+        else:
+            raise ValueError(f"Opcode {opcode} does not use branch gas")
+        fallthrough_opcode = program.zeta[fallthrough] if fallthrough < program.zeta_len else TRAP_OPCODE
+        target_opcode = program.zeta[target] if target < program.zeta_len else TRAP_OPCODE
+        if fallthrough_opcode in (TRAP_OPCODE, UNLIKELY_OPCODE) or target_opcode in (TRAP_OPCODE, UNLIKELY_OPCODE):
+            execution_cycles = 1
+        else:
+            execution_cycles = 20
+
+    decode_slots = profile.decode_slots
+    if not isinstance(decode_slots, int):
+        kind, first, second = decode_slots
+        if kind == "P":
+            decode_slots = first if set(source_registers) & set(destination_registers) else second
+        elif kind == "PS":
+            decode_slots = first if source_registers and destination_registers and source_registers[0] == destination_registers[0] else second
+        else:
+            raise ValueError(f"Unknown decode slot rule: {decode_slots!r}")
+
+    return (
+        pc,
+        opcode,
+        execution_cycles,
+        decode_slots,
+        profile.units,
+        source_registers,
+        destination_registers,
+    )
+
 
 cdef class CyInstMapper:
     """
@@ -57,17 +139,13 @@ cdef class CyInstMapper:
         cdef CyTableEntry entry_ptr = <CyTableEntry>self._dispatch_opdata[opcode]
         return entry_ptr is not None and entry_ptr.is_terminating
 
-    cpdef uint32_t get_gas_cost(self, uint8_t opcode):
-        """Get the gas cost for an opcode."""
-        cdef CyTableEntry entry_ptr = <CyTableEntry>self._dispatch_opdata[opcode]
-        return 0 if entry_ptr is None else entry_ptr.gas_cost
-    
     cdef tuple process_instruction(self, CyProgram program, int32_t program_counter, 
                                      uint64_t *registers, CyMemory memory):
         """
         Execute an instruction using the optimized dispatch table.
         """
-        cdef CyBlockInfo block = self.get_block(program, program_counter)
+        cdef int32_t block_start = program.containing_basic_block_start(program_counter)
+        cdef CyBlockInfo block = self.get_block(program, block_start)
         return block.execute(program, program_counter, registers, memory)
     
     cdef CyBlockInfo get_block(self, CyProgram program, int32_t start_pc):
@@ -87,11 +165,11 @@ cdef class CyInstMapper:
         cdef uint8_t opcode
         cdef CyTable table_instance
         cdef CyTableEntry entry
-        cdef uint32_t total_gas = 0
         cdef InstructionProps props
         cdef uint64_t skip_index
 
         compiled_instructions = []
+        gas_instructions = []
         
         while True:
             opcode = program.zeta[current_pc]
@@ -108,6 +186,7 @@ cdef class CyInstMapper:
             next_pc = current_pc + skip_index + 1
             # Create compiled instruction with pre-cached function and flags
             compiled_inst = CyCompiledInstruction(
+                current_pc,
                 opcode,
                 next_pc,
                 entry,
@@ -115,7 +194,14 @@ cdef class CyInstMapper:
             )
             
             compiled_instructions.append(compiled_inst)
-            total_gas += entry.gas_cost
+            gas_instructions.append(
+                _resolve_cython_gas_profile(
+                    program,
+                    current_pc,
+                    opcode,
+                    _gas_args_from_props(opcode, props),
+                )
+            )
             
             # Stop at terminating instructions
             if entry.is_terminating:
@@ -124,7 +210,7 @@ cdef class CyInstMapper:
             # Move to next instruction
             current_pc = next_pc
         
-        return CyBlockInfo(total_gas, compiled_instructions)
+        return CyBlockInfo(start_pc, compute_basic_block_gas(gas_instructions), compiled_instructions)
 
 # Global instance for compatibility with Python version
 cdef public CyInstMapper inst_map = CyInstMapper()

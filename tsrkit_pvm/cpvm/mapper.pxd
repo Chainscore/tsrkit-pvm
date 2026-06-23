@@ -15,7 +15,6 @@ cdef class CyInstMapper:
     cdef void _init_dispatch_table(self)
 
     cpdef bint     is_terminating(self, uint8_t opcode)
-    cpdef uint32_t get_gas_cost(self, uint8_t opcode)
 
     cdef tuple process_instruction(self,
                                    CyProgram  program,

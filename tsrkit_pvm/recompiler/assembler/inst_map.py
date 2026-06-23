@@ -76,14 +76,7 @@ class InstMapper:
         props = table_instance.get_props()
         result = handler.op_data.fn(table_instance, *args, *props)
 
-        return result, handler.op_data.gas
-
-    def get_gas_cost(self, opcode: int) -> int:
-        """Get gas cost for an opcode with direct lookup - no dictionary access."""
-        opc = self._dispatch_table[opcode]
-        if opc is None:
-            raise PvmError(PANIC, f"Invalid opcode: {opcode}")
-        return opc.op_data.gas
+        return result, 1
 
     def is_terminating(self, opcode: int) -> bool:
         """Check if an opcode is terminating with direct lookup."""

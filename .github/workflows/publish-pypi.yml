@@ -106,6 +106,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
+        with:
+          submodules: recursive
 
       - name: Set up Python 3.12
         if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
@@ -124,9 +126,10 @@ jobs:
         if: (matrix.skip_on_pr != true || github.event_name != 'pull_request') && matrix.arch != 'aarch64'
         shell: bash
         run: |
-          # Install from the dist directory, pip will pick the right wheel
-          # Allow pip to fetch dependencies from PyPI
-          pip install --find-links=dist/ tsrkit-pvm
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          # Install from the dist directory; pip will pick the wheel for this runner.
+          python -m pip install --find-links=dist/ tsrkit-pvm
 
       - name: Verify aarch64 wheel artifact
         if: (matrix.skip_on_pr != true || github.event_name != 'pull_request') && matrix.arch == 'aarch64'
@@ -143,46 +146,37 @@ jobs:
           print("Found wheels:", wheels)
           PY
 
-      - name: Test Interpreter Mode (Cython)
+      - name: Prepare installed-wheel test workspace
         if: (matrix.skip_on_pr != true || github.event_name != 'pull_request') && matrix.arch != 'aarch64'
         shell: bash
         run: |
-          echo "Testing PVM_MODE=interpreter..."
-          PVM_MODE=interpreter python - <<'PY'
-          import os
-          import sys
-          # Ensure we import the installed wheel, not the source checkout.
-          cwd = os.path.abspath(os.getcwd())
-          sys.path = [p for p in sys.path if p and os.path.abspath(p) != cwd]
-          from tsrkit_pvm.cpvm import CyInterpreter
-          print('[+] Successfully imported CyInterpreter')
-          print('[+] Interpreter mode test: PASSED')
-          PY
+          test -f tests/ext/pvm/programs/gas_basic_consume_all.json
+          test_root="$(mktemp -d)"
+          cp -R tests "$test_root/tests"
+          echo "TEST_ROOT=$test_root" >> "$GITHUB_ENV"
 
-      - name: Test Recompiler Mode (Linux x86_64 only)
+      - name: Test installed wheel interpreter and Cython vectors
+        if: (matrix.skip_on_pr != true || github.event_name != 'pull_request') && matrix.arch != 'aarch64'
+        shell: bash
+        run: |
+          cd "$TEST_ROOT"
+          python -m pytest tests/test_pvm_gas_accounting.py -q
+          python -m pytest tests/test_vectors.py::test_vectors_intr -q
+          python -m pytest tests/test_vectors.py::test_vectors_cython -q
+
+      - name: Test installed wheel recompiler vectors
         if: matrix.test_recompiler == true && (matrix.skip_on_pr != true || github.event_name != 'pull_request')
         shell: bash
-        continue-on-error: true
         run: |
-          echo "Testing PVM_MODE=recompiler..."
-          PVM_MODE=recompiler python -c "
-          try:
-              from tsrkit_pvm.recompiler.pvm import Recompiler
-              from tsrkit_pvm.common.program import Program
-              print('[+] Successfully imported Recompiler')
-              # Create a simple program
-              program = Program(code=bytes([0x00]))
-              pvm = Recompiler(program)
-              print('[+] Successfully created Recompiler instance')
-              print('[+] Recompiler mode test: PASSED')
-          except ImportError as e:
-              print('[!] Recompiler mode test: FAILED (expected - tsrkit-asm not yet on PyPI)')
-              print(f'[!] Import error: {e}')
-              exit(1)
-          except Exception as e:
-              print(f'[!] Recompiler mode test: FAILED with error: {e}')
-              exit(1)
-          "
+          cd "$TEST_ROOT"
+          python -m pytest tests/test_vectors.py::test_vectors_recompiler -q
+
+      - name: Test installed wheel standalone gas block vectors
+        if: matrix.test_recompiler == true && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          cd "$TEST_ROOT"
+          python -m pytest tests/test_vectors.py::test_vectors_gas_only_block_costs -q
 
       - name: Summary
         if: matrix.skip_on_pr != true || github.event_name != 'pull_request'
@@ -190,11 +184,11 @@ jobs:
         run: |
           if [ "${{ matrix.test_recompiler }}" = "true" ]; then
             echo "Platform: ${{ matrix.os }} ${{ matrix.arch }}"
-            echo "✓ Interpreter mode: Available"
-            echo "⚠ Recompiler mode: Expected to fail until tsrkit-asm is published to PyPI"
+            echo "✓ Interpreter and Cython Koute vectors passed"
+            echo "✓ Recompiler Koute vectors passed"
           else
             echo "Platform: ${{ matrix.os }} ${{ matrix.arch }}"
-            echo "✓ Interpreter mode: Available"
+            echo "✓ Interpreter and Cython Koute vectors passed"
             echo "- Recompiler mode: Not supported on this platform"
           fi
 

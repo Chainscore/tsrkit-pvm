@@ -8,6 +8,7 @@ from ....common.status import CONTINUE
 from ....common.utils import clamp_4, z
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 class WArgsOneOffset(InstructionTable):
     def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
@@ -27,7 +28,12 @@ class WArgsOneOffset(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            40: OpCode(name="jump", fn=cls.jump, gas=1, is_terminating=True),
+            40: OpCode(
+                name="jump",
+                fn=cls.jump,
+                is_terminating=True,
+                gas_profile=profile(15, 1, NO_UNITS)
+            ),
         }
 
     def jump(self, registers: list[int], memory: Memory, lx: int, vx: int) -> OpReturn:

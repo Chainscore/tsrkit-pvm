@@ -66,5 +66,5 @@ cdef class CyInstructionsWArgs1Reg1EwImm(CyTable):
 # Prebuilt table (opcode -> CyTableEntry)
 cdef dict TABLE = {}
 cdef CyTableEntry _e
-_e = CyTableEntry(); _e.fn = load_imm_64_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[20] = _e
+_e = CyTableEntry(); _e.fn = load_imm_64_fn; _e.is_terminating = False; TABLE[20] = _e
 

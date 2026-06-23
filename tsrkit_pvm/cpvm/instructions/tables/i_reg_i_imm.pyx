@@ -121,16 +121,16 @@ cdef class CyInstructionsWArgs1Reg1Imm(CyTable):
 # Prebuilt table (opcode -> CyTableEntry)
 cdef dict TABLE = {}
 cdef CyTableEntry _e
-_e = CyTableEntry(); _e.fn = jump_ind_fn; _e.gas_cost = 1; _e.is_terminating = True; TABLE[50] = _e
-_e = CyTableEntry(); _e.fn = load_imm_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[51] = _e
-_e = CyTableEntry(); _e.fn = load_u8_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[52] = _e
-_e = CyTableEntry(); _e.fn = load_i8_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[53] = _e
-_e = CyTableEntry(); _e.fn = load_u16_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[54] = _e
-_e = CyTableEntry(); _e.fn = load_i16_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[55] = _e
-_e = CyTableEntry(); _e.fn = load_u32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[56] = _e
-_e = CyTableEntry(); _e.fn = load_i32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[57] = _e
-_e = CyTableEntry(); _e.fn = load_u64_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[58] = _e
-_e = CyTableEntry(); _e.fn = store_u8_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[59] = _e
-_e = CyTableEntry(); _e.fn = store_u16_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[60] = _e
-_e = CyTableEntry(); _e.fn = store_u32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[61] = _e
-_e = CyTableEntry(); _e.fn = store_u64_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[62] = _e
+_e = CyTableEntry(); _e.fn = jump_ind_fn; _e.is_terminating = True; TABLE[50] = _e
+_e = CyTableEntry(); _e.fn = load_imm_fn; _e.is_terminating = False; TABLE[51] = _e
+_e = CyTableEntry(); _e.fn = load_u8_fn; _e.is_terminating = False; TABLE[52] = _e
+_e = CyTableEntry(); _e.fn = load_i8_fn; _e.is_terminating = False; TABLE[53] = _e
+_e = CyTableEntry(); _e.fn = load_u16_fn; _e.is_terminating = False; TABLE[54] = _e
+_e = CyTableEntry(); _e.fn = load_i16_fn; _e.is_terminating = False; TABLE[55] = _e
+_e = CyTableEntry(); _e.fn = load_u32_fn; _e.is_terminating = False; TABLE[56] = _e
+_e = CyTableEntry(); _e.fn = load_i32_fn; _e.is_terminating = False; TABLE[57] = _e
+_e = CyTableEntry(); _e.fn = load_u64_fn; _e.is_terminating = False; TABLE[58] = _e
+_e = CyTableEntry(); _e.fn = store_u8_fn; _e.is_terminating = False; TABLE[59] = _e
+_e = CyTableEntry(); _e.fn = store_u16_fn; _e.is_terminating = False; TABLE[60] = _e
+_e = CyTableEntry(); _e.fn = store_u32_fn; _e.is_terminating = False; TABLE[61] = _e
+_e = CyTableEntry(); _e.fn = store_u64_fn; _e.is_terminating = False; TABLE[62] = _e

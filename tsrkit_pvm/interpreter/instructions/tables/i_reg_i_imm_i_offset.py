@@ -8,6 +8,7 @@ from ....common.status import CONTINUE
 from ....common.utils import chi, compare, z, clamp_12, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
     def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
@@ -44,67 +45,68 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             80: OpCode(
-                name="load_imm_jump", fn=cls.load_imm_jump, gas=1, is_terminating=True
+                name="load_imm_jump", fn=cls.load_imm_jump, is_terminating=True,
+                gas_profile=profile(15, 1, NO_UNITS)
             ),
             81: OpCode(
                 name="branch_eq_imm",
                 fn=cls.branch_imm("eq"),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             82: OpCode(
                 name="branch_ne_imm",
                 fn=cls.branch_imm("ne"),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             83: OpCode(
                 name="branch_lt_u_imm",
                 fn=cls.branch_imm("lt"),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             84: OpCode(
                 name="branch_le_u_imm",
                 fn=cls.branch_imm("le"),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             85: OpCode(
                 name="branch_ge_u_imm",
                 fn=cls.branch_imm("ge"),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             86: OpCode(
                 name="branch_gt_u_imm",
                 fn=cls.branch_imm("gt"),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             87: OpCode(
                 name="branch_lt_s_imm",
                 fn=cls.branch_imm("lt", True),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             88: OpCode(
                 name="branch_le_s_imm",
                 fn=cls.branch_imm("le", True),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             89: OpCode(
                 name="branch_ge_s_imm",
                 fn=cls.branch_imm("ge", True),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
             90: OpCode(
                 name="branch_gt_s_imm",
                 fn=cls.branch_imm("gt", True),
-                gas=1,
                 is_terminating=True,
+                gas_profile=profile("branch", 1, ALU),
             ),
         }
 
@@ -126,6 +128,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
                     z(vx, 8) if signed else vx,
                     op,
                 ),
+                validate_fallthrough=True,
             )
             if status == CONTINUE and counter != self.counter:
                 return status, counter, registers, memory

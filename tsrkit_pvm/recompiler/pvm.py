@@ -1,5 +1,5 @@
 from typing import Tuple, ClassVar, Optional
-from tsrkit_pvm.common.types import Accessibility
+import importlib.util
 from tsrkit_pvm.core.ipvm import PVM
 from tsrkit_pvm.recompiler.assembler.inst_map import inst_map
 from tsrkit_pvm.recompiler.memory import REC_Memory
@@ -20,13 +20,14 @@ from tsrkit_asm import (
 import ctypes
 import mmap
 import os
-import os
 
 # Load libc for mprotect
 if os.uname().sysname == "Darwin":
-    libc = ctypes.CDLL("libc.dylib")
+    libc = ctypes.CDLL("libc.dylib", use_errno=True)
 else:
-    libc = ctypes.CDLL("libc.so.6")
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+libc.mprotect.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+libc.mprotect.restype = ctypes.c_int
 
 from ..common.status import PANIC, HALT, PAGE_FAULT, HOST, OUT_OF_GAS, ExecutionStatus
 
@@ -34,20 +35,24 @@ from ..common.status import PANIC, HALT, PAGE_FAULT, HOST, OUT_OF_GAS, Execution
 # Its handlers run on main thread only
 # C's sigaction provides a better low level handler
 try:
-    from importlib.resources import files
-    segwrap_package = files('libs')
-    _segwrap_path = str(segwrap_package / 'libsegwrap.so')
-    
-    # Load the segwrap library with error handling
+    spec = importlib.util.find_spec("tsrkit_pvm.recompiler.segwrap._segwrap")
+    if spec is None or spec.origin is None:
+        raise ImportError("recompiler segwrap extension is not built")
+
+    _segwrap_path = spec.origin
     segwrap: Optional[ctypes.CDLL] = ctypes.CDLL(_segwrap_path)
-    
-    # Test library loading by checking if expected symbols exist
-    if hasattr(segwrap, 'initialize') and hasattr(segwrap, 'run_code'):
+
+    if (
+        hasattr(segwrap, "initialize")
+        and hasattr(segwrap, "run_code")
+        and hasattr(segwrap, "get_program_status")
+        and hasattr(segwrap, "cleanup")
+    ):
         _segwrap_available = True
     else:
         _segwrap_available = False
         print("Warning: segwrap library loaded but missing expected symbols")
-        
+
 except (ImportError, OSError, Exception) as e:
     segwrap = None
     _segwrap_available = False
@@ -88,7 +93,6 @@ class Recompiler(PVM):
             heap_start=memory.heap_start,
         )
         vm_pointer, vm_size = vm_ctx.store(memory)
-        assert vm_pointer == memory.buf_start
 
         # Create callable function - pass memory.offset (guest memory pointer)
         addr, caller_buf = cls.create_caller(
@@ -104,47 +108,20 @@ class Recompiler(PVM):
                 addr, vm_ctx, vm_pointer, code_pointer + program.halt_offset, logger
             )
 
-            # NOTE: This is a temporary handler for `sbrk` - remove this once the instruction is removed
-            while (
-                status._value_.name == "host"
-                and status._value_.register == 2**64 - 1
-                and pg_data
-            ):
-                # We need imm, Calc the PVM instruction against current rip
-                pvm_pc = program.msn_to_pvm_index(pg_data.rip - code_pointer)
-                if pvm_pc == None:
-                    raise ValueError("Unable to map Machine code to PVM")
-                # sbrk is 2 bytes long, and rip is at the next instruction
-                sbrk_pc = pvm_pc - 2
-                imm = program.instruction_set[sbrk_pc + 1]
-                rd, ra = min(12, imm % 16), min(12, imm // 16)
-                # Bytes to add
-                req = updated_regs[ra]
-                updated_regs[rd] = vm_ctx.heap_start + req
-
-                memory.alter_accessibility(vm_ctx.heap_start, req, Accessibility.WRITE)
-
-                # Create callable function - pass memory.offset (guest memory pointer)
-                vm_ctx = VMContext.from_pointer(vm_pointer, len(vm_ctx.jump_table))
-                # Update registers - now vm_ctx.regs is a plain list, no need for TypedArray wrapper
-                vm_ctx.regs = updated_regs
-                vm_ctx.heap_start += req
-                _, _ = vm_ctx.store(memory)
-                addr, sbrk_caller_buf = cls.create_caller(pg_data.rip, memory.offset)
-                allocated_buffers.append(sbrk_caller_buf)
-                # Run from last return
-                status, updated_regs, pg_data = cls.run_code(
-                    addr, vm_ctx, vm_pointer, code_pointer + program.halt_offset, logger
-                )
-
         except Exception as e:
             raise ValueError(f"Page Fault {e}")
         finally:
             cls.cleanup_sig_state()
 
-        final_pc = program.msn_to_pvm_index(pg_data.rip - code_pointer)
+        fault_offset = pg_data.rip - code_pointer
+        final_pc = program.msn_to_pvm_index(fault_offset)
+        if status == PANIC:
+            final_pc = program.msn_to_pvm_index(program.panic_offset)
 
-        gas = int(VMContext.from_pointer(vm_pointer, len(program.jump_table)).gas)  # gas is already an int
+        updated_vm_ctx = VMContext.from_pointer(vm_pointer, len(program.jump_table))
+        gas = int(updated_vm_ctx.gas)  # gas is already an int
+        if status in (PANIC, HALT) and updated_vm_ctx.ret_addr:
+            final_pc = int(updated_vm_ctx.ret_addr) - 1
 
         # Adjust overflow
         if status._value_.name == "out-of-gas":
@@ -165,8 +142,9 @@ class Recompiler(PVM):
         """Create a caller function that executes generated code."""
         asm = PyAssembler()
 
-        # RCX –> code pointer,  R15 –> pointer to VMContext struct
+        # RCX -> code pointer, R15 -> guest memory base while generated code runs.
         asm.mov_imm64(TEMP_REG, code_pointer)
+        asm.push(Reg.r15)
         asm.mov_imm64(Reg.r15, mem_pointer)  # Base pointer to linear PVM memory
 
         # ----------------------------------------------------------
@@ -183,6 +161,7 @@ class Recompiler(PVM):
         # ----------------------------------------------------------
         save_all_regs(asm)
         pop_all_regs(asm)
+        asm.pop(Reg.r15)
 
         asm.ret()
 

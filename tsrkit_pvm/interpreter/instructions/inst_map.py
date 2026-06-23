@@ -24,6 +24,8 @@ from typing import Callable, List, Optional, Tuple, Any, Dict, Type, Union
 from tsrkit_pvm.core.instruction_table import InstructionTable
 from tsrkit_pvm.common.status import CONTINUE, ExecutionStatus, PvmError, PANIC
 from tsrkit_pvm.core.opcode import OpCode
+from tsrkit_pvm.gas.props import resolve_gas_profile
+from tsrkit_pvm.gas.simulator import compute_basic_block_gas
 
 all_tables = [
     InstructionsWoArgs,
@@ -51,9 +53,11 @@ class InstructionHandler:
 
 class CompiledInstruction:
     """Pre-compiled instruction with decoded operands and cached function pointers."""
-    __slots__ = ('handler', 'args', 'table', 'fn', 'is_terminating')
+    __slots__ = ('pc', 'opcode', 'handler', 'args', 'table', 'fn', 'is_terminating')
     
-    def __init__(self, handler: InstructionHandler, args: List[int], table: type[InstructionTable], fn: Callable, is_terminating: bool):
+    def __init__(self, pc: int, opcode: int, handler: InstructionHandler, args: List[int], table: type[InstructionTable], fn: Callable, is_terminating: bool):
+        self.pc = pc
+        self.opcode = opcode
         self.handler = handler
         self.args = args
         self.table = table
@@ -62,43 +66,46 @@ class CompiledInstruction:
 
 class BlockInfo:
     """Compiled basic block with pre-decoded instructions."""
-    __slots__ = ('total_gas', 'instructions')
+    __slots__ = ('start_pc', 'total_gas', 'instructions', 'index_by_pc')
     
-    def __init__(self, total_gas: int, instructions: List[CompiledInstruction]):
+    def __init__(self, start_pc: int, total_gas: int, instructions: List[CompiledInstruction]):
+        self.start_pc = start_pc
         self.total_gas = total_gas
         self.instructions = instructions
+        self.index_by_pc = {instruction.pc: index for index, instruction in enumerate(instructions)}
     
-    def execute(self, program: Any, start_pc: int, registers: List[int], memory: Any) -> Tuple[Tuple[Any, int, List[int], Any], int]:
+    def execute(self, program: Any, start_pc: int, registers: List[int], memory: Any) -> Tuple[Tuple[Any, int, List[int], Any], bool]:
         """Execute this block starting from start_pc with given registers and memory.
         
         Ultra-optimized version that uses pre-cached function pointers and flags
         to eliminate all attribute access in the hot execution loop.
         """
-        current_pc = start_pc
         status = None
         
         # Pre-cache data to eliminate repeated attribute access
         instructions = self.instructions
-        total_gas = self.total_gas
+        start_index = self.index_by_pc[start_pc]
         
-        for i, compiled_inst in enumerate(instructions):
+        for compiled_inst in instructions[start_index:]:
             # All critical data is now pre-cached in CompiledInstruction
-            status, next_pc, registers, memory = compiled_inst.fn(
-                compiled_inst.table, registers, memory, *compiled_inst.args
-            )
+            try:
+                status, next_pc, registers, memory = compiled_inst.fn(
+                    compiled_inst.table, registers, memory, *compiled_inst.args
+                )
+            except PvmError as error:
+                error.instruction_counter = compiled_inst.pc
+                error.executed_terminator = compiled_inst.is_terminating
+                raise
 
             # Use pre-cached termination flag
             if compiled_inst.is_terminating:
-                return (status, next_pc, registers, memory), total_gas
+                return (status, next_pc, registers, memory), True
                 
             if status != CONTINUE:
-                return (status, next_pc, registers, memory), i + 1
-            
-            # For non-terminating instructions, advance PC normally
-            current_pc = next_pc
+                return (status, next_pc, registers, memory), False
                 
         # Block completed normally (shouldn't happen as blocks end with terminating instructions)
-        return (status, current_pc, registers, memory), total_gas
+        return (status, start_pc, registers, memory), False
 
 class InstMapper:
     """
@@ -131,7 +138,7 @@ class InstMapper:
         """
         
         # ---- Block based execution ---- #
-        block = self.get_block(program, program_counter)
+        block = self.get_block(program, program.containing_basic_block_start(program_counter))
         return block.execute(program, program_counter, registers, memory)
         
         # ---- Unoptimized, but better if caching is program isolayted for some reason ---- #
@@ -141,14 +148,7 @@ class InstMapper:
         # table_instance = handler.table_class(counter=program_counter, program=program, skip_index=program.skip(program_counter))
         # props = table_instance.get_props()
         # result = handler.op_data.fn(table_instance, registers, memory, *props)
-        # return result, handler.op_data.gas
-
-    def get_gas_cost(self, opcode: int) -> int:
-        """Get gas cost for an opcode with direct lookup - no dictionary access."""
-        opc = self._dispatch_table[opcode]
-        if opc is None:
-            raise PvmError(PANIC, f"Invalid opcode: {opcode}")
-        return opc.op_data.gas
+        # return result
 
     def is_terminating(self, opcode: int) -> bool:
         """Check if an opcode is terminating with direct lookup."""
@@ -169,8 +169,8 @@ class InstMapper:
     def _compile_block(self, program: Any, start_pc: int) -> BlockInfo:
         """Compile a basic block starting at the given PC with aggressive pre-caching."""
         compiled_instructions = []
+        gas_instructions = []
         current_pc = start_pc
-        total_gas = 0
 
         while True:
             opcode = program.zeta[current_pc]
@@ -188,10 +188,20 @@ class InstMapper:
             op_data = handler.op_data
             fn = op_data.fn
             is_terminating = op_data.is_terminating
-            gas_cost = op_data.gas
+            gas_instructions.append(
+                resolve_gas_profile(
+                    program=program,
+                    pc=current_pc,
+                    opcode=opcode,
+                    args=args,
+                    profile=op_data.gas_profile,
+                )
+            )
             
             # Create compiled instruction with pre-cached function and flags
             compiled_inst = CompiledInstruction(
+                pc=current_pc,
+                opcode=opcode,
                 handler=handler,
                 args=args,
                 table=table_instance,
@@ -200,7 +210,6 @@ class InstMapper:
             )
             
             compiled_instructions.append(compiled_inst)
-            total_gas += gas_cost
             
             # Stop at terminating instructions
             if is_terminating:
@@ -210,7 +219,8 @@ class InstMapper:
             current_pc += 1 + skip_count
         
         return BlockInfo(
-            total_gas=total_gas,
+            start_pc=start_pc,
+            total_gas=compute_basic_block_gas(gas_instructions),
             instructions=compiled_instructions,
         )
 

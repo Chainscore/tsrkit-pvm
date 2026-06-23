@@ -9,11 +9,12 @@ from tsrkit_pvm.common.constants import (
     PVM_INIT_ZONE_SIZE,
     PVM_MEMORY_PAGE_SIZE,
 )
-from tsrkit_pvm.common.status import PAGE_FAULT, ExecutionStatus, PvmError
+from tsrkit_pvm.common.status import PAGE_FAULT, PANIC, ExecutionStatus, PvmError
 
 ADDR_MOD = 2**32
 PAGE_SIZE = PVM_MEMORY_PAGE_SIZE
 LOW_BOUND = 0
+LOW_PANIC_BOUND = 2**16
 
 # Pre-computed constants for optimization
 _PAGE_SHIFT = 12  # log2(PAGE_SIZE) = log2(4096) = 12
@@ -104,6 +105,10 @@ class INT_Memory:
         """Fast page index calculation using bit shift instead of division."""
         return addr >> _PAGE_SHIFT
 
+    @staticmethod
+    def _page_base(pg: int) -> int:
+        return pg << _PAGE_SHIFT
+
     def _page_for(self, addr: int, *, create: bool = False) -> Union[bytearray, bytes]:
         """
         Get the underlying page buffer for an address.
@@ -132,18 +137,18 @@ class INT_Memory:
         
         pg = addr >> _PAGE_SHIFT
         if pg >= MAX_PAGES:
-            raise PvmError(PAGE_FAULT(addr))
+            raise PvmError(PAGE_FAULT(self._page_base(pg)))
         
         if write:
             if not self._w_pages[pg]:
                 if self.logger:
                     self.logger.debug(f"Not allowed to write {addr}(Page={pg})")
-                raise PvmError(PAGE_FAULT(addr))
+                raise PvmError(PAGE_FAULT(self._page_base(pg)))
         else:
             if not (self._r_pages[pg] or self._w_pages[pg]):
                 if self.logger:
                     self.logger.debug(f"Not allowed to read {addr}(Page={pg})")
-                raise PvmError(PAGE_FAULT(addr))
+                raise PvmError(PAGE_FAULT(self._page_base(pg)))
 
     # --------------------------------------------------------------------- #
     # Public operations
@@ -154,6 +159,8 @@ class INT_Memory:
             return b""
         
         address = address & _ADDR_MASK
+        if address < LOW_PANIC_BOUND:
+            raise PvmError(PANIC)
         
         # Ultra-fast path: single page, hot cache hit
         pg = address >> _PAGE_SHIFT
@@ -165,7 +172,7 @@ class INT_Memory:
         # Single page path (most common)
         if (address >> _PAGE_SHIFT) == ((address + length - 1) >> _PAGE_SHIFT):
             if pg >= MAX_PAGES or not (self._r_pages[pg] or self._w_pages[pg]):
-                raise PvmError(PAGE_FAULT(address))
+                raise PvmError(PAGE_FAULT(self._page_base(pg)))
             
             page_off = address & _PAGE_MASK
             page_data = self._pages.get(pg)
@@ -193,7 +200,7 @@ class INT_Memory:
         while address < end:
             pg = address >> _PAGE_SHIFT
             if pg >= MAX_PAGES or not (self._r_pages[pg] or self._w_pages[pg]):
-                raise PvmError(PAGE_FAULT(address))
+                raise PvmError(PAGE_FAULT(self._page_base(pg)))
             
             page_off = address & _PAGE_MASK
             chunk = min(PAGE_SIZE - page_off, end - address)
@@ -216,6 +223,8 @@ class INT_Memory:
             
         address = address & _ADDR_MASK
         length = len(data_bytes)
+        if address < LOW_PANIC_BOUND:
+            raise PvmError(PANIC)
         
         # Ultra-fast path: single page, hot cache hit
         pg = address >> _PAGE_SHIFT
@@ -229,7 +238,7 @@ class INT_Memory:
         # Single page path (most common)
         if (address >> _PAGE_SHIFT) == ((address + length - 1) >> _PAGE_SHIFT):
             if pg >= MAX_PAGES or not self._w_pages[pg]:
-                raise PvmError(PAGE_FAULT(address))
+                raise PvmError(PAGE_FAULT(self._page_base(pg)))
             
             # Get or create page
             page_data = self._pages.get(pg)
@@ -262,7 +271,7 @@ class INT_Memory:
         while address < end:
             pg = address >> _PAGE_SHIFT
             if pg >= MAX_PAGES or not self._w_pages[pg]:
-                raise PvmError(PAGE_FAULT(address))
+                raise PvmError(PAGE_FAULT(self._page_base(pg)))
             
             page_off = address & _PAGE_MASK
             chunk = min(PAGE_SIZE - page_off, end - address)
@@ -329,7 +338,6 @@ class INT_Memory:
         for i, byt in enumerate(read):
             memory[read_start + i] = int(byt)
             
-        print(read_pages)
 
         write_start = 2 * PVM_INIT_ZONE_SIZE + total_zone_size(len(read))
         write_pages = get_pages(
@@ -351,7 +359,6 @@ class INT_Memory:
                 total_page_size(s),
             )
         )
-        print(write_pages)
 
         arg_start = 2**32 - PVM_INIT_ZONE_SIZE - PVM_INIT_DATA_SIZE
         read_pages.extend(get_pages(arg_start, total_page_size(len(args))))

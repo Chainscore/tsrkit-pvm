@@ -7,6 +7,7 @@ from ...memory import Memory
 from ....common.status import CONTINUE
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 from ....common.utils import clamp_12
 
 class InstructionsWArgs1Imm1EwImm(InstructionTable):
@@ -27,7 +28,10 @@ class InstructionsWArgs1Imm1EwImm(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             20: OpCode(
-                name="load_imm_64", fn=cls.load_imm_64, gas=1, is_terminating=False
+                name="load_imm_64",
+                fn=cls.load_imm_64,
+                is_terminating=False,
+                gas_profile=profile(1, 2, NO_UNITS)
             )
         }
 

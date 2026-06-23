@@ -5,10 +5,10 @@ if TYPE_CHECKING:
 
 from ...memory import Memory
 from ....common.status import CONTINUE
-from ....common.types import Accessibility
 from ....common.utils import b, b_inv, chi, compare, compare_bits_vectorized, z, z_inv, clamp_12
 from ....core.instruction_table import InstructionTable
-from ....core.opcode import OpCode, OpReturn
+from ....core.opcode import ExecutionUnits, OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 class InstructionsWArgs2Reg(InstructionTable):
     def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
@@ -29,75 +29,67 @@ class InstructionsWArgs2Reg(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            100: OpCode(name="move_reg", fn=cls.move_reg, gas=1, is_terminating=False),
-            101: OpCode(name="sbrk", fn=cls.sbrk, gas=1, is_terminating=False),
-            102: OpCode(
+            100: OpCode(name="move_reg", fn=cls.move_reg, is_terminating=False, gas_profile=profile(0, 1, NO_UNITS)),
+            101: OpCode(
                 name="count_set_bits_64",
                 fn=cls.count_set_bits(64),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 1, ALU),
             ),
-            103: OpCode(
+            102: OpCode(
                 name="count_set_bits_32",
                 fn=cls.count_set_bits(32),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 1, ALU),
             ),
-            104: OpCode(
+            103: OpCode(
                 name="leading_zero_bits_64",
                 fn=cls.leading_zero_bits(64),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 1, ALU),
             ),
-            105: OpCode(
+            104: OpCode(
                 name="leading_zero_bits_32",
                 fn=cls.leading_zero_bits(32),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 1, ALU),
             ),
-            106: OpCode(
+            105: OpCode(
                 name="trailing_zero_bits_64",
                 fn=cls.trailing_zero_bits(64),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(2, 1, ExecutionUnits(2, 0, 0, 0, 0)),
             ),
-            107: OpCode(
+            106: OpCode(
                 name="trailing_zero_bits_32",
                 fn=cls.trailing_zero_bits(32),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(2, 1, ExecutionUnits(2, 0, 0, 0, 0)),
+            ),
+            107: OpCode(
+                name="sign_extend_8", fn=cls.sign_extend(8), is_terminating=False,
+                gas_profile=profile(1, 1, ALU)
             ),
             108: OpCode(
-                name="sign_extend_8", fn=cls.sign_extend(8), gas=1, is_terminating=False
-            ),
-            109: OpCode(
                 name="sign_extend_16",
                 fn=cls.sign_extend(16),
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 1, ALU),
             ),
-            110: OpCode(
+            109: OpCode(
                 name="zero_extend_16",
                 fn=cls.zero_extend_16,
-                gas=1,
                 is_terminating=False,
+                gas_profile=profile(1, 1, ALU),
             ),
-            111: OpCode(
-                name="reverse_bytes", fn=cls.reverse_bytes, gas=1, is_terminating=False
+            110: OpCode(
+                name="reverse_bytes", fn=cls.reverse_bytes, is_terminating=False,
+                gas_profile=profile(1, ("P", 1, 2), ALU)
             ),
         }
 
     def move_reg(self, registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
         registers[rd] = registers[ra]
-        return CONTINUE, self.counter + self.skip_index + 1, registers, memory
-
-    def sbrk(self, registers: list[int], memory: Memory, rd: int, ra: int) -> OpReturn:
-        req = registers[ra]  # bytes requested
-        memory.alter_accessibility(memory.heap_break, req, Accessibility.WRITE)
-        memory.heap_break = memory.heap_break + req
-
-        # out of address space
-        registers[rd] = memory.heap_break
         return CONTINUE, self.counter + self.skip_index + 1, registers, memory
 
     @staticmethod

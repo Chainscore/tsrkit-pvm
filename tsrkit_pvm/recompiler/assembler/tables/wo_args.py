@@ -20,18 +20,22 @@ class InstructionsWoArgs(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            0: OpCode(name="trap", fn=cls.trap, gas=1, is_terminating=True),
+            0: OpCode(name="trap", fn=cls.trap, is_terminating=True),
             1: OpCode(
-                name="fallthrough", fn=cls.fallthrough, gas=1, is_terminating=True
+                name="fallthrough", fn=cls.fallthrough, is_terminating=True
             ),
+            2: OpCode(name="unlikely", fn=cls.unlikely, is_terminating=False),
         }
 
     def trap(self, asm):
         """Generate x86 code for PVM trap instruction"""
-        # Terminate execution safely
-        asm.ret()
+        asm.panic()
 
     def fallthrough(self, asm):
         """Generate x86 code for PVM fallthrough instruction"""
         # Fallthrough indicates normal termination, return to caller
+        asm.nop()
+
+    def unlikely(self, asm):
+        """Generate x86 code for PVM unlikely instruction."""
         asm.nop()

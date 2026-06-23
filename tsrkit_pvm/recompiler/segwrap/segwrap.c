@@ -97,7 +97,6 @@ static void segv_handler(int sig, siginfo_t *si, void *ctx) {
 int run_code(uint64_t addr, uint64_t *ret_val) {
     if (sigsetjmp(jmpbuf, 1) == 0) {
         uint64_t (*fn)(void) = (uint64_t (*)(void))addr;
-        uint64_t r = fn();
         uint64_t return_address;
 
         //  1) lea the label “1” into return_address  

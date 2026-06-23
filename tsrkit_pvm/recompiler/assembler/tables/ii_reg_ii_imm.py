@@ -54,7 +54,6 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
             180: OpCode(
                 name="load_imm_jump_ind",
                 fn=cls.load_imm_jump_ind,
-                gas=1,
                 is_terminating=True,
             ),
         }
@@ -88,7 +87,7 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
                 reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(2**32 - 2**16)
             )
         )
-        asm.jcc_label32(Condition.Equal, asm.halt_label)
+        asm.jcc_halt(Condition.Equal)
 
         # Part 4: Validate PVM address (check alignment, bounds, etc.)
         # Check if pvm_address == 0 (invalid)
@@ -97,11 +96,11 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
                 size=Size.U32, reg_mem=RegMem.Reg(TEMP_REG), reg=TEMP_REG
             )
         )
-        asm.jcc_label32(Condition.Equal, asm.panic_label)
+        asm.jcc_panic(Condition.Equal)
 
         # Check alignment: pvm_address % 2 == 0
         asm.test(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(1)))
-        asm.jcc_label32(Condition.NotEqual, asm.panic_label)
+        asm.jcc_panic(Condition.NotEqual)
 
         # Calculate jump table index: (pvm_address / 2) - 1
         asm.shr_imm(RegSize.R64, RegMem.Reg(TEMP_REG), 1)  # rcx = pvm_address / 2
@@ -114,7 +113,7 @@ class InstructionsWArgs2Reg2Imm(InstructionTable):
                 reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(asm.jump_table_len)
             )
         )
-        asm.jcc_label32(Condition.AboveOrEqual, asm.panic_label)
+        asm.jcc_panic(Condition.AboveOrEqual)
 
         # Jump to the machine code address
         asm.jmp(

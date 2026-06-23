@@ -23,7 +23,7 @@ class REC_Program(Program):
 
     # Assembled Machine Code
     msn_code: Optional[bytes]
-    # Index to halt label  
+    # Index to halt label
     halt_offset: Optional[int]
     # Index to panic label
     panic_offset: Optional[int]    # Optimized lookup structures for performance-critical operations
@@ -31,11 +31,11 @@ class REC_Program(Program):
     _pvm_to_msn: list[int]           # Direct array: pvm_offset -> msn_offset
     _msn_to_pvm_map: dict[int, int]  # Hash map: msn_offset -> pvm_offset (sparse)
     _msn_breakpoints: list[int]      # Sorted list of valid msn addresses for binary search
-    
+
     # Pre-computed data for O(1) runtime lookups
     _skip_cache: list[int]           # Pre-computed skip values
     _valid_pvm_offsets: set[int]     # Set of valid PVM instruction starts
-    
+
     # Basic block information (keeping for compatibility)
     basic_blocks: list[int]
     bitmask_index: list[int]
@@ -45,72 +45,85 @@ class REC_Program(Program):
     def __post_init__(self) -> None:
         """
         Optimized initialization with single-pass data structure building.
-        
+
         This replaces the original multi-pass approach with a single iteration
         that builds all required lookup structures simultaneously.
         """
         super().__post_init__()
-        
+
         # Single-pass initialization of all lookup structures
         self._build_optimized_structures()
 
     def _build_optimized_structures(self) -> None:
         """
         Build all lookup structures in a single pass for maximum efficiency.
-        
+
         Replaces multiple separate loops with one efficient pass.
         """
         len_i_set = len(self.instruction_set)
         offset_bitmask = self.offset_bitmask  # Cache the attribute access
         extended_bitmask = self._extended_bitmask  # Cache the attribute access
-        
+
         # Pre-allocate all structures with exact sizes when possible
         self._skip_cache = [0] * len_i_set
         self._valid_pvm_offsets = set()
+        self._basic_blocks_set = set()
+        self._exec_blocks = {}
         basic_blocks = [0]
         bitmask_index = [0] * len_i_set  # Pre-allocate full size
         pvm_to_msn_builder = []  # Will become _pvm_to_msn
-        
+
         # Count valid instructions first for better allocation
         valid_count = sum(offset_bitmask)
         pvm_to_msn_builder = [0] * valid_count  # Pre-allocate exact size
-        
-        # Single pass through instruction set
+
         bb_counter = 0
-        last_valid_offset = len_i_set
-        
-        # Process in reverse for skip calculation efficiency - vectorized approach
-        for i in range(len_i_set - 1, -1, -1):
-            # Calculate skip value (distance to next valid instruction)
-            if i < len_i_set - 1 and extended_bitmask[i + 1]:
-                last_valid_offset = i + 1
-            self._skip_cache[i] = min(24, last_valid_offset - i - 1) if last_valid_offset < len_i_set else 0
-        
+
+        # Match interpreter/program.py exactly: skip is the distance to the
+        # next valid instruction marker, capped at 24.
+        for i in range(len_i_set):
+            skip_value = len_i_set
+            for j in range(i + 1, len_i_set + 1):
+                if extended_bitmask[j]:
+                    skip_value = j - i - 1
+                    break
+            self._skip_cache[i] = min(24, skip_value)
+
         # Forward pass for other structures - avoid repeated attribute lookups
         inst_set = self.instruction_set  # Cache attribute
         dispatch_table = inst_map._dispatch_table  # Cache frequently accessed data
-        
+        from tsrkit_pvm.interpreter.instructions.inst_map import inst_map as interpreter_inst_map
+        interpreter_dispatch_table = interpreter_inst_map._dispatch_table
+
         for i in range(len_i_set):
             if offset_bitmask[i]:
                 self._valid_pvm_offsets.add(i)
                 bitmask_index[i] = bb_counter
                 bb_counter += 1
-                
+
                 # Check for basic block boundaries - optimized condition checking
-                if (i < 256 and 
-                    dispatch_table[inst_set[i]] is not None and
-                    inst_map.is_terminating(inst_set[i])):
+                opcode = inst_set[i]
+                if (opcode < 256 and
+                    dispatch_table[opcode] is not None and
+                    interpreter_dispatch_table[opcode] is not None and
+                    interpreter_inst_map.is_terminating(opcode)):
                     next_block = i + 1 + self._skip_cache[i]
-                    if next_block < len_i_set:
+                    if (
+                        next_block < len_i_set
+                        and offset_bitmask[next_block]
+                        and inst_set[next_block] < 256
+                        and dispatch_table[inst_set[next_block]] is not None
+                    ):
                         basic_blocks.append(next_block)
             else:
                 bitmask_index[i] = -1
-        
+
         # Store computed structures
-        self.basic_blocks = basic_blocks
+        self.basic_blocks = sorted(set(basic_blocks))
+        self._basic_blocks_set = set(self.basic_blocks)
         self.bitmask_index = bitmask_index
         self._pvm_to_msn = pvm_to_msn_builder
-        
+
         # Initialize assembly-related structures
         self.msn_code = None
         self.panic_offset = None
@@ -128,27 +141,32 @@ class REC_Program(Program):
         instruction_set = self.instruction_set
         offset_bitmask = self.offset_bitmask
         jump_table_len = len(self.jump_table)
-        
+
         # Create labels for all basic blocks (jump targets) - use dict comprehension
-        labels = {i: asm.forward_declare_label() 
+        labels = {i: asm.forward_declare_label()
                  for i in range(len(instruction_set)) if offset_bitmask[i]}
 
         halt_label = asm.forward_declare_label()
         panic_label = asm.forward_declare_label()
-        
+
         # Create context wrapper
         asm_ctx = AssemblerContext(asm, labels, halt_label, panic_label, jump_table_len)
+        from tsrkit_pvm.interpreter.instructions.inst_map import inst_map as interpreter_inst_map
+        block_gas_by_start = {
+            block_start: interpreter_inst_map.get_block(self, block_start).total_gas
+            for block_start in self.basic_blocks
+        }
 
         # Build optimized mapping during assembly
         counter = 0
         pvm_index = 0
         len_inst_set = len(instruction_set)
-        
+
         # Cache frequently accessed objects
         dispatch_table = inst_map._dispatch_table
         pvm_to_msn = self._pvm_to_msn
         msn_to_pvm_map = self._msn_to_pvm_map
-        
+
         while counter < len_inst_set:
             if offset_bitmask[counter]:  # Only process actual opcodes
                 # Define label
@@ -170,29 +188,30 @@ class REC_Program(Program):
                         f"📍 {counter} \t Processing opcode \t {opdata} ({opcode})"
                     )
 
-                if gas_enabled:
-                    gas = opdata.gas
-                    # --- Gas Computation --- #
+                if gas_enabled and counter in block_gas_by_start:
+                    gas = block_gas_by_start[counter]
                     x61mov_imm = -gas_offset + 0x61
+                    gas_slot = RegMem.Mem(
+                        MemOp.BaseOffset(
+                            seg=None, size=RegSize.R64, base=Reg.r15, offset=0x61
+                        )
+                    )
                     asm.sub(
                         Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
                     )
-                    asm.sub(
-                        Operands.RegMem_Imm(
-                            RegMem.Mem(
-                                MemOp.BaseOffset(
-                                    seg=None, size=RegSize.R64, base=Reg.r15, offset=0x61
-                                )
-                            ),
-                            ImmKind.I32(gas),
-                        )
+                    asm.cmp(
+                        Operands.RegMem_Imm(gas_slot, ImmKind.I32(gas))
                     )
-                    asm.jcc_rel32(Condition.Sign, -2)
+                    asm.jcc_rel32(Condition.Below, -2)
+                    asm.sub(
+                        Operands.RegMem_Imm(gas_slot, ImmKind.I32(gas))
+                    )
                     asm.add(
                         Operands.RegMem_Imm(RegMem.Reg(Reg.r15), ImmKind.I64(x61mov_imm))
                     )
-                    
+
                 # Process the instruction
+                asm_ctx.current_pc = counter
                 _, gas = inst_map.process_instruction(self, counter, asm_ctx)
             counter += 1
 
@@ -222,23 +241,23 @@ class REC_Program(Program):
     def msn_to_pvm_index(self, msn_offset: int) -> int:
         """
         Machine code to PVM index conversion using binary search.
-        O(log n) binary search with direct hash map lookup. 
+        O(log n) binary search with direct hash map lookup.
         """
         # Fast path: direct lookup if exact match
         direct_result = self._msn_to_pvm_map.get(msn_offset)
         if direct_result is not None:
             return direct_result
-        
+
         # Binary search to find the closest valid instruction start
         breakpoints = self._msn_breakpoints
         if not breakpoints or msn_offset < breakpoints[0]:
             return 0
-            
+
         # Use cached bisect module for maximum performance
         pos = bisect.bisect_right(breakpoints, msn_offset)
         if pos == 0:
             return 0
-            
+
         # Get the PVM index for the found machine address
         closest_msn = breakpoints[pos - 1]
         return self._msn_to_pvm_map[closest_msn]
@@ -246,7 +265,7 @@ class REC_Program(Program):
     def pvm_to_msn_index(self, pvm_offset: int) -> int:
         """
         PVM to machine code index conversion using direct array access.
-        
+
         O(1) direct array lookup.
         """
         # Validate input
@@ -258,20 +277,26 @@ class REC_Program(Program):
                     break
             else:
                 return 0
-        
+
         # Get the bitmap index for this PVM offset
         bb_index = self.bitmask_index[pvm_offset]
         if bb_index == -1:
             # This shouldn't happen with valid offsets, but handle gracefully
             return self.pvm_to_msn_index(pvm_offset - 1) if pvm_offset > 0 else 0
-        
+
         # Direct O(1) lookup
         return self._pvm_to_msn[bb_index]
 
     def skip(self, pc: int) -> int:
         """
         O(1) skip value lookup using pre-computed cache.
-        
+
         Optimized from runtime computation to direct array access.
         """
         return self._skip_cache[pc] if pc < len(self._skip_cache) else 0
+
+    def containing_basic_block_start(self, pc: int) -> int:
+        index = bisect.bisect_right(self.basic_blocks, pc) - 1
+        if index < 0:
+            return 0
+        return self.basic_blocks[index]

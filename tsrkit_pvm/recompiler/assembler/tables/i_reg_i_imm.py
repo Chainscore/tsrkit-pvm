@@ -46,19 +46,19 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            50: OpCode(name="jump_ind", fn=cls.jump_ind, gas=1, is_terminating=True),
-            51: OpCode(name="load_imm", fn=cls.load_imm, gas=1, is_terminating=False),
-            52: OpCode(name="load_u8", fn=cls.load_u8, gas=1, is_terminating=False),
-            53: OpCode(name="load_i8", fn=cls.load_i8, gas=1, is_terminating=False),
-            54: OpCode(name="load_u16", fn=cls.load_u16, gas=1, is_terminating=False),
-            55: OpCode(name="load_i16", fn=cls.load_i16, gas=1, is_terminating=False),
-            56: OpCode(name="load_u32", fn=cls.load_u32, gas=1, is_terminating=False),
-            57: OpCode(name="load_i32", fn=cls.load_i32, gas=1, is_terminating=False),
-            58: OpCode(name="load_u64", fn=cls.load_u64, gas=1, is_terminating=False),
-            59: OpCode(name="store_u8", fn=cls.store_u8, gas=1, is_terminating=False),
-            60: OpCode(name="store_u16", fn=cls.store_u16, gas=1, is_terminating=False),
-            61: OpCode(name="store_u32", fn=cls.store_u32, gas=1, is_terminating=False),
-            62: OpCode(name="store_u64", fn=cls.store_u64, gas=1, is_terminating=False),
+            50: OpCode(name="jump_ind", fn=cls.jump_ind, is_terminating=True),
+            51: OpCode(name="load_imm", fn=cls.load_imm, is_terminating=False),
+            52: OpCode(name="load_u8", fn=cls.load_u8, is_terminating=False),
+            53: OpCode(name="load_i8", fn=cls.load_i8, is_terminating=False),
+            54: OpCode(name="load_u16", fn=cls.load_u16, is_terminating=False),
+            55: OpCode(name="load_i16", fn=cls.load_i16, is_terminating=False),
+            56: OpCode(name="load_u32", fn=cls.load_u32, is_terminating=False),
+            57: OpCode(name="load_i32", fn=cls.load_i32, is_terminating=False),
+            58: OpCode(name="load_u64", fn=cls.load_u64, is_terminating=False),
+            59: OpCode(name="store_u8", fn=cls.store_u8, is_terminating=False),
+            60: OpCode(name="store_u16", fn=cls.store_u16, is_terminating=False),
+            61: OpCode(name="store_u32", fn=cls.store_u32, is_terminating=False),
+            62: OpCode(name="store_u64", fn=cls.store_u64, is_terminating=False),
         }
 
     def jump_ind(self, asm, ra: int, lx: int, vx: int):
@@ -85,7 +85,7 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
                 reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(2**32 - 2**16)
             )
         )
-        asm.jcc_label32(Condition.Equal, asm.halt_label)
+        asm.jcc_halt(Condition.Equal)
 
         # Part 4: Validate PVM address (check alignment, bounds, etc.)
         # Check if pvm_address == 0 (invalid)
@@ -94,11 +94,11 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
                 size=Size.U32, reg_mem=RegMem.Reg(TEMP_REG), reg=TEMP_REG
             )
         )
-        asm.jcc_label32(Condition.Equal, asm.panic_label)
+        asm.jcc_panic(Condition.Equal)
 
         # Check alignment: pvm_address % 2 == 0
         asm.test(Operands.RegMem_Imm(reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(1)))
-        asm.jcc_label32(Condition.NotEqual, asm.panic_label)
+        asm.jcc_panic(Condition.NotEqual)
 
         # Calculate jump table index: (pvm_address / 2) - 1
         asm.shr_imm(RegSize.R64, RegMem.Reg(TEMP_REG), 1)  # rcx = pvm_address / 2
@@ -110,7 +110,7 @@ class InstructionsWArgs1Reg1Imm(InstructionTable):
                 reg_mem=RegMem.Reg(TEMP_REG), imm=ImmKind.I32(asm.jump_table_len)
             )
         )
-        asm.jcc_label32(Condition.AboveOrEqual, asm.panic_label)
+        asm.jcc_panic(Condition.AboveOrEqual)
 
         # Jump to the machine code address
         asm.jmp(

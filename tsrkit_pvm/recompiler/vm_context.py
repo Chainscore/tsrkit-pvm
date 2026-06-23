@@ -46,9 +46,11 @@ import os
 
 # Load libc for mprotect
 if os.uname().sysname == "Darwin":
-    libc = ctypes.CDLL("libc.dylib")
+    libc = ctypes.CDLL("libc.dylib", use_errno=True)
 else:
-    libc = ctypes.CDLL("libc.so.6")
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+libc.mprotect.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+libc.mprotect.restype = ctypes.c_int
 
 from .memory import REC_Memory
 
@@ -180,7 +182,11 @@ class VMContext:
         vm_pointer = guest.offset - size
 
         # Allocate RW access
-        libc.mprotect(vm_pointer, size, prot=mmap.PROT_WRITE | mmap.PROT_READ)
+        libc.mprotect(
+            ctypes.c_void_p(vm_pointer),
+            ctypes.c_size_t(size),
+            mmap.PROT_WRITE | mmap.PROT_READ,
+        )
 
         # Write data directly to memory using ctypes for maximum performance
         jump_len = len(self.jump_table)

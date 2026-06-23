@@ -47,60 +47,52 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             80: OpCode(
-                name="load_imm_jump", fn=cls.load_imm_jump, gas=1, is_terminating=False
+                name="load_imm_jump", fn=cls.load_imm_jump, is_terminating=False
             ),
             81: OpCode(
-                name="branch_eq_imm", fn=cls.branch_eq_imm, gas=1, is_terminating=False
+                name="branch_eq_imm", fn=cls.branch_eq_imm, is_terminating=False
             ),
             82: OpCode(
-                name="branch_ne_imm", fn=cls.branch_ne_imm, gas=1, is_terminating=False
+                name="branch_ne_imm", fn=cls.branch_ne_imm, is_terminating=False
             ),
             83: OpCode(
                 name="branch_lt_u_imm",
                 fn=cls.branch_lt_u_imm,
-                gas=1,
                 is_terminating=False,
             ),
             84: OpCode(
                 name="branch_le_u_imm",
                 fn=cls.branch_le_u_imm,
-                gas=1,
                 is_terminating=False,
             ),
             85: OpCode(
                 name="branch_ge_u_imm",
                 fn=cls.branch_ge_u_imm,
-                gas=1,
                 is_terminating=False,
             ),
             86: OpCode(
                 name="branch_gt_u_imm",
                 fn=cls.branch_gt_u_imm,
-                gas=1,
                 is_terminating=False,
             ),
             87: OpCode(
                 name="branch_lt_s_imm",
                 fn=cls.branch_lt_s_imm,
-                gas=1,
                 is_terminating=False,
             ),
             88: OpCode(
                 name="branch_le_s_imm",
                 fn=cls.branch_le_s_imm,
-                gas=1,
                 is_terminating=False,
             ),
             89: OpCode(
                 name="branch_ge_s_imm",
                 fn=cls.branch_ge_s_imm,
-                gas=1,
                 is_terminating=False,
             ),
             90: OpCode(
                 name="branch_gt_s_imm",
                 fn=cls.branch_gt_s_imm,
-                gas=1,
                 is_terminating=False,
             ),
         }
@@ -116,8 +108,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jmp_label32(target_label)
         else:
-            # Fallback if label not found
-            asm.ud2()  # This shouldn't happen in a well-formed program
+            asm.panic()
 
     def branch_eq_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register equals immediate value"""
@@ -134,9 +125,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Equal, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.Equal)
 
     def branch_ne_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register not equals immediate value"""
@@ -151,9 +140,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.NotEqual, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.NotEqual)
 
     def branch_lt_u_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register less than immediate value (unsigned)"""
@@ -168,9 +155,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Below, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.Below)
 
     def branch_lt_s_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register less than immediate value (signed)"""
@@ -185,9 +170,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Less, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.Less)
 
     def branch_ge_u_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register greater than or equal to immediate value (unsigned)"""
@@ -202,9 +185,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.AboveOrEqual, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.AboveOrEqual)
 
     def branch_ge_s_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register greater than or equal to immediate value (signed)"""
@@ -219,9 +200,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.GreaterOrEqual, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.GreaterOrEqual)
 
     def branch_gt_u_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register greater than immediate value (unsigned)"""
@@ -236,9 +215,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Above, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.Above)
 
     def branch_gt_s_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register greater than immediate value (signed)"""
@@ -253,9 +230,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.Greater, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.Greater)
 
     def branch_le_u_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register less than or equal to immediate value (unsigned)"""
@@ -270,9 +245,7 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.BelowOrEqual, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.BelowOrEqual)
 
     def branch_le_s_imm(self, asm, ra, length_info, lx, vx, ly, vy):
         """Branch if register less than or equal to immediate value (signed)"""
@@ -287,6 +260,4 @@ class InstructionsWArgs1Reg1Imm1Offset(InstructionTable):
             target_label = asm.labels[target_addr]
             asm.jcc_label32(Condition.LessOrEqual, target_label)
         else:
-            print(
-                f"Warning: Branch target {target_addr} not found in labels, falling through"
-            )
+            asm.jcc_panic(Condition.LessOrEqual)

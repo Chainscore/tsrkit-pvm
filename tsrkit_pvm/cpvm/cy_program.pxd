@@ -39,5 +39,7 @@ cdef class CyProgram:
     
     # Public methods that can be called from other Cython modules
     cdef uint32_t branch(self, int32_t counter, int32_t branch, bint cond)
-    cdef uint32_t skip(self, int32_t pc) nogil
+    cdef uint32_t conditional_branch(self, int32_t counter, int32_t branch, bint cond)
+    cpdef uint32_t skip(self, int32_t pc)
+    cdef int32_t containing_basic_block_start(self, int32_t pc)
     cdef uint32_t djump(self, uint32_t counter, uint32_t a)

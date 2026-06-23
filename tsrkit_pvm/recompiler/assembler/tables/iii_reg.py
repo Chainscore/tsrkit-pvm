@@ -26,65 +26,65 @@ class InstructionsWArgs3Reg(InstructionTable):
     @classmethod
     def table(cls) -> Dict[int, OpCode]:
         return {
-            190: OpCode(name="add_32", fn=cls.add_32, gas=1, is_terminating=False),
-            191: OpCode(name="sub_32", fn=cls.sub_32, gas=1, is_terminating=False),
-            192: OpCode(name="mul_32", fn=cls.mul_32, gas=1, is_terminating=False),
-            193: OpCode(name="div_u_32", fn=cls.div_u_32, gas=1, is_terminating=False),
-            194: OpCode(name="div_s_32", fn=cls.div_s_32, gas=1, is_terminating=False),
-            195: OpCode(name="rem_u_32", fn=cls.rem_u_32, gas=1, is_terminating=False),
-            196: OpCode(name="rem_s_32", fn=cls.rem_s_32, gas=1, is_terminating=False),
+            190: OpCode(name="add_32", fn=cls.add_32, is_terminating=False),
+            191: OpCode(name="sub_32", fn=cls.sub_32, is_terminating=False),
+            192: OpCode(name="mul_32", fn=cls.mul_32, is_terminating=False),
+            193: OpCode(name="div_u_32", fn=cls.div_u_32, is_terminating=False),
+            194: OpCode(name="div_s_32", fn=cls.div_s_32, is_terminating=False),
+            195: OpCode(name="rem_u_32", fn=cls.rem_u_32, is_terminating=False),
+            196: OpCode(name="rem_s_32", fn=cls.rem_s_32, is_terminating=False),
             197: OpCode(
-                name="shlo_l_32", fn=cls.shlo_l_32, gas=1, is_terminating=False
+                name="shlo_l_32", fn=cls.shlo_l_32, is_terminating=False
             ),
             198: OpCode(
-                name="shlo_r_32", fn=cls.shlo_r_32, gas=1, is_terminating=False
+                name="shlo_r_32", fn=cls.shlo_r_32, is_terminating=False
             ),
             199: OpCode(
-                name="shar_r_32", fn=cls.shar_r_32, gas=1, is_terminating=False
+                name="shar_r_32", fn=cls.shar_r_32, is_terminating=False
             ),
-            200: OpCode(name="add_64", fn=cls.add_64, gas=1, is_terminating=False),
-            201: OpCode(name="sub_64", fn=cls.sub_64, gas=1, is_terminating=False),
-            202: OpCode(name="mul_64", fn=cls.mul_64, gas=1, is_terminating=False),
-            203: OpCode(name="div_u_64", fn=cls.div_u_64, gas=1, is_terminating=False),
-            204: OpCode(name="div_s_64", fn=cls.div_s_64, gas=1, is_terminating=False),
-            205: OpCode(name="rem_u_64", fn=cls.rem_u_64, gas=1, is_terminating=False),
-            206: OpCode(name="rem_s_64", fn=cls.rem_s_64, gas=1, is_terminating=False),
+            200: OpCode(name="add_64", fn=cls.add_64, is_terminating=False),
+            201: OpCode(name="sub_64", fn=cls.sub_64, is_terminating=False),
+            202: OpCode(name="mul_64", fn=cls.mul_64, is_terminating=False),
+            203: OpCode(name="div_u_64", fn=cls.div_u_64, is_terminating=False),
+            204: OpCode(name="div_s_64", fn=cls.div_s_64, is_terminating=False),
+            205: OpCode(name="rem_u_64", fn=cls.rem_u_64, is_terminating=False),
+            206: OpCode(name="rem_s_64", fn=cls.rem_s_64, is_terminating=False),
             207: OpCode(
-                name="shlo_l_64", fn=cls.shlo_l_64, gas=1, is_terminating=False
+                name="shlo_l_64", fn=cls.shlo_l_64, is_terminating=False
             ),
             208: OpCode(
-                name="shlo_r_64", fn=cls.shlo_r_64, gas=1, is_terminating=False
+                name="shlo_r_64", fn=cls.shlo_r_64, is_terminating=False
             ),
             209: OpCode(
-                name="shar_r_64", fn=cls.shar_r_64, gas=1, is_terminating=False
+                name="shar_r_64", fn=cls.shar_r_64, is_terminating=False
             ),
-            210: OpCode(name="and", fn=cls.and_op, gas=1, is_terminating=False),
-            211: OpCode(name="xor", fn=cls.xor_op, gas=1, is_terminating=False),
-            212: OpCode(name="or", fn=cls.or_op, gas=1, is_terminating=False),
+            210: OpCode(name="and", fn=cls.and_op, is_terminating=False),
+            211: OpCode(name="xor", fn=cls.xor_op, is_terminating=False),
+            212: OpCode(name="or", fn=cls.or_op, is_terminating=False),
             213: OpCode(
-                name="mul_upper_s_s", fn=cls.mul_upper_s_s, gas=1, is_terminating=False
+                name="mul_upper_s_s", fn=cls.mul_upper_s_s, is_terminating=False
             ),
             214: OpCode(
-                name="mul_upper_u_u", fn=cls.mul_upper_u_u, gas=1, is_terminating=False
+                name="mul_upper_u_u", fn=cls.mul_upper_u_u, is_terminating=False
             ),
             215: OpCode(
-                name="mul_upper_s_u", fn=cls.mul_upper_s_u, gas=1, is_terminating=False
+                name="mul_upper_s_u", fn=cls.mul_upper_s_u, is_terminating=False
             ),
-            216: OpCode(name="set_lt_u", fn=cls.set_lt_u, gas=1, is_terminating=False),
-            217: OpCode(name="set_lt_s", fn=cls.set_lt_s, gas=1, is_terminating=False),
-            218: OpCode(name="cmov_iz", fn=cls.cmov_iz, gas=1, is_terminating=False),
-            219: OpCode(name="cmov_nz", fn=cls.cmov_nz, gas=1, is_terminating=False),
-            220: OpCode(name="rot_l_64", fn=cls.rot_l_64, gas=1, is_terminating=False),
-            221: OpCode(name="rot_l_32", fn=cls.rot_l_32, gas=1, is_terminating=False),
-            222: OpCode(name="rot_r_64", fn=cls.rot_r_64, gas=1, is_terminating=False),
-            223: OpCode(name="rot_r_32", fn=cls.rot_r_32, gas=1, is_terminating=False),
-            224: OpCode(name="and_inv", fn=cls.and_inv, gas=1, is_terminating=False),
-            225: OpCode(name="or_inv", fn=cls.or_inv, gas=1, is_terminating=False),
-            226: OpCode(name="xnor", fn=cls.xnor, gas=1, is_terminating=False),
-            227: OpCode(name="max", fn=cls.max_op, gas=1, is_terminating=False),
-            228: OpCode(name="max_u", fn=cls.max_u, gas=1, is_terminating=False),
-            229: OpCode(name="min", fn=cls.min_op, gas=1, is_terminating=False),
-            230: OpCode(name="min_u", fn=cls.min_u, gas=1, is_terminating=False),
+            216: OpCode(name="set_lt_u", fn=cls.set_lt_u, is_terminating=False),
+            217: OpCode(name="set_lt_s", fn=cls.set_lt_s, is_terminating=False),
+            218: OpCode(name="cmov_iz", fn=cls.cmov_iz, is_terminating=False),
+            219: OpCode(name="cmov_nz", fn=cls.cmov_nz, is_terminating=False),
+            220: OpCode(name="rot_l_64", fn=cls.rot_l_64, is_terminating=False),
+            221: OpCode(name="rot_l_32", fn=cls.rot_l_32, is_terminating=False),
+            222: OpCode(name="rot_r_64", fn=cls.rot_r_64, is_terminating=False),
+            223: OpCode(name="rot_r_32", fn=cls.rot_r_32, is_terminating=False),
+            224: OpCode(name="and_inv", fn=cls.and_inv, is_terminating=False),
+            225: OpCode(name="or_inv", fn=cls.or_inv, is_terminating=False),
+            226: OpCode(name="xnor", fn=cls.xnor, is_terminating=False),
+            227: OpCode(name="max", fn=cls.max_op, is_terminating=False),
+            228: OpCode(name="max_u", fn=cls.max_u, is_terminating=False),
+            229: OpCode(name="min", fn=cls.min_op, is_terminating=False),
+            230: OpCode(name="min_u", fn=cls.min_u, is_terminating=False),
         }
 
     def add_32(self, asm, ra: int, rb: int, rd: int):

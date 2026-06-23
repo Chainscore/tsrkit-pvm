@@ -47,14 +47,14 @@ cdef class CyProgram:
         self.jump_table_len      = len(jump_table)
 
         self._extended_bitmask = self.offset_bitmask + [True] * 1000
-        
+
         # Allocate and initialize zeta as C array for ultra-fast access
         cdef int32_t total_len = self.instruction_set_len + 1000
         self.zeta_len = total_len
         self.zeta = <uint8_t*>malloc(total_len * sizeof(uint8_t))
         if self.zeta == NULL:
             raise MemoryError("failed to allocate zeta buffer")
-        
+
         # Copy instruction set to C array with padding
         cdef int32_t i
         for i in range(self.instruction_set_len):
@@ -62,7 +62,7 @@ cdef class CyProgram:
         # Zero-fill padding bytes
         for i in range(self.instruction_set_len, total_len):
             self.zeta[i] = 0
-            
+
         self._exec_blocks      = {}
 
         self._precompute_cache()
@@ -80,7 +80,7 @@ cdef class CyProgram:
 
         cdef int32_t i, j, skip_value
         cdef int32_t extended_len = len(self._extended_bitmask)
-        
+
         # Optimized skip cache computation with minimal Python calls
         for i in range(bitmask_len):
             skip_value = bitmask_len
@@ -94,19 +94,27 @@ cdef class CyProgram:
         # compute basic blocks with optimized loop and pre-allocation
         cdef uint8_t opcode
         cdef list bb = [0]
+        cdef int32_t next_block
         cdef int32_t instruction_len = self.instruction_set_len
-        
+
         # Fast basic block computation with minimal overhead
         for i in range(instruction_len):
             if self.offset_bitmask[i]:
                 opcode = self.instruction_set[i]
                 # Optimized termination check with early exit
-                if (opcode < 256 and 
-                    inst_map.is_terminating(opcode) and 
+                if (opcode < 256 and
+                    inst_map.is_terminating(opcode) and
                     inst_map._dispatch_table[opcode] != <void*>0):
-                    bb.append(i + 1 + self._skip_cache[i])  # Use cached skip value
-                    
-        self.basic_blocks      = bb
+                    next_block = i + 1 + self._skip_cache[i]
+                    if (
+                        next_block < instruction_len and
+                        self.offset_bitmask[next_block] and
+                        self.instruction_set[next_block] < 256 and
+                        inst_map._dispatch_table[self.instruction_set[next_block]] != <void*>0
+                    ):
+                        bb.append(next_block)  # Use cached skip value
+
+        self.basic_blocks      = sorted(set(bb))
         self._basic_blocks_set = set(bb)
 
     # ---------------------------------------------------------------- dealloc
@@ -117,9 +125,8 @@ cdef class CyProgram:
             free(self.zeta)
 
     # ------------------------------------------------------------ fast helpers
-    @cython.cfunc
     @cython.inline
-    cdef uint32_t skip(self, int32_t pc) nogil:
+    cpdef uint32_t skip(self, int32_t pc):
         """Ultra-fast skip lookup with bounds checking optimized away."""
         if pc < 0 or pc >= self._skip_cache_len:
             return 0
@@ -129,14 +136,36 @@ cdef class CyProgram:
     @cython.inline
     cdef uint32_t branch(self, int32_t counter, int32_t branch, bint cond):
         """Optimized conditional branch with fast set lookup."""
+        cdef uint32_t fallthrough = <uint32_t>(counter + 1 + self._skip_cache[counter])
         if not cond:
-            return <uint32_t>0xFFFF_FFFF
+            return fallthrough
         if branch not in self._basic_blocks_set:
             raise PvmExit(PVM_PANIC)
         return branch
 
     @cython.cfunc
-    @cython.inline  
+    @cython.inline
+    cdef uint32_t conditional_branch(self, int32_t counter, int32_t branch, bint cond):
+        """Conditional branches validate both target and fallthrough block starts."""
+        cdef uint32_t fallthrough = <uint32_t>(counter + 1 + self._skip_cache[counter])
+        if branch not in self._basic_blocks_set or fallthrough not in self._basic_blocks_set:
+            raise PvmExit(PVM_PANIC)
+        if not cond:
+            return fallthrough
+        return branch
+
+    @cython.cfunc
+    cdef int32_t containing_basic_block_start(self, int32_t pc):
+        cdef int32_t result = 0
+        cdef int32_t block
+        for block in self.basic_blocks:
+            if block > pc:
+                break
+            result = block
+        return result
+
+    @cython.cfunc
+    @cython.inline
     cdef uint32_t djump(self, uint32_t counter, uint32_t a):
         """Optimized dynamic jump with safer type handling."""
         # halt sentinel - original comparison
@@ -181,7 +210,7 @@ cdef class CyProgram:
         """
         cdef int32_t curr = offset
         cdef int32_t i
-        
+
         curr += Uint[self.jump_table_len](self.jump_table_len).encode_into(buffer, curr)
         curr += Uint[8](self.z).encode_into(buffer, curr)
         curr += Uint(self.instruction_set_len).encode_into(buffer, curr)
@@ -245,7 +274,7 @@ cdef class CyProgram:
         cdef int32_t full_bytes = c_len >> 3  # Faster than // 8
         cdef int32_t byte_idx, bit_idx, base
         cdef uint8_t byte_val
-        
+
         # Process full bytes with optimized bit extraction
         for byte_idx in range(full_bytes):
             byte_val = bit_data[byte_idx]

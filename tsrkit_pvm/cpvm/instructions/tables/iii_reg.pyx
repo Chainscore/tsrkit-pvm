@@ -78,8 +78,8 @@ cdef inline uint32_t  rem_u_32(CyProgram program, uint64_t *registers, CyMemory 
 
 cdef inline uint32_t rem_s_32(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC196: 32-bit signed remainder."""
-    cdef int64_t a = <int64_t>(registers[ra])
-    cdef int64_t b = <int64_t>(registers[rb])
+    cdef int64_t a = z(registers[ra] % (2**32), 4)
+    cdef int64_t b = z(registers[rb] % (2**32), 4)
     if a == -2147483648 and b == -1:  # -(2**31) and -1
         registers[rd] = 0
     else:
@@ -139,7 +139,7 @@ cdef inline uint32_t  rem_s_64(CyProgram program, uint64_t *registers, CyMemory 
     """OPC206: 64-bit signed remainder."""
     a = <int64_t>registers[ra]
     b = <int64_t>registers[rb]
-    if a == -(2**31) and b == -1:
+    if a == -(2**63) and b == -1:
         registers[rd] = 0
     else:
         registers[rd] = z_inv(smod(a, b), 8)
@@ -211,9 +211,9 @@ cdef inline uint32_t  or_op(CyProgram program, uint64_t *registers, CyMemory mem
 # Multiplication upper bits
 cdef inline uint32_t  mul_upper_s_s(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
     """OPC213: Signed multiplication upper 64 bits."""
-    cdef int64_t signed_a = <int64_t>registers[ra]
-    cdef int64_t signed_b = <int64_t>registers[rb]
-    registers[rd] = <uint64_t>(signed_a * signed_b)
+    registers[rd] = z_inv(
+        int(z(registers[ra], 8)) * int(z(registers[rb], 8)) // 2**64, 8
+    )
     return <uint32_t>0xFFFFFFFF
 
 cdef inline uint32_t  mul_upper_u_u(CyProgram program, uint64_t *registers, CyMemory memory, uint32_t counter, uint64_t vx, uint64_t vy, uint8_t ra, uint8_t rb, uint8_t rd):
@@ -370,60 +370,60 @@ cdef dict TABLE = {}
 cdef CyTableEntry _e
 
 # 32-bit arithmetic operations (190-199)
-_e = CyTableEntry(); _e.fn = add_32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[190] = _e
-_e = CyTableEntry(); _e.fn = sub_32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[191] = _e
-_e = CyTableEntry(); _e.fn = mul_32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[192] = _e
-_e = CyTableEntry(); _e.fn = div_u_32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[193] = _e
-_e = CyTableEntry(); _e.fn = div_s_32_fn; _e.gas_cost = 1; _e.is_terminating = False; TABLE[194] = _e
-_e = CyTableEntry(); _e.fn = rem_u_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[195] = _e
-_e = CyTableEntry(); _e.fn = rem_s_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[196] = _e
-_e = CyTableEntry(); _e.fn = shlo_l_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[197] = _e
-_e = CyTableEntry(); _e.fn = shlo_r_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[198] = _e
-_e = CyTableEntry(); _e.fn = shar_r_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[199] = _e
+_e = CyTableEntry(); _e.fn = add_32_fn; _e.is_terminating = False; TABLE[190] = _e
+_e = CyTableEntry(); _e.fn = sub_32_fn; _e.is_terminating = False; TABLE[191] = _e
+_e = CyTableEntry(); _e.fn = mul_32_fn; _e.is_terminating = False; TABLE[192] = _e
+_e = CyTableEntry(); _e.fn = div_u_32_fn; _e.is_terminating = False; TABLE[193] = _e
+_e = CyTableEntry(); _e.fn = div_s_32_fn; _e.is_terminating = False; TABLE[194] = _e
+_e = CyTableEntry(); _e.fn = rem_u_32; _e.is_terminating = False; TABLE[195] = _e
+_e = CyTableEntry(); _e.fn = rem_s_32; _e.is_terminating = False; TABLE[196] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_32; _e.is_terminating = False; TABLE[197] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_32; _e.is_terminating = False; TABLE[198] = _e
+_e = CyTableEntry(); _e.fn = shar_r_32; _e.is_terminating = False; TABLE[199] = _e
 
 # 64-bit arithmetic operations (200-209)
-_e = CyTableEntry(); _e.fn = add_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[200] = _e
-_e = CyTableEntry(); _e.fn = sub_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[201] = _e
-_e = CyTableEntry(); _e.fn = mul_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[202] = _e
-_e = CyTableEntry(); _e.fn = div_u_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[203] = _e
-_e = CyTableEntry(); _e.fn = div_s_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[204] = _e
-_e = CyTableEntry(); _e.fn = rem_u_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[205] = _e
-_e = CyTableEntry(); _e.fn = rem_s_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[206] = _e
-_e = CyTableEntry(); _e.fn = shlo_l_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[207] = _e
-_e = CyTableEntry(); _e.fn = shlo_r_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[208] = _e
-_e = CyTableEntry(); _e.fn = shar_r_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[209] = _e
+_e = CyTableEntry(); _e.fn = add_64; _e.is_terminating = False; TABLE[200] = _e
+_e = CyTableEntry(); _e.fn = sub_64; _e.is_terminating = False; TABLE[201] = _e
+_e = CyTableEntry(); _e.fn = mul_64; _e.is_terminating = False; TABLE[202] = _e
+_e = CyTableEntry(); _e.fn = div_u_64; _e.is_terminating = False; TABLE[203] = _e
+_e = CyTableEntry(); _e.fn = div_s_64; _e.is_terminating = False; TABLE[204] = _e
+_e = CyTableEntry(); _e.fn = rem_u_64; _e.is_terminating = False; TABLE[205] = _e
+_e = CyTableEntry(); _e.fn = rem_s_64; _e.is_terminating = False; TABLE[206] = _e
+_e = CyTableEntry(); _e.fn = shlo_l_64; _e.is_terminating = False; TABLE[207] = _e
+_e = CyTableEntry(); _e.fn = shlo_r_64; _e.is_terminating = False; TABLE[208] = _e
+_e = CyTableEntry(); _e.fn = shar_r_64; _e.is_terminating = False; TABLE[209] = _e
 
 # Bitwise operations (210-212)
-_e = CyTableEntry(); _e.fn = and_op; _e.gas_cost = 1; _e.is_terminating = False; TABLE[210] = _e
-_e = CyTableEntry(); _e.fn = xor_op; _e.gas_cost = 1; _e.is_terminating = False; TABLE[211] = _e
-_e = CyTableEntry(); _e.fn = or_op; _e.gas_cost = 1; _e.is_terminating = False; TABLE[212] = _e
+_e = CyTableEntry(); _e.fn = and_op; _e.is_terminating = False; TABLE[210] = _e
+_e = CyTableEntry(); _e.fn = xor_op; _e.is_terminating = False; TABLE[211] = _e
+_e = CyTableEntry(); _e.fn = or_op; _e.is_terminating = False; TABLE[212] = _e
 
 # Multiplication upper bits (213-215)
-_e = CyTableEntry(); _e.fn = mul_upper_s_s; _e.gas_cost = 1; _e.is_terminating = False; TABLE[213] = _e
-_e = CyTableEntry(); _e.fn = mul_upper_u_u; _e.gas_cost = 1; _e.is_terminating = False; TABLE[214] = _e
-_e = CyTableEntry(); _e.fn = mul_upper_s_u; _e.gas_cost = 1; _e.is_terminating = False; TABLE[215] = _e
+_e = CyTableEntry(); _e.fn = mul_upper_s_s; _e.is_terminating = False; TABLE[213] = _e
+_e = CyTableEntry(); _e.fn = mul_upper_u_u; _e.is_terminating = False; TABLE[214] = _e
+_e = CyTableEntry(); _e.fn = mul_upper_s_u; _e.is_terminating = False; TABLE[215] = _e
 
 # Comparison operations (216-217)
-_e = CyTableEntry(); _e.fn = set_lt_u; _e.gas_cost = 1; _e.is_terminating = False; TABLE[216] = _e
-_e = CyTableEntry(); _e.fn = set_lt_s; _e.gas_cost = 1; _e.is_terminating = False; TABLE[217] = _e
+_e = CyTableEntry(); _e.fn = set_lt_u; _e.is_terminating = False; TABLE[216] = _e
+_e = CyTableEntry(); _e.fn = set_lt_s; _e.is_terminating = False; TABLE[217] = _e
 
 # Conditional move operations (218-219)
-_e = CyTableEntry(); _e.fn = cmov_iz; _e.gas_cost = 1; _e.is_terminating = False; TABLE[218] = _e
-_e = CyTableEntry(); _e.fn = cmov_nz; _e.gas_cost = 1; _e.is_terminating = False; TABLE[219] = _e
+_e = CyTableEntry(); _e.fn = cmov_iz; _e.is_terminating = False; TABLE[218] = _e
+_e = CyTableEntry(); _e.fn = cmov_nz; _e.is_terminating = False; TABLE[219] = _e
 
 # Rotation operations (220-223)
-_e = CyTableEntry(); _e.fn = rot_l_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[220] = _e
-_e = CyTableEntry(); _e.fn = rot_l_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[221] = _e
-_e = CyTableEntry(); _e.fn = rot_r_64; _e.gas_cost = 1; _e.is_terminating = False; TABLE[222] = _e
-_e = CyTableEntry(); _e.fn = rot_r_32; _e.gas_cost = 1; _e.is_terminating = False; TABLE[223] = _e
+_e = CyTableEntry(); _e.fn = rot_l_64; _e.is_terminating = False; TABLE[220] = _e
+_e = CyTableEntry(); _e.fn = rot_l_32; _e.is_terminating = False; TABLE[221] = _e
+_e = CyTableEntry(); _e.fn = rot_r_64; _e.is_terminating = False; TABLE[222] = _e
+_e = CyTableEntry(); _e.fn = rot_r_32; _e.is_terminating = False; TABLE[223] = _e
 
 # Inverted bitwise operations (224-226)
-_e = CyTableEntry(); _e.fn = and_inv; _e.gas_cost = 1; _e.is_terminating = False; TABLE[224] = _e
-_e = CyTableEntry(); _e.fn = or_inv; _e.gas_cost = 1; _e.is_terminating = False; TABLE[225] = _e
-_e = CyTableEntry(); _e.fn = xnor; _e.gas_cost = 1; _e.is_terminating = False; TABLE[226] = _e
+_e = CyTableEntry(); _e.fn = and_inv; _e.is_terminating = False; TABLE[224] = _e
+_e = CyTableEntry(); _e.fn = or_inv; _e.is_terminating = False; TABLE[225] = _e
+_e = CyTableEntry(); _e.fn = xnor; _e.is_terminating = False; TABLE[226] = _e
 
 # Min/max operations (227-230)
-_e = CyTableEntry(); _e.fn = max_op; _e.gas_cost = 1; _e.is_terminating = False; TABLE[227] = _e
-_e = CyTableEntry(); _e.fn = max_u; _e.gas_cost = 1; _e.is_terminating = False; TABLE[228] = _e
-_e = CyTableEntry(); _e.fn = min_op; _e.gas_cost = 1; _e.is_terminating = False; TABLE[229] = _e
-_e = CyTableEntry(); _e.fn = min_u; _e.gas_cost = 1; _e.is_terminating = False; TABLE[230] = _e
+_e = CyTableEntry(); _e.fn = max_op; _e.is_terminating = False; TABLE[227] = _e
+_e = CyTableEntry(); _e.fn = max_u; _e.is_terminating = False; TABLE[228] = _e
+_e = CyTableEntry(); _e.fn = min_op; _e.is_terminating = False; TABLE[229] = _e
+_e = CyTableEntry(); _e.fn = min_u; _e.is_terminating = False; TABLE[230] = _e

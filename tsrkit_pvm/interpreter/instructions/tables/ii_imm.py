@@ -8,6 +8,7 @@ from ....common.status import CONTINUE
 from ....common.utils import chi, clamp_4, clamp_4_max0
 from ....core.instruction_table import InstructionTable
 from ....core.opcode import OpCode, OpReturn
+from ....gas.profiles import ALU, DIV_UNITS, LOAD_UNITS, MUL_UNITS, NO_UNITS, STORE_UNITS, profile
 
 class InstructionsWArgs2Imm(InstructionTable):
     def __init__(self, counter: int, program: "INT_Program", skip_index: int) -> None:
@@ -39,16 +40,20 @@ class InstructionsWArgs2Imm(InstructionTable):
     def table(cls) -> Dict[int, OpCode]:
         return {
             30: OpCode(
-                name="store_imm_u8", fn=cls.store_imm(8), gas=1, is_terminating=False
+                name="store_imm_u8", fn=cls.store_imm(8), is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS)
             ),
             31: OpCode(
-                name="store_imm_u16", fn=cls.store_imm(16), gas=1, is_terminating=False
+                name="store_imm_u16", fn=cls.store_imm(16), is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS)
             ),
             32: OpCode(
-                name="store_imm_u32", fn=cls.store_imm(32), gas=1, is_terminating=False
+                name="store_imm_u32", fn=cls.store_imm(32), is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS)
             ),
             33: OpCode(
-                name="store_imm_u64", fn=cls.store_imm(64), gas=1, is_terminating=False
+                name="store_imm_u64", fn=cls.store_imm(64), is_terminating=False,
+                gas_profile=profile("memory", 1, STORE_UNITS)
             ),
         }
 
